@@ -52,12 +52,22 @@ Detailed tasks:
   - `FollowUpAnswer`
   - `RevisionEvent`
   - `ShareLink`
+- treat `BriefSnapshot` as the immutable parent record for generated brief versions
+- persist generated brief content in relational child tables:
+  - `BriefClaim`
+  - `BriefQuestion`
+  - `EvidenceRef`
+- add section and ordering fields so snapshot rendering order is deterministic
+- keep evidence locator payloads in `Json` fields rather than over-normalizing source-specific locator shapes
 - define enums for statuses, source types, project mode, and revision event types
 - add unique constraints and indexes for:
   - share token lookup
   - snapshot version lookup
   - session timeline queries
   - source asset lookup by session
+- define and document invariants that Prisma alone does not fully enforce:
+  - evidence belongs to either one claim or one question
+  - item-targeted comments and answers must reference rows from the same snapshot version
 - add seed strategy for local demo data
 - document naming and deletion behavior for each entity
 - define immutable snapshot policy and mutable feedback policy
@@ -132,11 +142,11 @@ Detailed tasks:
 - define the prompt input format for mixed-source sessions
 - call `Vertex AI` through `@google/genai`
 - validate AI output against the brief contract
-- map model output into:
-  - `BriefSnapshot`
-  - `BriefClaim`
-  - `BriefQuestion`
-  - `EvidenceRef`
+- map model output into a transactional relational write set:
+  - one new `BriefSnapshot`
+  - ordered `BriefClaim` rows for `summary` and `goals`
+  - ordered `BriefQuestion` rows for `ambiguities` and `followUpQuestions`
+  - `EvidenceRef` rows attached to exactly one claim or question
 - persist snapshots and generation events safely
 - define retry behavior and non-retriable error handling
 - expose generation progress states to the UI

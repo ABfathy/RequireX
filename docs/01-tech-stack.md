@@ -113,8 +113,49 @@ Default model assumption:
 
 - `gemini-2.5-flash` for the main generation loop
 
+Streaming note:
+
+- the Google SDK already supports streaming output directly
+- this is enough for incremental generation or staged UI updates if needed
+- for this product, reliable multimodal generation and structured output matter more than chat-specific abstractions
+
+Decision rule:
+
+- use `@google/genai` as the default and primary AI SDK for all core workflows
+- this includes ingestion, extraction, brief generation, and regeneration
+
 Reference:
 - [Google Gen AI JS SDK docs](https://context7.com/websites/googleapis_github_io_js-genai)
+
+### Vercel AI SDK
+
+Do not use the `Vercel AI SDK` as the primary AI layer in v1.
+
+Why:
+
+- the product’s main challenge is not generic chat streaming
+- the core workflow is better modeled as async processing plus structured brief rendering
+- the team already needs direct `Vertex AI` and Gemini support through Google’s SDK
+
+Where it may still help later:
+
+- internal refinement composer
+- chat-like section editing
+- richer streaming UI for internal assistant interactions
+- easier client-side React chat state if the refinement surface becomes more conversational
+
+Decision rule:
+
+- use `Vercel AI SDK` only if the team later wants a more polished chat/refinement UI
+- do not make it the source of truth for brief generation or contract persistence
+
+Practical guidance:
+
+- brief generation should usually feel like staged progress and structured section rendering, not like a token-by-token chatbot answer
+- if streaming is used in the core product, status and section progress matter more than raw text token streaming
+
+Reference:
+- [Vercel AI SDK docs](https://context7.com/vercel/ai)
 
 ## Why Not Python in V1
 
@@ -164,6 +205,16 @@ It is a strong option, but `Prisma` is better for team speed in this project.
 ### Python AI Worker
 
 Deferred until quality data proves it necessary.
+
+### Vercel AI SDK as the Primary AI Layer
+
+Rejected for v1 as the main AI integration layer.
+
+Reason:
+
+- it is valuable for chat and streaming UX
+- it is not the best primary fit for a product whose main requirement is direct multimodal processing on `Vertex AI`
+- it adds an extra abstraction where the core product benefits more from using the Google SDK directly
 
 ## UI Novelty Dependencies
 

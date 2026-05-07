@@ -39,11 +39,17 @@ Clients should be able to:
 - `Vitest` + `React Testing Library` for unit and component tests
 - `Playwright` + `axe-core` for e2e, responsive, and accessibility testing
 
+Optional later addition:
+
+- `Vercel AI SDK` only for a more chat-like internal refinement UX if needed
+
 ## Why TypeScript-Only in V1
 
 Python is intentionally not part of the initial architecture.
 
 The hackathon problem is primarily orchestration, normalization, storage, AI prompting, validation, and UI workflow. Those all fit cleanly in a single TypeScript stack. A Python worker would only be introduced later if extraction quality, OCR layout fidelity, or audio preprocessing becomes a measurable bottleneck.
+
+We are also treating `@google/genai` as the primary AI SDK. The `Vercel AI SDK` may still be useful later for refinement-chat UX, but not as the main brief-generation layer.
 
 ## Docs
 
