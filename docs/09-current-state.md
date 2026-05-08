@@ -15,7 +15,7 @@ Use this file as the simplest possible implementation tracker. Check items only 
 - [x] Clerk integrated
 - [x] Internal routes protected
 - [x] Public brief route left open
-- [ ] Internal API authorization helpers added
+- [x] Internal API authorization helpers added
 - [ ] Public mutation boundaries implemented
 
 ## Data and Persistence
