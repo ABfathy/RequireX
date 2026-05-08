@@ -10,22 +10,7 @@ This document captures differentiators that strengthen the demo without violatin
 
 ## Recommended Novelties
 
-### 1. Evidence-Backed Brief Claims
-
-Every generated claim or question can expose:
-
-- exact source type
-- source locator
-- excerpt
-- preview
-
-Why it matters:
-
-- it makes the AI output feel inspectable
-- it improves trust immediately
-- it is stronger than a plain summary generator
-
-## 2. Brief-First Workspace
+### 1. Brief-First Workspace
 
 Make the brief the main artifact, not chat.
 
@@ -40,7 +25,7 @@ Why it matters:
 - it feels more productized than a generic chatbot
 - it aligns better with the hackathon brief
 
-## 3. Contextual Refinement
+## 2. Contextual Refinement
 
 Let internal users select a specific claim or section and ask for refinement against:
 
@@ -53,20 +38,37 @@ Why it matters:
 - it gives real operational value
 - it keeps AI edits precise
 
-## 4. Clean Public Review Experience
+## 3. Clean Public Review Experience
 
 Clients should not just “approve”.
 
 They should be able to:
 
-- comment on a section
-- answer generated questions
+- add inline comments to highlighted sections or targeted brief areas
+- answer generated questions through structured controls
 - confirm when satisfied
 
 Why it matters:
 
 - it closes the intake loop
 - it gives the demo a stronger real-world feel
+
+## 4. Revision Diff Review
+
+When a brief is regenerated after client feedback or internal refinement, show a clean “what changed” view between versions.
+
+The diff should focus on:
+
+- added summary or goal points
+- updated wording
+- resolved ambiguities
+- new or removed follow-up questions
+
+Why it matters:
+
+- it makes the revision cycle much easier to understand
+- it gives the demo a strong collaboration story
+- it keeps the product focused on briefing rather than turning into a generic editor
 
 ## 5. Processing-State UX
 
@@ -91,7 +93,7 @@ Use motion only for:
 - section insertion
 - panel transitions
 - share-link success states
-- landing polish
+- optional landing polish
 
 Why it matters:
 
@@ -130,9 +132,8 @@ Recommended tool:
 
 ## Optional Later Novelty
 
-These are good after the core product works:
+These are good only after the core product works and should not affect the hackathon MVP:
 
-- n8n ingestion adapters
-- snapshot diff visualization
 - source confidence heatmaps
 - reusable brief templates by domain
+- post-hackathon automation experiments like `n8n` adapters

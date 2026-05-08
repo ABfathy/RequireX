@@ -8,7 +8,7 @@ Ship a focused intake-and-briefing web app that:
 - processes them asynchronously
 - generates a structured brief with evidence references
 - supports internal refinement
-- supports public client review without authentication
+- supports public client review with minimal friction
 
 ## Top-Level System
 
@@ -16,10 +16,10 @@ Ship a focused intake-and-briefing web app that:
 
 `Next.js` App Router serves:
 
-- landing page
 - authenticated internal workspace
 - public brief review links
 - route handlers for uploads, comments, and regeneration triggers
+- an optional landing page only if time remains after the core workflow is stable
 
 ### 2. Auth Layer
 
@@ -30,8 +30,11 @@ Ship a focused intake-and-briefing web app that:
 
 Public routes stay open:
 
-- landing page
 - `/brief/[shareToken]`
+
+Optional bonus:
+
+- a lightweight access-code gate before the brief is shown
 
 ### 3. Storage Layer
 
@@ -45,7 +48,7 @@ Public routes stay open:
 `Supabase Postgres` stores:
 
 - projects
-- sessions
+- intake sessions
 - source asset metadata
 - generated brief snapshots
 - client comments
@@ -82,23 +85,19 @@ Public routes stay open:
 
 A `Project` is the top-level container.
 
-Each project can be:
+Each project represents one client and one source of truth.
 
-- `single_client`
-- `multi_contact`
-
-Default:
-- `single_client`
+Projects can still contain multiple chats or intake sessions over time, but they do not contain multiple clients.
 
 ### Session Model
 
-An `IntakeSession` represents one intake attempt or conversation branch inside a project.
+An `IntakeSession` represents one intake attempt or chat branch inside a project.
 
 Use sessions for:
 
 - different uploads
 - different rounds of context
-- separate intake conversations
+- separate intake conversations for the same client
 
 ### Brief Model
 
@@ -143,6 +142,7 @@ Mobile support:
 ### Route Handler Examples
 
 - `POST /api/uploads`
+- `POST /api/folder-uploads`
 - `POST /api/projects`
 - `POST /api/sessions`
 - `POST /api/generate`
@@ -157,7 +157,7 @@ Mobile support:
 
 1. Internal user creates or opens a project.
 2. User starts an intake session.
-3. User uploads text, audio, image, and/or PDF inputs.
+3. User uploads text, audio, image, and/or PDF inputs, either one by one or as one mixed-source folder.
 4. Files are stored and metadata is persisted.
 5. Generation job is queued.
 6. UI shows processing state and partial progress.
@@ -169,11 +169,12 @@ Mobile support:
 ### B. Public Review Flow
 
 1. Internal user creates a share link.
-2. Client opens the link without an account.
+2. Client opens the link with minimal friction.
 3. Client reads the brief.
-4. Client comments on sections and answers follow-up questions.
-5. Internal user reviews feedback.
-6. Internal user triggers regeneration into a new snapshot.
+4. Client highlights sections or targets specific brief areas with inline comments.
+5. Client answers follow-up questions through structured inputs.
+6. Internal user reviews feedback.
+7. Internal user triggers regeneration into a new snapshot.
 
 ### C. Internal Refinement Flow
 
@@ -240,6 +241,7 @@ UI rule:
 
 - use compact citation affordances
 - do not clutter the main text with dense inline markers
+- public review should stay brief-first and should not become a client chat surface
 
 ## Performance Rules
 

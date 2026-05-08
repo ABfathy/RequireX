@@ -29,7 +29,7 @@ Use this file as the simplest possible implementation tracker. Check items only 
 ## Projects and Sessions
 
 - [ ] Project creation implemented
-- [ ] Project mode selection implemented
+- [ ] One-client-per-project rule enforced
 - [ ] Intake session creation implemented
 - [ ] Project/session sidebar history implemented
 
@@ -39,6 +39,7 @@ Use this file as the simplest possible implementation tracker. Check items only 
 - [ ] Image upload implemented
 - [ ] Audio upload implemented
 - [ ] PDF upload implemented
+- [ ] Mixed-source folder upload implemented
 - [ ] Mixed-source submission implemented
 - [ ] Upload validation implemented
 - [ ] Upload progress states implemented
@@ -80,8 +81,9 @@ Use this file as the simplest possible implementation tracker. Check items only 
 ## Public Review
 
 - [ ] Public share link generation implemented
+- [ ] Optional access-code gate implemented
 - [ ] Public brief page implemented
-- [ ] Section comments implemented
+- [ ] Inline highlighted comments implemented
 - [ ] Follow-up answer submission implemented
 - [ ] Brief confirmation implemented
 - [ ] Public success and error states implemented
@@ -92,12 +94,13 @@ Use this file as the simplest possible implementation tracker. Check items only 
 - [ ] Selected-section refinement implemented
 - [ ] Regenerate-from-feedback flow implemented
 - [ ] Revision events persisted
+- [ ] Revision diff review implemented
 - [ ] Snapshot restore action implemented
 - [ ] Feedback visible in internal workspace
 
 ## Novelty and UX Polish
 
-- [ ] Landing-page decorative treatment added
+- [ ] Optional landing-page decorative treatment added
 - [ ] Controlled animejs transitions added
 - [ ] Reduced-motion handling implemented
 - [ ] Web haptics integrated for supported mobile events

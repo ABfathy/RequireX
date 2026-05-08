@@ -26,7 +26,8 @@ Detailed tasks:
   - lib
   - server
   - tests
-- add placeholder routes for landing page, internal app, and public brief page
+- add placeholder routes for the internal app and public brief page
+- keep landing page work explicitly optional until the core workflow is stable
 - add base error and loading boundaries
 - add CI-ready script placeholders in `package.json`
 
@@ -44,7 +45,6 @@ Detailed tasks:
 - define `Prisma` schema for:
   - `Workspace`
   - `Project`
-  - `Contact`
   - `IntakeSession`
   - `SourceAsset`
   - `BriefSnapshot`
@@ -109,6 +109,7 @@ Detailed tasks:
 - build image upload flow
 - build audio upload flow
 - build PDF upload flow
+- build mixed-source folder upload flow
 - define accepted MIME types and upload size limits
 - store asset records before generation starts
 - add upload validation and error states
@@ -121,6 +122,7 @@ Detailed tasks:
   - failed
 - add progress-state payloads the UI can consume
 - document how mixed-source submissions are assembled into one session
+- document that one project always represents one client, even when many intake sessions exist
 
 Outputs:
 - complete intake API surface
@@ -188,15 +190,14 @@ Objective:
 Detailed tasks:
 - build public brief page route
 - render the brief cleanly with strong typography and section clarity
-- build section comment submission
-- build follow-up question answering flow
+- build inline highlighted comment submission
+- build section-targeted comment submission
+- build follow-up question answering flow with structured controls
 - build confirmation action
 - add client success and failure states
 - optimize public page for mobile support without weakening desktop readability
 - ensure citation references remain readable and optional
-- define anonymous identity capture strategy if desired:
-  - optional name field
-  - otherwise anonymous client markers
+- define optional lightweight access-code gate as a bonus path, not a core blocker
 
 Outputs:
 - complete no-auth review path
@@ -211,6 +212,12 @@ Detailed tasks:
 - implement selected-section refinement flow
 - implement regenerate-from-feedback flow
 - create revision timeline rendering rules
+- implement revision diff review between consecutive brief snapshots
+- define diff categories:
+  - added points
+  - updated points
+  - resolved ambiguities
+  - newly introduced questions
 - persist revision events with actor attribution
 - implement snapshot restore action
 - define what creates a new snapshot vs an event-only update
@@ -220,6 +227,7 @@ Detailed tasks:
 Outputs:
 - stable revision model
 - visible change history
+- readable snapshot-to-snapshot change review
 
 ## Workstream 9: Motion, Haptics, and Demo Polish
 
@@ -227,7 +235,7 @@ Objective:
 - add novelty deliberately without harming performance or readability
 
 Detailed tasks:
-- integrate `react-bits` only on landing, empty states, or controlled decorative surfaces
+- integrate `react-bits` only on an optional landing page, empty states, or controlled decorative surfaces
 - add `animejs` transitions for:
   - panel changes
   - brief reveal/update
@@ -354,6 +362,7 @@ Why this exists:
 
 Detailed tasks:
 - connect comments and answers to the correct snapshot and section targets
+- connect highlighted comment anchors to the correct snapshot targets
 - ensure public submissions create the correct revision events
 - make feedback visible in the internal workspace timeline and inspector
 - connect “regenerate from feedback” to real snapshot history

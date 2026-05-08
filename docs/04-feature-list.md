@@ -7,9 +7,7 @@
 - internal sign-in for team members
 - shared workspace for the hackathon team
 - project creation
-- project mode selection:
-  - single client
-  - multi-contact
+- one client per project
 - intake session creation inside a project
 - project/session sidebar history
 
@@ -19,6 +17,7 @@
 - image upload
 - audio upload
 - PDF upload
+- mixed-source folder upload
 - mixed-source intake in the same session
 - upload status and processing states
 
@@ -44,10 +43,10 @@
 ### Public Client Review
 
 - unique public share link
-- no account required
+- no mandatory client account
 - readable public brief layout
-- section comments
-- follow-up question answers
+- inline comments on highlighted sections or targeted brief areas
+- follow-up question answers through structured inputs
 - brief confirmation action
 
 ### Persistence
@@ -70,7 +69,7 @@
 
 ## Novelty Features That Still Fit Scope
 
-- elegant evidence popovers or side-panel citation drill-down
+- revision diff review between brief versions
 - tasteful landing background treatment with `react-bits`
 - subtle workspace transitions with `animejs`
 - mobile success haptics with `web-haptics`
@@ -78,22 +77,21 @@
 
 ## Stretch Features
 
-- draft share link revocation
+- optional access-code gate before viewing the brief
 - client display name capture
 - source asset preview thumbnails
-- snapshot diff view
 - confidence-based highlighting
 - templated AI refinement prompts
 
 ## Deferred Features
 
-- WhatsApp and Telegram intake automation through `n8n`
 - broad document format support beyond text, image, audio, and PDF
 - direct client inline editing of brief text
 - multi-tenant SaaS workspace model
 - task management or PM boards
 - invoicing, proposals, or contracts
 - deep CRM functionality
+- third-party intake automation like `n8n` during the hackathon build
 
 ## Explicit Non-Goals
 

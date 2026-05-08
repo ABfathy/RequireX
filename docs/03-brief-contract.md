@@ -158,8 +158,10 @@ type BriefComment = {
   id: string;
   snapshotId: string;
   section: "summary" | "goals" | "ambiguities" | "followUpQuestions";
+  anchorType: "section" | "claim" | "question" | "text-range";
   claimId?: string | null;
   questionId?: string | null;
+  selectionText?: string | null;
   authorName?: string | null;
   body: string;
   status: "open" | "acknowledged" | "resolved";
@@ -495,7 +497,7 @@ Before saving a snapshot:
 
 - citations are claim-level, not word-level
 - clicking the citation icon should expose the exact source excerpt
-- public clients comment by section or by target claim/question
+- public clients comment by highlighted area, section, or target claim/question
 - manual internal edits should create new snapshots or explicit events
 
 ## Versioning Rules

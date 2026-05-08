@@ -73,6 +73,7 @@ pnpm test:a11y
 - source normalization helpers
 - upload validation helpers
 - share-link token helpers
+- optional access-code gate helpers if the bonus flow is implemented
 - route/service pure logic
 - event mapping logic
 
@@ -80,7 +81,7 @@ pnpm test:a11y
 
 - brief renderer
 - citation trigger and evidence preview UI
-- public comment form
+- public inline comment form
 - follow-up answer form
 - processing-state indicators
 - project/session navigation shell
@@ -93,6 +94,7 @@ pnpm test:a11y
 - create project
 - create session
 - submit text input
+- submit mixed-source folder upload
 - generate brief
 - inspect evidence
 - share brief
@@ -102,7 +104,7 @@ pnpm test:a11y
 ### Mobile Support
 
 - public brief route loads on mobile viewport
-- section comments can be submitted
+- inline comments can be submitted
 - follow-up answers can be submitted
 - confirmation action works
 - navigation drawers and sheets do not trap the user
@@ -111,15 +113,16 @@ pnpm test:a11y
 
 - protected internal routes redirect correctly
 - public share links stay accessible
+- optional access-code gate works if implemented
 - unauthorized access to private mutations is blocked
 
 ## Accessibility Checks
 
 Critical routes:
 
-- landing page
 - internal workspace shell
 - public brief page
+- landing page only if it is actually implemented
 
 Minimum checks:
 

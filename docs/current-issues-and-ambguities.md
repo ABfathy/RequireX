@@ -1,5 +1,16 @@
 # Current Issues and Ambiguities
 
+## Organizer Decisions Already Applied
+
+The following items are no longer open after the Softworks meeting and should not be treated as active scope questions:
+
+- one project always has one client and one source of truth
+- multiple chats or intake sessions may exist inside a project
+- client review should be inline and brief-first, not a public chat surface
+- `n8n` and third-party intake automation are out of core hackathon scope
+- landing page work is optional polish only
+- a lightweight access gate before viewing the brief is a bonus, not a core requirement
+
 This document captures the remaining high-level implementation issues that are still unresolved after locking the normalized relational persistence model for generated brief content.
 
 These are not generic concerns about ambition or polish. They are concrete behavior, data, and systems questions that should be decided before parallel implementation goes too far.

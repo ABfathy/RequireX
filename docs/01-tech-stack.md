@@ -20,7 +20,6 @@
 
 Use `Next.js` because the product needs:
 
-- a fast landing page
 - authenticated internal routes
 - public share-link routes
 - server route handlers
@@ -65,6 +64,11 @@ Why:
 - it avoids spending hackathon time building auth
 
 Clients do not need accounts in v1.
+
+Bonus path if time allows:
+
+- add a lightweight access-code gate before the public brief page opens
+- do not turn client review into a full account system
 
 Reference:
 - [Clerk docs](https://context7.com/clerk/clerk-docs)
@@ -222,7 +226,7 @@ Reason:
 
 Use selectively for:
 
-- landing page background
+- optional landing page background
 - empty states
 - controlled decorative overlays
 

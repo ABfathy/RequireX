@@ -23,7 +23,8 @@ The project can represent:
 
 - one client with one ongoing briefing flow
 - one project with multiple intake sessions over time
-- in some cases, more than one contact involved in the same project
+
+There is always one client and one source of truth per project. If more context arrives later, it should come through additional chats or intake sessions inside that same project.
 
 ### 2. The User Adds Raw Client Context
 
@@ -35,6 +36,7 @@ Planned supported inputs:
 - uploaded screenshots or images
 - uploaded audio or voice notes
 - uploaded PDFs
+- mixed-source folder upload for batches that contain several file types together
 
 The user can submit one input type or combine multiple inputs in the same intake session.
 
@@ -74,17 +76,19 @@ The goal here is not to remove human judgment, but to remove the repetitive manu
 
 Once the internal user is satisfied with the first draft, they can generate a shareable link for the client.
 
-The client should be able to open the brief without creating an account.
+The base flow keeps client access low-friction and does not require a full account system.
 
 This follows the hackathon requirement of keeping the client experience frictionless.
+
+If time allows, we may add a lightweight access gate before the brief opens, such as a simple access code, as a bonus hardening step.
 
 ### 7. The Client Reviews and Responds
 
 On the public brief page, the client should be able to:
 
 - read the generated brief
-- comment on specific sections
-- answer follow-up questions
+- add inline comments to highlighted sections or targeted brief areas
+- answer follow-up questions through structured inputs
 - confirm the brief when it is correct
 
 This creates a cleaner feedback loop than long email or messaging chains.
@@ -138,23 +142,25 @@ We are designing the internal experience so the brief is the main artifact, not 
 
 This keeps the product aligned with the problem statement instead of drifting toward a chatbot product.
 
+### Clear Revision Review
+
+We also want regenerated versions of the brief to be easy to compare.
+
+If the client adds comments or answers follow-up questions, the internal user should be able to review what changed between versions instead of manually rereading the entire brief.
+
+We think this can be a meaningful differentiator because it makes the briefing loop feel deliberate and trackable.
+
 ## Possible Additions If We Finish Early
 
 If core features are stable early, we may explore one or more of these additions:
 
-### 1. n8n Intake Automations
+### 1. Optional Access Hardening
 
-Set up `n8n` flows to capture incoming material from channels such as:
+Add a lightweight access code before the public brief view opens.
 
-- WhatsApp
-- Telegram
-- email forwarding
+This would be treated as bonus protection, not a replacement for the low-friction share-link model.
 
-The goal would be to let teams ingest client material with less manual uploading.
-
-This would be treated as an extension to the core workflow, not a replacement for it.
-
-### 2. More Flexible Source Intake
+### 2. Better Batch Intake
 
 If time allows, we may improve how the app handles mixed context by making source grouping even smoother across multiple uploads in the same intake session.
 
@@ -167,9 +173,9 @@ If time allows, we may add clearer version comparison or feedback summaries betw
 We would especially like feedback on these points:
 
 1. Does this implementation still clearly fit the hackathon PDF’s requirement of staying focused on intake and structuring?
-2. Is allowing clients to comment on sections and answer follow-up questions still comfortably within scope, or does that risk going too far beyond the requested share-link review flow?
+2. Is allowing clients to add inline comments to highlighted parts of the brief and answer follow-up questions still comfortably within scope, or does that risk going too far beyond the requested share-link review flow?
 3. Does adding simple source references improve the product in a way that supports the brief, or does it risk adding unnecessary complexity?
-4. If the core workflow is completed early, would optional `n8n` automations for automatic intake capture still be seen as aligned with the challenge?
+4. If the core workflow is completed early, is a lightweight access gate before brief viewing an acceptable bonus enhancement?
 
 ---
 

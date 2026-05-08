@@ -1,4 +1,4 @@
-# BriefForge
+# RequireX
 
 Desktop-first AI intake and project-brief generation for the Softworks x AISprint hackathon.
 
@@ -11,7 +11,9 @@ The app is an intake and structuring layer, not a project management tool.
 Internal users should be able to:
 
 - Create projects and intake sessions
+- Work within one client per project
 - Upload raw client material
+- Upload files one by one or as one mixed-source folder
 - Generate a structured brief with AI
 - Inspect claim-level evidence references
 - Refine selected sections through AI-assisted editing
@@ -21,10 +23,10 @@ Internal users should be able to:
 
 Clients should be able to:
 
-- Open a share link without an account
+- Open a share link with minimal friction
 - Read the brief cleanly on desktop or mobile
-- Comment on specific sections
-- Answer follow-up questions
+- Add inline comments to highlighted sections or targeted brief areas
+- Answer follow-up questions through structured inputs
 - Confirm the brief
 
 ## Planned Stack
@@ -118,6 +120,15 @@ Layout target:
 - right panel for chat history, source assets, revisions, and feedback
 
 Mobile support remains important, especially for public client review, but mobile should not weaken the main desktop authoring workflow.
+
+## Scope Clarifications from Softworks
+
+- one project always has one client and one source of truth
+- multiple chats or intake sessions can exist inside the same project
+- client review should be a brief-first page with inline comments, not a public chat UI
+- `n8n` and third-party intake automation are out of core scope for the hackathon
+- a landing page is optional polish, not a required deliverable
+- a lightweight access gate before viewing the client brief is a bonus, not a core requirement
 
 ## UI Novelty Constraints
 

@@ -42,6 +42,7 @@ Deliverables:
 
 - implement project/session flows
 - implement upload handling
+- implement mixed-source folder upload
 - persist source metadata
 - implement basic processing states
 - implement initial Prisma schema and migrations
@@ -70,7 +71,8 @@ Deliverables:
 - implement citation UX
 - implement selected-section refinement
 - implement client share links
-- implement public comment and answer flows
+- implement public inline comment and answer flows
+- implement optional access-code gate only if core public review is already stable
 
 Deliverables:
 
@@ -101,6 +103,7 @@ Deliverables:
 - seed data or demo project setup
 - prepare demo script
 - prepare backup screenshots and flows
+- build the landing page only if the core workflow is already complete and stable
 
 Deliverables:
 
