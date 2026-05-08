@@ -5,4 +5,4 @@ export {
   isInternalAuthorizationError,
   requireInternalActor,
   requireInternalAuth,
-} from "@/server/auth";
+} from "./internal";
