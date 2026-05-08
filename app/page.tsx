@@ -72,7 +72,11 @@ export default function HomePage() {
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {link.description}
               </p>
-              <Link href={link.href} className={`${buttonVariants()} mt-5`}>
+              <Link
+                href={link.href}
+                prefetch={link.href.startsWith("/app") ? false : undefined}
+                className={`${buttonVariants()} mt-5`}
+              >
                 Open route
               </Link>
             </div>
