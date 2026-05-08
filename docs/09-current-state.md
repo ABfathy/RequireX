@@ -4,11 +4,11 @@ Use this file as the simplest possible implementation tracker. Check items only 
 
 ## Foundation
 
-- [ ] Next.js app scaffolded
-- [ ] Tailwind configured
-- [ ] Environment variable strategy documented
-- [ ] Shared repo structure created
-- [ ] Core scripts added
+- [x] Next.js app scaffolded
+- [x] Tailwind configured
+- [x] Environment variable strategy documented
+- [x] Shared repo structure created
+- [x] Core scripts added
 
 ## Auth and Access
 

@@ -4,6 +4,7 @@
 
 - Frontend and app server: `Next.js` App Router on `Vercel`
 - Styling: `Tailwind CSS`
+- Component system: `shadcn/ui`
 - Internal auth: `Clerk`
 - Database and file storage: `Supabase Postgres + Storage`
 - ORM and migrations: `Prisma`
@@ -52,6 +53,34 @@ Use `Tailwind CSS` because the UI needs:
 - tight implementation speed during a hackathon
 
 The product is desktop-first for internal users, with mobile support for public review and light internal access.
+
+### shadcn/ui
+
+Use `shadcn/ui` as the main component baseline for the app shell.
+
+Why:
+
+- it is a strong fit for a modern desktop-first product UI
+- it matches the clean, structured, Codex-like interface direction better than ad hoc component styling
+- it gives the team accessible primitives for:
+  - buttons
+  - inputs
+  - forms
+  - sheets
+  - dialogs
+  - dropdowns
+  - tabs
+  - cards
+- components live in the codebase directly, which makes design iteration easier during the hackathon
+
+Design rule:
+
+- use `shadcn/ui` for baseline product components
+- use custom styling on top where needed to differentiate the workspace
+- do not let decorative libraries replace the core app component layer
+
+Reference:
+- [shadcn/ui docs](https://context7.com/shadcn-ui/ui)
 
 ### Clerk
 

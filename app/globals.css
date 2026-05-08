@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans:
+    "Inter", "SF Pro Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "SFMono-Regular", "JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+
+  --shadow-panel: 0 10px 30px rgba(8, 15, 23, 0.08);
+  --shadow-soft: 0 4px 18px rgba(8, 15, 23, 0.06);
+
+  --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
+  --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+
+  --breakpoint-3xl: 120rem;
+}
+
+:root {
+  --background: oklch(0.98 0.004 95);
+  --foreground: oklch(0.2 0.012 260);
+  --surface: oklch(0.995 0 0);
+  --surface-2: oklch(0.965 0.006 95);
+  --border: oklch(0.9 0.01 250);
+  --border-strong: oklch(0.82 0.015 250);
+  --accent: oklch(0.49 0.12 230);
+  --accent-foreground: oklch(0.99 0 0);
+  --muted: oklch(0.95 0.007 250);
+  --muted-foreground: oklch(0.48 0.015 250);
+  --success: oklch(0.65 0.14 150);
+  --warning: oklch(0.74 0.16 75);
+  --danger: oklch(0.63 0.19 25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(86, 122, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 247, 244, 0.98));
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 22%, white);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

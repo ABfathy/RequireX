@@ -17,12 +17,14 @@ Objective:
 Detailed tasks:
 - scaffold the `Next.js` App Router project with TypeScript
 - add `Tailwind CSS` and define initial layout tokens for desktop-first responsive behavior
+- initialize `shadcn/ui` and set `components/ui` as the shared component baseline
 - create a shared environment variable module and document required secrets
 - choose package manager and repo conventions
 - add linting, formatting, and import conventions
 - define base folder structure for:
   - app routes
   - components
+  - components/ui
   - lib
   - server
   - tests

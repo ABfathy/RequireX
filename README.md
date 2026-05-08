@@ -33,6 +33,7 @@ Clients should be able to:
 
 - `Next.js` App Router on `Vercel`
 - `Tailwind CSS` with a desktop-first responsive layout
+- `shadcn/ui` for streamlined, accessible app-shell components aligned with the Codex-style workspace direction
 - `Clerk` for internal auth
 - `Supabase Postgres + Storage`
 - `Prisma` for schema and migrations
@@ -73,9 +74,9 @@ Detailed planning:
 - [docs/09-current-state.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/09-current-state.md)
 - [docs/10-current-plan.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/10-current-plan.md)
 
-## Planned Repo Scripts
+## Current Repo Scripts
 
-These are the scripts the implementation should expose once the app scaffold is added:
+These scripts are now available in the scaffold:
 
 ```bash
 pnpm dev
@@ -134,6 +135,7 @@ Mobile support remains important, especially for public client review, but mobil
 
 Novelty is allowed only when it helps the demo without hurting readability or performance.
 
+- `shadcn/ui` should provide the baseline component layer for buttons, sheets, dialogs, forms, and layout primitives
 - `react-bits` should stay mostly on landing, empty states, and controlled decorative areas
 - `animejs` should be used for short, meaningful transitions
 - `web-haptics` should enhance mobile confirmations and submissions only
