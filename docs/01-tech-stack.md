@@ -6,7 +6,8 @@
 - Styling: `Tailwind CSS`
 - Component system: `shadcn/ui`
 - Internal auth: `Clerk`
-- Database and file storage: `Supabase Postgres + Storage`
+- Relational database: `Supabase Postgres`
+- File upload and storage: `UploadThing`
 - ORM and migrations: `Prisma`
 - Background jobs: `Inngest`
 - AI inference: `@google/genai` using `Vertex AI`
@@ -102,15 +103,33 @@ Bonus path if time allows:
 Reference:
 - [Clerk docs](https://context7.com/clerk/clerk-docs)
 
-### Supabase Postgres + Storage
+### Supabase Postgres
 
-Use `Supabase` as the quickest reliable backend for:
+Use `Supabase` for managed `Postgres` only.
 
-- managed `Postgres`
-- file storage for uploads
-- easy metadata access patterns
+Why:
 
-We are not using Supabase Auth because `Clerk` owns internal authentication.
+- the team still gets a fast hosted relational database
+- Prisma can own schema and migrations cleanly
+- the app can avoid mixing file storage concerns into the database decision
+
+We are not using Supabase Auth or Supabase Storage in v1.
+
+### UploadThing
+
+Use `UploadThing` as the only upload and file storage provider in v1.
+
+Why:
+
+- it gives the team a fast path for hosted file uploads
+- it fits `Next.js` App Router well
+- middleware can attach auth and upload metadata before storage
+- `onUploadComplete` is the right handoff point for persisting `SourceAsset` rows in the database
+
+Implementation rule:
+
+- file-backed `SourceAsset` rows store UploadThing identifiers and URLs
+- raw pasted text is still stored directly in Postgres as a first-class source item
 
 ### Prisma
 

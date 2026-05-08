@@ -38,23 +38,30 @@ Optional bonus:
 
 ### 3. Storage Layer
 
-`Supabase Storage` stores:
+`UploadThing` stores:
 
 - uploaded audio
 - images
 - PDFs
-- generated previews if needed
+- any later generated file-backed previews if needed
 
 `Supabase Postgres` stores:
 
 - projects
 - intake sessions
 - source asset metadata
+- normalized source chunks
 - generated brief snapshots
 - client comments
 - follow-up answers
 - revision events
 - share links
+- processing jobs
+
+Special case:
+
+- pasted text does not go through `UploadThing`
+- it is persisted directly as a `SourceAsset` row with inline text content
 
 ### 4. Job Layer
 
@@ -143,6 +150,7 @@ Mobile support:
 
 - `POST /api/uploads`
 - `POST /api/folder-uploads`
+- `POST /api/uploadthing`
 - `POST /api/projects`
 - `POST /api/sessions`
 - `POST /api/generate`
@@ -158,10 +166,10 @@ Mobile support:
 1. Internal user creates or opens a project.
 2. User starts an intake session.
 3. User uploads text, audio, image, and/or PDF inputs, either one by one or as one mixed-source folder.
-4. Files are stored and metadata is persisted.
+4. File inputs are stored through `UploadThing`, and source metadata is persisted in Postgres.
 5. Generation job is queued.
 6. UI shows processing state and partial progress.
-7. Job normalizes sources.
+7. Job normalizes sources into addressable chunks.
 8. AI generates a contract-shaped brief.
 9. The brief snapshot is stored.
 10. The internal user reviews and refines if needed.

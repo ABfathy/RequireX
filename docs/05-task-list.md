@@ -12,39 +12,39 @@ This task list is meant to be executable by multiple people in parallel. Each wo
 ## Workstream 1: Platform and Developer Experience
 
 Objective:
-- create the base app shell and developer workflow so the rest of the team can build without blocking
+- ~~create the base app shell and developer workflow so the rest of the team can build without blocking~~
 
 Detailed tasks:
-- scaffold the `Next.js` App Router project with TypeScript
-- add `Tailwind CSS` and define initial layout tokens for desktop-first responsive behavior
-- initialize `shadcn/ui` and set `components/ui` as the shared component baseline
-- create a shared environment variable module and document required secrets
-- choose package manager and repo conventions
-- add linting, formatting, and import conventions
-- define base folder structure for:
+- ~~scaffold the `Next.js` App Router project with TypeScript~~
+- ~~add `Tailwind CSS` and define initial layout tokens for desktop-first responsive behavior~~
+- ~~initialize `shadcn/ui` and set `components/ui` as the shared component baseline~~
+- ~~create a shared environment variable module and document required secrets~~
+- ~~choose package manager and repo conventions~~
+- ~~add linting, formatting, and import conventions~~
+- ~~define base folder structure for:~~
   - app routes
   - components
   - components/ui
   - lib
   - server
   - tests
-- add placeholder routes for the internal app and public brief page
-- keep landing page work explicitly optional until the core workflow is stable
-- add base error and loading boundaries
-- add CI-ready script placeholders in `package.json`
+- ~~add placeholder routes for the internal app and public brief page~~
+- ~~keep landing page work explicitly optional until the core workflow is stable~~
+- ~~add base error and loading boundaries~~
+- ~~add CI-ready script placeholders in `package.json`~~
 
 Outputs:
-- bootable app scaffold
-- consistent repo structure
-- shared DX baseline for the team
+- ~~bootable app scaffold~~
+- ~~consistent repo structure~~
+- ~~shared DX baseline for the team~~
 
 ## Workstream 2: Data Model and Persistence
 
 Objective:
-- define the app’s durable backend model so all features can store and query the same entities
+- ~~define the app’s durable backend model so all features can store and query the same entities~~
 
 Detailed tasks:
-- define `Prisma` schema for:
+- ~~define `Prisma` schema for:~~
   - `Workspace`
   - `Project`
   - `IntakeSession`
@@ -54,30 +54,31 @@ Detailed tasks:
   - `FollowUpAnswer`
   - `RevisionEvent`
   - `ShareLink`
-- treat `BriefSnapshot` as the immutable parent record for generated brief versions
-- persist generated brief content in relational child tables:
+- ~~treat `BriefSnapshot` as the immutable parent record for generated brief versions~~
+- ~~persist generated brief content in relational child tables:~~
   - `BriefClaim`
   - `BriefQuestion`
   - `EvidenceRef`
-- add section and ordering fields so snapshot rendering order is deterministic
-- keep evidence locator payloads in `Json` fields rather than over-normalizing source-specific locator shapes
-- define enums for statuses, source types, project mode, and revision event types
-- add unique constraints and indexes for:
+- ~~add `SourceChunk` and `ProcessingJob` so evidence provenance and async state are durable from the start~~
+- ~~add section and ordering fields so snapshot rendering order is deterministic~~
+- ~~keep evidence locator payloads in `Json` fields rather than over-normalizing source-specific locator shapes~~
+- ~~define enums for statuses, source types, and revision event types~~
+- ~~add unique constraints and indexes for:~~
   - share token lookup
   - snapshot version lookup
   - session timeline queries
   - source asset lookup by session
-- define and document invariants that Prisma alone does not fully enforce:
+- ~~define and document invariants that Prisma alone does not fully enforce:~~
   - evidence belongs to either one claim or one question
   - item-targeted comments and answers must reference rows from the same snapshot version
-- add seed strategy for local demo data
-- document naming and deletion behavior for each entity
-- define immutable snapshot policy and mutable feedback policy
+- ~~add seed strategy for local demo data~~
+- ~~document naming and deletion behavior for each entity~~
+- ~~define immutable snapshot policy and mutable feedback policy~~
 
 Outputs:
-- complete first-pass schema
-- migration plan
-- domain ownership rules for persistent data
+- ~~complete first-pass schema~~
+- ~~migration plan~~
+- ~~domain ownership rules for persistent data~~
 
 ## Workstream 3: Authentication and Access Control
 
@@ -293,7 +294,7 @@ Why this exists:
 Detailed tasks:
 - connect the base app to the real database client
 - wire shared domain types to actual persistence calls
-- align env handling with database and storage configuration
+- align env handling with database and upload configuration
 - validate migration flow on a fresh local environment
 - add seed path for demoable local data
 

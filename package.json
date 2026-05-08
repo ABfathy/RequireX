@@ -16,16 +16,22 @@
     "test:a11y": "node -e \"console.log('Accessibility tests are not configured yet. Planned for Workstream 10.')\"",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
+    "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
+    "pg": "^8.20.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0",
+    "uploadthing": "^7.7.4",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -38,8 +44,9 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "prettier": "^3.6.2",
-    "prisma": "^6.19.2",
+    "prisma": "^7.8.0",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   },
   "packageManager": "pnpm@10.22.0"

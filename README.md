@@ -35,7 +35,8 @@ Clients should be able to:
 - `Tailwind CSS` with a desktop-first responsive layout
 - `shadcn/ui` for streamlined, accessible app-shell components aligned with the Codex-style workspace direction
 - `Clerk` for internal auth
-- `Supabase Postgres + Storage`
+- `Supabase Postgres`
+- `UploadThing` for file upload and file storage
 - `Prisma` for schema and migrations
 - `Inngest` for async jobs and retries
 - `@google/genai` on `Vertex AI`
@@ -87,6 +88,8 @@ pnpm test:unit
 pnpm test:e2e
 pnpm test:a11y
 pnpm prisma:migrate
+pnpm prisma:generate
+pnpm prisma:seed
 pnpm prisma:studio
 ```
 

@@ -33,9 +33,9 @@ The user can provide the scattered material they received from the client.
 Planned supported inputs:
 
 - pasted text or copied messages
-- uploaded screenshots or images
-- uploaded audio or voice notes
-- uploaded PDFs
+- uploaded screenshots or images through `UploadThing`
+- uploaded audio or voice notes through `UploadThing`
+- uploaded PDFs through `UploadThing`
 - mixed-source folder upload for batches that contain several file types together
 
 The user can submit one input type or combine multiple inputs in the same intake session.
@@ -43,6 +43,8 @@ The user can submit one input type or combine multiple inputs in the same intake
 ### 3. The App Processes the Material
 
 The app reads the uploaded or pasted material and extracts the useful context needed to understand what the client is asking for.
+
+File inputs are stored through `UploadThing`, while pasted text is stored directly in the relational model as a first-class source item.
 
 Instead of forcing the user to rewrite everything manually, the app should prepare a first structured interpretation of the request.
 

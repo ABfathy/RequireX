@@ -1,0 +1,410 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Workspace {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  createdBy String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+}
+
+model Project {
+  id             String          @id @default(cuid())
+  workspaceId    String
+  name           String
+  clientName     String
+  description    String?         @db.Text
+  status         ProjectStatus   @default(ACTIVE)
+  createdBy      String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sessions       IntakeSession[]
+  snapshots      BriefSnapshot[]
+  revisionEvents RevisionEvent[]
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, status])
+}
+
+model IntakeSession {
+  id             String          @id @default(cuid())
+  projectId      String
+  title          String
+  status         SessionStatus   @default(DRAFT)
+  createdBy      String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  lastActivityAt DateTime        @default(now())
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceAssets   SourceAsset[]
+  snapshots      BriefSnapshot[]
+  revisionEvents RevisionEvent[]
+  processingJobs ProcessingJob[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, updatedAt])
+  @@index([projectId, status])
+}
+
+model SourceAsset {
+  id               String            @id @default(cuid())
+  sessionId        String
+  sourceType       SourceType
+  status           SourceAssetStatus @default(UPLOADED)
+  displayLabel     String?
+  originalFileName String?
+  mimeType         String?
+  fileSizeBytes    Int?
+  textContent      String?           @db.Text
+  routeSlug        String?
+  utKey            String?           @unique
+  ufsUrl           String?
+  appUrl           String?
+  customId         String?           @unique
+  folderLabel      String?
+  providerMetadata Json?             @db.JsonB
+  errorMessage     String?           @db.Text
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  processedAt      DateTime?
+  session          IntakeSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  chunks           SourceChunk[]
+  evidenceRefs     EvidenceRef[]
+
+  @@index([sessionId, createdAt])
+  @@index([sessionId, status])
+  @@index([sessionId, sourceType])
+}
+
+model SourceChunk {
+  id            String          @id @default(cuid())
+  sourceAssetId String
+  kind          SourceChunkKind
+  orderIndex    Int
+  text          String          @db.Text
+  locator       Json            @db.JsonB
+  pageNumber    Int?
+  startMs       Int?
+  endMs         Int?
+  chunkLabel    String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  sourceAsset   SourceAsset     @relation(fields: [sourceAssetId], references: [id], onDelete: Cascade)
+  evidenceRefs  EvidenceRef[]
+
+  @@unique([sourceAssetId, orderIndex])
+  @@index([sourceAssetId, orderIndex])
+  @@index([sourceAssetId, kind])
+}
+
+model BriefSnapshot {
+  id                  String              @id @default(cuid())
+  projectId           String
+  sessionId           String
+  version             Int
+  status              BriefSnapshotStatus @default(DRAFT)
+  sourceBundleVersion Int
+  createdBy           String
+  createdAt           DateTime            @default(now())
+  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session             IntakeSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  claims              BriefClaim[]
+  questions           BriefQuestion[]
+  evidenceRefs        EvidenceRef[]
+  comments            BriefComment[]
+  answers             FollowUpAnswer[]
+  revisionEvents      RevisionEvent[]     @relation("SnapshotRevisionEvents")
+  shareLinks          ShareLink[]
+  sourceJobs          ProcessingJob[]     @relation("SourceSnapshotJobs")
+  resultJobs          ProcessingJob[]     @relation("ResultSnapshotJobs")
+
+  @@unique([sessionId, version])
+  @@index([projectId, createdAt])
+  @@index([sessionId, createdAt])
+}
+
+model BriefClaim {
+  id           String            @id @default(cuid())
+  snapshotId   String
+  section      BriefClaimSection
+  orderIndex   Int
+  text         String            @db.Text
+  confidence   BriefConfidence
+  createdAt    DateTime          @default(now())
+  snapshot     BriefSnapshot     @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  evidenceRefs EvidenceRef[]
+  comments     BriefComment[]
+
+  @@unique([snapshotId, section, orderIndex])
+  @@index([snapshotId, section, orderIndex])
+}
+
+model BriefQuestion {
+  id           String               @id @default(cuid())
+  snapshotId   String
+  section      BriefQuestionSection
+  orderIndex   Int
+  text         String               @db.Text
+  reason       String               @db.Text
+  status       BriefQuestionStatus  @default(OPEN)
+  createdAt    DateTime             @default(now())
+  snapshot     BriefSnapshot        @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  evidenceRefs EvidenceRef[]
+  comments     BriefComment[]
+  answers      FollowUpAnswer[]
+
+  @@unique([snapshotId, section, orderIndex])
+  @@index([snapshotId, section, orderIndex])
+  @@index([snapshotId, status])
+}
+
+model EvidenceRef {
+  id            String         @id @default(cuid())
+  snapshotId    String
+  sourceAssetId String
+  sourceChunkId String
+  claimId       String?
+  questionId    String?
+  sourceType    SourceType
+  label         String
+  locator       Json           @db.JsonB
+  excerpt       String         @db.Text
+  previewUrl    String?
+  createdAt     DateTime       @default(now())
+  snapshot      BriefSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  sourceAsset   SourceAsset    @relation(fields: [sourceAssetId], references: [id], onDelete: Cascade)
+  sourceChunk   SourceChunk    @relation(fields: [sourceChunkId], references: [id], onDelete: Cascade)
+  claim         BriefClaim?    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  question      BriefQuestion? @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, claimId])
+  @@index([snapshotId, questionId])
+  @@index([sourceAssetId])
+  @@index([sourceChunkId])
+}
+
+model BriefComment {
+  id            String                 @id @default(cuid())
+  snapshotId    String
+  section       BriefCommentSection
+  anchorType    BriefCommentAnchorType
+  claimId       String?
+  questionId    String?
+  selectionText String?                @db.Text
+  authorName    String?
+  authorEmail   String?
+  body          String                 @db.Text
+  status        BriefCommentStatus     @default(OPEN)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  snapshot      BriefSnapshot          @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  claim         BriefClaim?            @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  question      BriefQuestion?         @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId, createdAt])
+  @@index([snapshotId, section, status])
+}
+
+model FollowUpAnswer {
+  id          String        @id @default(cuid())
+  snapshotId  String
+  questionId  String
+  body        String        @db.Text
+  authorName  String?
+  authorEmail String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  snapshot    BriefSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  question    BriefQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([snapshotId, createdAt])
+  @@index([questionId, createdAt])
+}
+
+model RevisionEvent {
+  id        String            @id @default(cuid())
+  projectId String
+  sessionId String
+  snapshotId String?
+  type      RevisionEventType
+  actorType ActorType
+  actorId   String?
+  summary   String
+  metadata  Json?             @db.JsonB
+  createdAt DateTime          @default(now())
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session   IntakeSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  snapshot  BriefSnapshot?    @relation("SnapshotRevisionEvents", fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([snapshotId, createdAt])
+}
+
+model ShareLink {
+  id         String          @id @default(cuid())
+  snapshotId String
+  token      String          @unique
+  status     ShareLinkStatus @default(ACTIVE)
+  createdBy  String
+  expiresAt  DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  snapshot   BriefSnapshot   @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, createdAt])
+}
+
+model ProcessingJob {
+  id               String              @id @default(cuid())
+  sessionId        String
+  sourceSnapshotId String?
+  resultSnapshotId String?
+  type             ProcessingJobType
+  status           ProcessingJobStatus @default(QUEUED)
+  attemptCount     Int                 @default(0)
+  errorCode        String?
+  errorMessage     String?             @db.Text
+  payload          Json?               @db.JsonB
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  session          IntakeSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sourceSnapshot   BriefSnapshot?      @relation("SourceSnapshotJobs", fields: [sourceSnapshotId], references: [id], onDelete: SetNull)
+  resultSnapshot   BriefSnapshot?      @relation("ResultSnapshotJobs", fields: [resultSnapshotId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@index([sessionId, status])
+  @@index([type, status])
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum SessionStatus {
+  DRAFT
+  COLLECTING
+  PROCESSING
+  REVIEW_READY
+  FAILED
+  ARCHIVED
+}
+
+enum SourceType {
+  TEXT
+  AUDIO
+  IMAGE
+  PDF
+}
+
+enum SourceAssetStatus {
+  UPLOADED
+  QUEUED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum SourceChunkKind {
+  TEXT_BLOCK
+  TRANSCRIPT_SEGMENT
+  PDF_BLOCK
+  IMAGE_OBSERVATION
+}
+
+enum BriefSnapshotStatus {
+  DRAFT
+  SHARED
+  CONFIRMED
+  SUPERSEDED
+}
+
+enum BriefClaimSection {
+  SUMMARY
+  GOALS
+}
+
+enum BriefQuestionSection {
+  AMBIGUITIES
+  FOLLOW_UP_QUESTIONS
+}
+
+enum BriefQuestionStatus {
+  OPEN
+  ANSWERED
+  RESOLVED
+}
+
+enum BriefCommentSection {
+  SUMMARY
+  GOALS
+  AMBIGUITIES
+  FOLLOW_UP_QUESTIONS
+}
+
+enum BriefCommentAnchorType {
+  SECTION
+  CLAIM
+  QUESTION
+  TEXT_RANGE
+}
+
+enum BriefCommentStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum RevisionEventType {
+  GENERATED
+  REGENERATED
+  MANUAL_EDIT
+  CLIENT_COMMENT_ADDED
+  CLIENT_ANSWER_ADDED
+  SNAPSHOT_RESTORED
+  BRIEF_CONFIRMED
+}
+
+enum ShareLinkStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum ProcessingJobType {
+  INTAKE_PROCESSING
+  GENERATION
+  REGENERATION
+}
+
+enum ProcessingJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum ActorType {
+  INTERNAL_USER
+  CLIENT
+  SYSTEM
+}
+
+enum BriefConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}

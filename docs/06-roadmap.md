@@ -24,7 +24,7 @@ Deliverables:
 
 - scaffold app
 - configure auth
-- configure database and storage
+- configure database and upload/storage provider
 - configure job runner
 - configure AI client
 - configure test frameworks
@@ -35,7 +35,7 @@ Deliverables:
 - repo scaffold
 - working auth shell
 - working database connection
-- working storage connection
+- working upload/storage connection
 - working test harness
 
 ## Day 3: Intake and Data Layer

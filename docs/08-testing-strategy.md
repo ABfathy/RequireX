@@ -72,6 +72,7 @@ pnpm test:a11y
 - evidence reference builders
 - source normalization helpers
 - upload validation helpers
+- UploadThing callback persistence and provider metadata mapping
 - share-link token helpers
 - optional access-code gate helpers if the bonus flow is implemented
 - route/service pure logic

@@ -22,7 +22,7 @@ Primary external brief:
 ## What Each Doc Does
 
 - `01-tech-stack.md`: the chosen technologies, why they fit, and what was rejected
-- `02-system-architecture.md`: routes, subsystems, async jobs, storage, and data flow
+- `02-system-architecture.md`: routes, subsystems, async jobs, upload/storage flow, and data flow
 - `03-brief-contract.md`: the stable brief format every generation must satisfy
 - `04-feature-list.md`: must-have, stretch, deferred, and banned scope
 - `05-task-list.md`: implementation backlog the team can split immediately

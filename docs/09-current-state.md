@@ -20,11 +20,13 @@ Use this file as the simplest possible implementation tracker. Check items only 
 
 ## Data and Persistence
 
-- [ ] Prisma schema created
-- [ ] Initial migration created
-- [ ] Demo seed flow created
+- [x] Prisma schema created
+- [x] Initial migration created
+- [x] Demo seed flow created
 - [ ] Supabase Postgres connected
-- [ ] Supabase Storage connected
+- [ ] UploadThing storage integration connected
+- [x] Source chunk model created
+- [x] Processing job model created
 
 ## Projects and Sessions
 
