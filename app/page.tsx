@@ -1,3 +1,9 @@
+import {
+  Show,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from "@clerk/nextjs";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -19,8 +25,27 @@ export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center px-6 py-16 sm:px-10 lg:px-12">
       <div className="max-w-3xl rounded-[2rem] border border-border/80 bg-surface/90 p-8 shadow-[var(--shadow-panel)] backdrop-blur sm:p-10">
-        <div className="mb-8 inline-flex items-center rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          RequireX scaffold
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            RequireX scaffold
+          </div>
+          <div className="flex items-center gap-2">
+            <Show when="signed-out">
+              <SignInButton mode="redirect">
+                <button className={buttonVariants({ variant: "outline" })}>
+                  Sign in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="redirect">
+                <button className={buttonVariants()}>
+                  Sign up
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
+          </div>
         </div>
         <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           Desktop-first AI intake and brief generation for messy client inputs.
