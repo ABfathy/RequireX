@@ -7,7 +7,7 @@
     "postinstall": "prisma generate",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
-    "lint": "eslint app components lib server --max-warnings=0",
+    "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
