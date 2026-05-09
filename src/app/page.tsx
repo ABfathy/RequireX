@@ -1,88 +1,153 @@
-import {
-  Show,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from "@clerk/nextjs";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 
-import { buttonVariants } from "@/components/ui/button";
-
-const links = [
-  {
-    href: "/app",
-    label: "Open Internal Workspace",
-    description: "Placeholder shell for the signed-in team workflow.",
-  },
-  {
-    href: "/brief/demo-share-token",
-    label: "Open Public Brief View",
-    description: "Placeholder client-facing review surface.",
-  },
-];
+import { RxLogo } from "@/components/icons";
 
 export default function HomePage() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center px-6 py-16 sm:px-10 lg:px-12">
-      <div className="max-w-3xl rounded-[2rem] border border-border/80 bg-surface/90 p-8 shadow-[var(--shadow-panel)] backdrop-blur sm:p-10">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            RequireX scaffold
-          </div>
-          <div className="flex items-center gap-2">
-            <Show when="signed-out">
-              <SignInButton mode="redirect">
-                <button className={buttonVariants({ variant: "outline" })}>
-                  Sign in
-                </button>
-              </SignInButton>
-              <SignUpButton mode="redirect">
-                <button className={buttonVariants()}>
-                  Sign up
-                </button>
-              </SignUpButton>
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
-          </div>
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-16"
+      style={{ background: "var(--background)" }}>
+
+      {/* Center card */}
+      <div className="w-full max-w-[480px]">
+
+        {/* Brand */}
+        <div className="flex items-center gap-2.5 mb-8">
+          <RxLogo size={22} className="text-[var(--accent)]" />
+          <span
+            className="text-[17px] font-semibold tracking-[-0.01em]"
+            style={{ color: "var(--fg-primary)" }}
+          >
+            RequireX
+          </span>
         </div>
-        <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-          Desktop-first AI intake and brief generation for messy client inputs.
+
+        {/* Headline */}
+        <h1
+          className="text-[33px] font-semibold leading-[1.15] tracking-[-0.02em] mb-4"
+          style={{ color: "var(--fg-primary)" }}
+        >
+          Requirements engineering,{" "}
+          <span style={{ color: "var(--accent)" }}>without the chaos.</span>
         </h1>
-        <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-          This root route is intentionally minimal. The landing page is optional
-          polish later. For now, it points the team toward the two primary
-          surfaces that matter in the scaffold: the internal workspace and the
-          public brief review page.
+
+        <p
+          className="text-[15px] leading-[1.65] mb-8"
+          style={{ color: "var(--fg-tertiary)" }}
+        >
+          Ingest PDFs, transcripts, tickets, and code. RequireX extracts,
+          structures, and traces every requirement — then shares a clean brief
+          your clients can actually review.
         </p>
 
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
-          {links.map((link) => (
-            <div
-              key={link.href}
-              className="group rounded-[1.5rem] border border-border bg-background/85 p-5 shadow-[var(--shadow-soft)] transition-colors hover:border-accent/40 hover:bg-white"
-            >
-              <div className="text-sm font-medium text-muted-foreground">
-                Placeholder route
-              </div>
-              <div className="mt-2 text-xl font-semibold text-foreground">
-                {link.label}
-              </div>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {link.description}
-              </p>
-              <Link
-                href={link.href}
-                prefetch={link.href.startsWith("/app") ? false : undefined}
-                className={`${buttonVariants()} mt-5`}
+        {/* Auth CTAs */}
+        <div className="flex items-center gap-2 mb-10">
+          <Show when="signed-out">
+            <SignUpButton mode="redirect">
+              <button
+                className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] cursor-pointer"
+                style={{
+                  background: "var(--accent)",
+                  color: "var(--accent-fg)",
+                }}
               >
-                Open route
-              </Link>
-            </div>
-          ))}
+                Get started
+              </button>
+            </SignUpButton>
+            <SignInButton mode="redirect">
+              <button
+                className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] border cursor-pointer"
+                style={{
+                  background: "transparent",
+                  color: "var(--fg-secondary)",
+                  borderColor: "var(--border-strong)",
+                }}
+              >
+                Sign in
+              </button>
+            </SignInButton>
+          </Show>
+          <Show when="signed-in">
+            <Link
+              href="/app"
+              className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms]"
+              style={{
+                background: "var(--accent)",
+                color: "var(--accent-fg)",
+              }}
+            >
+              Open workspace
+            </Link>
+            <UserButton />
+          </Show>
         </div>
+
+        {/* Divider */}
+        <div
+          className="h-px mb-8"
+          style={{ background: "var(--border)" }}
+        />
+
+        {/* Nav cards */}
+        <div className="grid grid-cols-2 gap-3">
+          <NavCard
+            href="/app"
+            label="Internal workspace"
+            description="Editor, chat, source ingestion, revision history."
+            prefetch={false}
+          />
+          <NavCard
+            href="/brief/demo-share-token"
+            label="Client brief view"
+            description="Shareable review link — comment, answer, approve."
+          />
+        </div>
+
+        {/* Footer */}
+        <p
+          className="mt-8 text-[11px] text-center"
+          style={{ color: "var(--fg-disabled)" }}
+        >
+          RequireX &mdash; AI-powered requirements engineering
+        </p>
       </div>
     </main>
+  );
+}
+
+function NavCard({
+  href,
+  label,
+  description,
+  prefetch,
+}: {
+  href: string;
+  label: string;
+  description: string;
+  prefetch?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      prefetch={prefetch}
+      className="block p-4 rounded-[8px] border transition-colors duration-[120ms] group"
+      style={{
+        background: "var(--surface-1)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <div
+        className="text-[12px] font-medium mb-1"
+        style={{ color: "var(--fg-secondary)" }}
+      >
+        {label}
+      </div>
+      <div
+        className="text-[11px] leading-[1.5]"
+        style={{ color: "var(--fg-muted)" }}
+      >
+        {description}
+      </div>
+    </Link>
   );
 }
