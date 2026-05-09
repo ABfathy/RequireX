@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RequireX — Review</title>
+  <link rel="stylesheet" href="kit.css">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="bits.jsx"></script>
+
+<!-- ── Data ─────────────────────────────────────────────── -->
+<script type="text/babel">
+const CLIENT_REQS = [
+  { id:'REQ-0140', section:'Functional requirements',
+    title:'Idempotency key required on all POST /payments',
+    body:'Every POST to /payments MUST include an Idempotency-Key header. Duplicate keys within a 24-hour window return the original response without re-executing the side effect.',
+    status:'approved', tags:['functional','api'] },
+  { id:'REQ-0141', section:'Functional requirements',
+    title:'Failed payment retries follow exponential backoff',
+    body:'Retries on transient gateway errors (5xx, network) follow exponential backoff with full jitter, capped at 30 s and 6 attempts.',
+    status:'approved', tags:['functional','retry'] },
+  { id:'REQ-0142', section:'Performance requirements',
+    title:'Payment latency under 200 ms p99',
+    body:'The payments handler must respond within 200 ms at the 99th percentile under nominal load. Breaches escalate to the on-call within one minute.',
+    status:'approved', tags:['non-functional','slo'],
+    question:'What is the acceptable p99 latency during planned maintenance windows?' },
+  { id:'REQ-0143', section:'Compliance requirements',
+    title:'Audit log retains 7 years',
+    body:'All payment events are persisted to the audit log for 7 years (regulatory). Deletion is denied for retention-locked rows.',
+    status:'in-review', tags:['compliance','audit'],
+    question:'Please confirm the 7-year retention period meets your regulatory requirements.' },
+  { id:'REQ-0144', section:'Operational requirements',
+    title:'Settlement reconciliation runs daily at 03:00 UTC',
+    body:'A nightly job reconciles processor statements against the ledger. Discrepancies above $0.01 raise a Sev-3 alert.',
+    status:'draft', tags:['ops','functional'] },
+  { id:'REQ-0145', section:'Security requirements',
+    title:'PII fields encrypted at rest with KMS-managed keys',
+    body:'Cardholder name and last-4 are encrypted using customer-managed KMS keys. Logs MUST scrub PAN entirely.',
+    status:'conflict', tags:['security','compliance'] },
+];
+
+const CLIENT_REVISIONS = [
+  { id:'r1', label:'v2.1.0', time:'2m ago',    msg:'Approved REQ-0140, REQ-0141, REQ-0142', current:true },
+  { id:'r2', label:'v2.0.1', time:'1h ago',    msg:'Added REQ-0144 from kickoff notes' },
+  { id:'r3', label:'v2.0.0', time:'3h ago',    msg:'Initial draft' },
+];
+
+Object.assign(window, { CLIENT_REQS, CLIENT_REVISIONS });
+</script>
+
+<!-- ── Requirement Card ──────────────────────────────────── -->
+<script type="text/babel">
+const { useState: useReqSt } = React;
+
+const STATUS_TONE  = { approved:'success', 'in-review':'info', draft:'neutral', conflict:'danger' };
+const STATUS_LABEL = { approved:'Approved', 'in-review':'In review', draft:'Draft', conflict:'Conflict' };
+
+const RequirementCard = ({ req }) => {
+  const [commentOpen,  setCommentOpen]  = useReqSt(false);
+  const [commentText,  setCommentText]  = useReqSt('');
+  const [commentDone,  setCommentDone]  = useReqSt(false);
+  const [answerText,   setAnswerText]   = useReqSt('');
+  const [answerDone,   setAnswerDone]   = useReqSt(false);
+
+  const submitComment = () => {
+    if (!commentText.trim()) return;
+    setCommentDone(true);
+  };
+
+  const submitAnswer = () => {
+    if (!answerText.trim()) return;
+    setAnswerDone(true);
+  };
+
+  const hasComment = commentDone;
+  const hasQ       = !!req.question;
+
+  return (
+    <div className={"client-req"+(hasComment?' has-comment':'')+(hasQ&&!answerDone?' has-question':'')}>
+      <div className="client-req-head">
+        <span className="client-req-id mono">{req.id}</span>
+        <Pill tone={STATUS_TONE[req.status]}>{STATUS_LABEL[req.status]}</Pill>
+        <span className="client-req-spread" />
+        {req.tags.map(t => <Tag key={t}>{t}</Tag>)}
+        <button className="client-req-comment-btn" onClick={()=>setCommentOpen(o=>!o)}>
+          <Icon.MessageSq size={11} />
+          <span>{commentOpen ? 'Close' : 'Comment'}</span>
+        </button>
+      </div>
+
+      <div className="client-req-title">{req.title}</div>
+      <div className="client-req-body">{req.body}</div>
+
+      {/* Unanswered question */}
+      {hasQ && !answerDone && (
+        <div className="question-block">
+          <div className="question-label">Question</div>
+          <div className="question-text">{req.question}</div>
+          <textarea
+            className="question-answer-input"
+            rows={2}
+            placeholder="Type your answer…"
+            value={answerText}
+            onChange={e=>setAnswerText(e.target.value)}
+          />
+          {answerText.trim() && (
+            <div style={{marginTop:6}}>
+              <Btn kind="primary" size="sm" onClick={submitAnswer}>Submit answer</Btn>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Answered question */}
+      {hasQ && answerDone && (
+        <div className="question-block" style={{borderColor:'rgba(126,180,134,0.30)', background:'var(--success-soft)'}}>
+          <div className="question-label" style={{color:'var(--success)'}}>Answer submitted</div>
+          <div className="question-answered">{answerText}</div>
+        </div>
+      )}
+
+      {/* Comment thread */}
+      {(commentOpen || commentDone) && (
+        <div className="comment-thread">
+          {commentDone ? (
+            <div className="comment-submitted">
+              <div className="comment-avatar">CL</div>
+              <div>
+                <div className="comment-submitted-role">Client · just now</div>
+                <div className="comment-submitted-text">{commentText}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="comment-input-row">
+              <div className="comment-avatar">CL</div>
+              <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                <textarea
+                  className="comment-input"
+                  rows={2}
+                  autoFocus
+                  placeholder="Add a comment or suggest a change…"
+                  value={commentText}
+                  onChange={e=>setCommentText(e.target.value)}
+                />
+                {commentText.trim() && (
+                  <div style={{display:'flex',gap:6}}>
+                    <Btn kind="primary" size="sm" onClick={submitComment}>Submit</Btn>
+                    <Btn kind="ghost" size="sm" onClick={()=>{setCommentOpen(false);setCommentText('');}}>Cancel</Btn>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+window.RequirementCard = RequirementCard;
+window.STATUS_TONE_C  = STATUS_TONE;
+window.STATUS_LABEL_C = STATUS_LABEL;
+</script>
+
+<!-- ── Revision Panel ───────────────────────────────────── -->
+<script type="text/babel">
+const RevisionPanel = ({ onClose }) => {
+  const { CLIENT_REVISIONS } = window;
+  return (
+    <aside className="client-rev-panel">
+      <div className="client-rev-header">
+        <span className="client-rev-title">History</span>
+        <IconBtn title="Close" onClick={onClose}><Icon.X /></IconBtn>
+      </div>
+      <div className="client-rev-content">
+        <div className="rev-tree">
+          {CLIENT_REVISIONS.map(rev => (
+            <div key={rev.id} className="rev-node">
+              <div className="rev-dot-col">
+                <div className={"rev-dot"+(rev.current?' is-active':'')} />
+                <div className="rev-line" />
+              </div>
+              <div className="rev-info">
+                <div className={"rev-label"+(rev.current?' is-active':'')}>{rev.label}</div>
+                <div className="rev-meta">{rev.time}</div>
+                <div className="rev-msg">{rev.msg}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+};
+window.RevisionPanel = RevisionPanel;
+</script>
+
+<!-- ── Client Shell + Render ────────────────────────────── -->
+<script type="text/babel">
+const { useState: useClSt, useEffect: useClEff } = React;
+
+const ClientHeader = ({ revOpen, theme, onToggleRev, onToggleTheme }) => {
+  const [submitted, setSubmitted] = useClSt(false);
+  return (
+    <header className="client-header">
+      <div className="client-header-brand">
+        <Icon.Logo size={15} style={{color:'var(--accent)'}} />
+        <span>RequireX</span>
+      </div>
+      <div className="client-header-sep" />
+      <span className="client-header-doc">payments-v2 · spec/v2.1</span>
+      <div className="client-header-grow" />
+      <span className="client-header-status">6 requirements · 2 need your input</span>
+      <IconBtn title="Revision history" active={revOpen} onClick={onToggleRev}><Icon.History /></IconBtn>
+      <IconBtn title={theme==='dark'?'Light mode':'Dark mode'} onClick={onToggleTheme}>
+        {theme==='dark' ? <Icon.Sun /> : <Icon.Moon />}
+      </IconBtn>
+      {submitted ? (
+        <Btn kind="secondary" size="sm" leading={<Icon.Check size={12}/>}>Submitted</Btn>
+      ) : (
+        <Btn kind="primary" size="sm" onClick={()=>setSubmitted(true)}>Submit feedback</Btn>
+      )}
+    </header>
+  );
+};
+
+const ClientDoc = () => {
+  const { CLIENT_REQS } = window;
+  const sections = [...new Set(CLIENT_REQS.map(r => r.section))];
+
+  return (
+    <div className="client-doc-wrap">
+      <div className="client-doc">
+        <div className="client-doc-title">Payment Service v2 — Requirements Specification</div>
+        <div className="client-doc-meta">
+          <span>payments-v2</span>
+          <span className="client-doc-meta-sep">·</span>
+          <span>spec/v2.1</span>
+          <span className="client-doc-meta-sep">·</span>
+          <span>6 requirements</span>
+          <span className="client-doc-meta-sep">·</span>
+          <span>shared for review</span>
+        </div>
+
+        {sections.map(section => (
+          <div className="client-section" key={section}>
+            <div className="client-section-label">{section}</div>
+            {CLIENT_REQS.filter(r => r.section === section).map(req => (
+              <RequirementCard key={req.id} req={req} />
+            ))}
+          </div>
+        ))}
+
+        <div style={{height:1, background:'var(--border-1)', margin:'32px 0 24px'}} />
+        <div style={{display:'flex', justifyContent:'flex-end', gap:8}}>
+          <Btn kind="secondary">Download PDF</Btn>
+          <Btn kind="primary" leading={<Icon.Send size={13}/>}>Submit all feedback</Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientShell = () => {
+  const [revOpen, setRevOpen] = useClSt(false);
+  const [theme,   setTheme]   = useClSt('dark');
+
+  useClEff(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t==='dark' ? 'light' : 'dark');
+
+  return (
+    <div className="client-shell">
+      <ClientHeader
+        revOpen={revOpen} theme={theme}
+        onToggleRev={()=>setRevOpen(p=>!p)}
+        onToggleTheme={toggleTheme}
+      />
+      <div className={"client-body"+(revOpen?' rev-open':'')}>
+        <ClientDoc />
+        {revOpen && <RevisionPanel onClose={()=>setRevOpen(false)} />}
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<ClientShell />);
+</script>
+</body>
+</html>

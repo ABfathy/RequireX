@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RequireX — Demo</title>
+  <link rel="stylesheet" href="kit.css">
+  <style>
+    .demo-badge {
+      font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+      padding: 2px 7px; border-radius: var(--r-full);
+      background: var(--accent-soft); color: var(--accent);
+      border: 1px solid var(--accent-ring); letter-spacing: 0.04em;
+    }
+    .index-feature {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: 12px; color: var(--fg-3); line-height: 1.5;
+    }
+    .index-feature-dot {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: var(--fg-4); flex-shrink: 0; margin-top: 6px;
+    }
+    .theme-toggle {
+      background: none; border: 1px solid var(--border-2);
+      color: var(--fg-3); border-radius: var(--r-2);
+      padding: 3px 10px; font-size: 12px; font-family: var(--font-sans);
+      cursor: default;
+      transition: border-color 120ms, color 120ms;
+    }
+    .theme-toggle:hover { border-color: var(--border-strong); color: var(--fg-1); }
+    .divider { width: 1px; height: 20px; background: var(--border-1); }
+  </style>
+</head>
+<body>
+<div style="display:flex;flex-direction:column;min-height:100vh;background:var(--bg-app);">
+
+  <!-- Header -->
+  <header style="height:52px;display:flex;align-items:center;gap:12px;padding:0 32px;border-bottom:1px solid var(--border-1);">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 20 L12 6 L19 20"/><path d="M8.5 15 L15.5 15" stroke-width="1.3"/>
+      <circle cx="12" cy="6" r="1" fill="var(--accent)" stroke="none"/>
+    </svg>
+    <span style="font-size:14px;font-weight:600;letter-spacing:-0.015em;color:var(--fg-1);">RequireX</span>
+    <div class="divider"></div>
+    <span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-4);">demo</span>
+    <div style="flex:1;"></div>
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">Light mode</button>
+  </header>
+
+  <!-- Body -->
+  <main style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 24px;gap:48px;">
+
+    <!-- Heading -->
+    <div style="text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;">
+      <span class="demo-badge">Internal preview</span>
+      <h1 style="font-size:28px;font-weight:600;letter-spacing:-0.025em;color:var(--fg-1);margin:0;line-height:1.2;">
+        Requirements, traced to source.
+      </h1>
+      <p style="font-size:13px;color:var(--fg-3);margin:0;max-width:460px;line-height:1.6;">
+        Two views. One for the team extracting requirements from sources — one for the client reviewing and responding.
+      </p>
+    </div>
+
+    <!-- Cards -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;width:100%;max-width:760px;">
+
+      <!-- Editor card -->
+      <a href="editor.html" class="index-card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <svg class="index-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/>
+          </svg>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);">Internal tool</span>
+        </div>
+        <div class="index-card-title">Editor view</div>
+        <div class="index-card-desc">
+          Extract, review and refine requirements from PDFs, transcripts, tickets and code. Evidence traced inline to every source.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Project sidebar with chat history</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Line-numbered document view</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Inline evidence bits with source tooltips</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Right pane: sources · chat · revisions</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Chat bar for AI-assisted edits</span></div>
+        </div>
+        <div class="index-card-link">
+          Open editor
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>
+          </svg>
+        </div>
+      </a>
+
+      <!-- Client card -->
+      <a href="client.html" class="index-card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <svg class="index-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);">Shared link</span>
+        </div>
+        <div class="index-card-title">Client review view</div>
+        <div class="index-card-desc">
+          A clean, focused document shared with the client. They can comment on requirements and answer open questions inline.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Minimal header — doc takes center stage</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Inline comments on any requirement</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Answer open questions flagged by the team</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Collapsible revision history panel</span></div>
+          <div class="index-feature"><div class="index-feature-dot"></div><span>Submit all feedback in one click</span></div>
+        </div>
+        <div class="index-card-link">
+          Open client view
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>
+          </svg>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- Footer note -->
+    <p style="font-family:var(--font-mono);font-size:11px;color:var(--fg-4);text-align:center;margin:0;">
+      Both views support dark / light mode · All data is mocked
+    </p>
+
+  </main>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  html.setAttribute('data-theme', next);
+  document.getElementById('themeBtn').textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
+}
+</script>
+</body>
+</html>
