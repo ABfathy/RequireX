@@ -1,3 +1,5 @@
+import * as React from "react";
+
 import { cn } from "@/lib/utils";
 
 interface TagProps {
@@ -5,12 +7,11 @@ interface TagProps {
   className?: string;
 }
 
-export function Tag({ children, className }: TagProps) {
+function Tag({ children, className }: TagProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center px-1.5 h-[18px] rounded-[2px] font-mono text-[10px] leading-none",
-        "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--fg-tertiary)]",
+        "font-mono text-[10px] px-[5px] py-px rounded-[2px] bg-surface-2 text-fg-4 border border-border",
         className,
       )}
     >
@@ -18,3 +19,5 @@ export function Tag({ children, className }: TagProps) {
     </span>
   );
 }
+
+export { Tag };

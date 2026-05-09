@@ -1,52 +1,144 @@
-type PublicBriefPageProps = {
-  params: Promise<{
-    shareToken: string;
-  }>;
-};
+"use client";
 
-export default async function PublicBriefPage({
-  params,
-}: PublicBriefPageProps) {
-  const { shareToken } = await params;
+import { useEffect, useState } from "react";
+
+import { ClientDoc } from "@/components/brief/client-doc";
+import { ClientHeader } from "@/components/brief/client-header";
+import { RevisionPanel, type Revision } from "@/components/brief/revision-panel";
+import type { Requirement } from "@/components/brief/requirement-card";
+import { cn } from "@/lib/utils";
+
+/* ── Mock data (matches design/client.html) ─────────── */
+
+const MOCK_REQUIREMENTS: Requirement[] = [
+  {
+    id: "REQ-0140",
+    section: "Functional requirements",
+    title: "Idempotency key required on all POST /payments",
+    body: "Every POST to /payments MUST include an Idempotency-Key header. Duplicate keys within a 24-hour window return the original response without re-executing the side effect.",
+    status: "approved",
+    tags: ["functional", "api"],
+  },
+  {
+    id: "REQ-0141",
+    section: "Functional requirements",
+    title: "Failed payment retries follow exponential backoff",
+    body: "Retries on transient gateway errors (5xx, network) follow exponential backoff with full jitter, capped at 30 s and 6 attempts.",
+    status: "approved",
+    tags: ["functional", "retry"],
+  },
+  {
+    id: "REQ-0142",
+    section: "Performance requirements",
+    title: "Payment latency under 200 ms p99",
+    body: "The payments handler must respond within 200 ms at the 99th percentile under nominal load. Breaches escalate to the on-call within one minute.",
+    status: "approved",
+    tags: ["non-functional", "slo"],
+    question:
+      "What is the acceptable p99 latency during planned maintenance windows?",
+  },
+  {
+    id: "REQ-0143",
+    section: "Compliance requirements",
+    title: "Audit log retains 7 years",
+    body: "All payment events are persisted to the audit log for 7 years (regulatory). Deletion is denied for retention-locked rows.",
+    status: "in-review",
+    tags: ["compliance", "audit"],
+    question:
+      "Please confirm the 7-year retention period meets your regulatory requirements.",
+  },
+  {
+    id: "REQ-0144",
+    section: "Operational requirements",
+    title: "Settlement reconciliation runs daily at 03:00 UTC",
+    body: "A nightly job reconciles processor statements against the ledger. Discrepancies above $0.01 raise a Sev-3 alert.",
+    status: "draft",
+    tags: ["ops", "functional"],
+  },
+  {
+    id: "REQ-0145",
+    section: "Security requirements",
+    title: "PII fields encrypted at rest with KMS-managed keys",
+    body: "Cardholder name and last-4 are encrypted using customer-managed KMS keys. Logs MUST scrub PAN entirely.",
+    status: "conflict",
+    tags: ["security", "compliance"],
+  },
+];
+
+const MOCK_REVISIONS: Revision[] = [
+  {
+    id: "r1",
+    label: "v2.1.0",
+    time: "2m ago",
+    msg: "Approved REQ-0140, REQ-0141, REQ-0142",
+    current: true,
+  },
+  {
+    id: "r2",
+    label: "v2.0.1",
+    time: "1h ago",
+    msg: "Added REQ-0144 from kickoff notes",
+  },
+  {
+    id: "r3",
+    label: "v2.0.0",
+    time: "3h ago",
+    msg: "Initial draft",
+  },
+];
+
+/* ── Client Shell ──────────────────────────────────── */
+
+export default function BriefClientShell() {
+  const [revOpen, setRevOpen] = useState(false);
+  const [theme, setTheme] = useState("dark");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () =>
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+
+  const needsInputCount = MOCK_REQUIREMENTS.filter((r) => r.question).length;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-panel)] sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Public brief review
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
-              Share token: {shareToken}
-            </h1>
-          </div>
-          <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted-foreground">
-            Placeholder route
-          </span>
-        </div>
+    <div className="grid grid-rows-[48px_1fr] h-screen overflow-hidden bg-background">
+      <ClientHeader
+        docName="payments-v2"
+        specVersion="spec/v2.1"
+        reqCount={MOCK_REQUIREMENTS.length}
+        needsInputCount={needsInputCount}
+        revOpen={revOpen}
+        theme={theme}
+        onToggleRev={() => setRevOpen((p) => !p)}
+        onToggleTheme={toggleTheme}
+      />
 
-        <div className="mt-8 space-y-5">
-          {[
-            "Summary",
-            "Goals and success criteria",
-            "Ambiguities",
-            "Follow-up questions",
-          ].map((section) => (
-            <section
-              key={section}
-              className="rounded-[1.25rem] border border-border bg-background/70 p-5"
-            >
-              <h2 className="text-lg font-semibold text-foreground">{section}</h2>
-              <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                This placeholder establishes the public brief route. The real
-                implementation will replace this with a structured brief,
-                inline-highlight comment support, and follow-up answer controls.
-              </p>
-            </section>
-          ))}
-        </div>
+      <div
+        className={cn(
+          "grid min-h-0 overflow-hidden transition-all duration-base ease-out-app",
+          revOpen ? "grid-cols-[1fr_240px]" : "grid-cols-[1fr]",
+        )}
+      >
+        <ClientDoc
+          title="Payment Service v2 — Requirements Specification"
+          meta={{
+            project: "payments-v2",
+            version: "spec/v2.1",
+            reqCount: MOCK_REQUIREMENTS.length,
+            label: "shared for review",
+          }}
+          requirements={MOCK_REQUIREMENTS}
+        />
+
+        {revOpen && (
+          <RevisionPanel
+            revisions={MOCK_REVISIONS}
+            onClose={() => setRevOpen(false)}
+          />
+        )}
       </div>
-    </main>
+    </div>
   );
 }
