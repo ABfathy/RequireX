@@ -5,21 +5,25 @@ import {
   ACCEPTED_IMAGE_TYPES,
   ACCEPTED_PDF_TYPES,
   detectSourceType,
+  isAcceptedAudioType,
+  isAcceptedImageType,
+  isAcceptedPdfType,
+  isAcceptedSourceMimeType,
   TEXT_MAX_CHARS,
   TextAssetInputSchema,
   UpdateLabelInputSchema,
 } from "@/server/validators/assets";
 
 describe("detectSourceType", () => {
-  it.each(ACCEPTED_IMAGE_TYPES)("maps %s to IMAGE", (mime) => {
+  it.each(ACCEPTED_IMAGE_TYPES)("maps %s to IMAGE", (mime: string) => {
     expect(detectSourceType(mime)).toBe("IMAGE");
   });
 
-  it.each(ACCEPTED_AUDIO_TYPES)("maps %s to AUDIO", (mime) => {
+  it.each(ACCEPTED_AUDIO_TYPES)("maps %s to AUDIO", (mime: string) => {
     expect(detectSourceType(mime)).toBe("AUDIO");
   });
 
-  it.each(ACCEPTED_PDF_TYPES)("maps %s to PDF", (mime) => {
+  it.each(ACCEPTED_PDF_TYPES)("maps %s to PDF", (mime: string) => {
     expect(detectSourceType(mime)).toBe("PDF");
   });
 
@@ -31,6 +35,30 @@ describe("detectSourceType", () => {
 
   it("throws on empty string", () => {
     expect(() => detectSourceType("")).toThrow("Unsupported MIME type:");
+  });
+});
+
+describe("accepted MIME type helpers", () => {
+  it.each(ACCEPTED_IMAGE_TYPES)("accepts image type %s", (mime: string) => {
+    expect(isAcceptedImageType(mime)).toBe(true);
+    expect(isAcceptedSourceMimeType(mime)).toBe(true);
+  });
+
+  it.each(ACCEPTED_AUDIO_TYPES)("accepts audio type %s", (mime: string) => {
+    expect(isAcceptedAudioType(mime)).toBe(true);
+    expect(isAcceptedSourceMimeType(mime)).toBe(true);
+  });
+
+  it.each(ACCEPTED_PDF_TYPES)("accepts pdf type %s", (mime: string) => {
+    expect(isAcceptedPdfType(mime)).toBe(true);
+    expect(isAcceptedSourceMimeType(mime)).toBe(true);
+  });
+
+  it("rejects unsupported types", () => {
+    expect(isAcceptedImageType("application/zip")).toBe(false);
+    expect(isAcceptedAudioType("application/zip")).toBe(false);
+    expect(isAcceptedPdfType("application/zip")).toBe(false);
+    expect(isAcceptedSourceMimeType("application/zip")).toBe(false);
   });
 });
 

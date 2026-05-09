@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm test:unit && pnpm test:e2e && pnpm test:a11y",
+    "test": "pnpm vitest",
     "test:unit": "node -e \"console.log('Unit tests are not configured yet. Planned for Workstream 10.')\"",
     "test:e2e": "node -e \"console.log('E2E tests are not configured yet. Planned for Workstream 10.')\"",
     "test:a11y": "node -e \"console.log('Accessibility tests are not configured yet. Planned for Workstream 10.')\"",
@@ -49,7 +49,8 @@
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   },
   "packageManager": "pnpm@10.22.0"
 }

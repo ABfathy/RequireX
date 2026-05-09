@@ -34,14 +34,34 @@ export const UpdateLabelInputSchema = z.object({
 export type TextAssetInput = z.infer<typeof TextAssetInputSchema>;
 export type UpdateLabelInput = z.infer<typeof UpdateLabelInputSchema>;
 
+export function isAcceptedImageType(mimeType: string) {
+  return (ACCEPTED_IMAGE_TYPES as readonly string[]).includes(mimeType);
+}
+
+export function isAcceptedAudioType(mimeType: string) {
+  return (ACCEPTED_AUDIO_TYPES as readonly string[]).includes(mimeType);
+}
+
+export function isAcceptedPdfType(mimeType: string) {
+  return (ACCEPTED_PDF_TYPES as readonly string[]).includes(mimeType);
+}
+
+export function isAcceptedSourceMimeType(mimeType: string) {
+  return (
+    isAcceptedImageType(mimeType) ||
+    isAcceptedAudioType(mimeType) ||
+    isAcceptedPdfType(mimeType)
+  );
+}
+
 export function detectSourceType(mimeType: string): SourceType {
-  if ((ACCEPTED_IMAGE_TYPES as readonly string[]).includes(mimeType)) {
+  if (isAcceptedImageType(mimeType)) {
     return "IMAGE";
   }
-  if ((ACCEPTED_AUDIO_TYPES as readonly string[]).includes(mimeType)) {
+  if (isAcceptedAudioType(mimeType)) {
     return "AUDIO";
   }
-  if ((ACCEPTED_PDF_TYPES as readonly string[]).includes(mimeType)) {
+  if (isAcceptedPdfType(mimeType)) {
     return "PDF";
   }
   throw new Error(`Unsupported MIME type: ${mimeType}`);

@@ -5,6 +5,7 @@ import {
   AssetNotFoundError,
   deleteAsset,
   getSessionAssets,
+  persistFileAsset,
   persistTextAsset,
 } from "@/server/services/assets";
 
@@ -92,6 +93,42 @@ describe("persistTextAsset", () => {
         textContent: "x".repeat(500_001),
       }),
     ).rejects.toThrow("500000");
+  });
+});
+
+describe("persistFileAsset", () => {
+  it("maps upload metadata into SourceAsset columns", async () => {
+    mockPrisma.sourceAsset.create.mockResolvedValueOnce({ id: "asset_file_1" });
+
+    await persistFileAsset({
+      sessionId: "session_1",
+      sourceType: "PDF",
+      utKey: "ut_key_1",
+      ufsUrl: "https://utfs.io/f/ut_key_1",
+      mimeType: "application/pdf",
+      fileSizeBytes: 2048,
+      originalFileName: "scope.pdf",
+      displayLabel: "Client scope",
+      routeSlug: "pdfUploader",
+      folderLabel: "kickoff-batch",
+    });
+
+    expect(mockPrisma.sourceAsset.create).toHaveBeenCalledWith({
+      data: {
+        sessionId: "session_1",
+        sourceType: "PDF",
+        status: "UPLOADED",
+        displayLabel: "Client scope",
+        originalFileName: "scope.pdf",
+        mimeType: "application/pdf",
+        fileSizeBytes: 2048,
+        utKey: "ut_key_1",
+        ufsUrl: "https://utfs.io/f/ut_key_1",
+        appUrl: "https://utfs.io/f/ut_key_1",
+        routeSlug: "pdfUploader",
+        folderLabel: "kickoff-batch",
+      },
+    });
   });
 });
 

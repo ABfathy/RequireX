@@ -24,7 +24,7 @@ Use this file as the simplest possible implementation tracker. Check items only 
 - [x] Initial migration created
 - [x] Demo seed flow created
 - [ ] Supabase Postgres connected
-- [ ] UploadThing storage integration connected
+- [x] UploadThing storage integration connected
 - [x] Source chunk model created
 - [x] Processing job model created
 
@@ -71,7 +71,7 @@ Use this file as the simplest possible implementation tracker. Check items only 
 
 ## Internal Workspace
 
-- [ ] Desktop workspace shell implemented
+- [x] Desktop workspace shell implemented
 - [ ] Left rail project/session navigation implemented
 - [ ] Bottom refinement composer implemented
 - [ ] Right-side inspector implemented
@@ -111,14 +111,14 @@ Use this file as the simplest possible implementation tracker. Check items only 
 
 ## Testing
 
-- [ ] Vitest configured
+- [x] Vitest configured
 - [ ] React Testing Library configured
 - [ ] jest-dom configured
 - [ ] Playwright configured
 - [ ] axe-core checks configured
 - [ ] Contract validation unit tests added
 - [ ] Evidence mapping unit tests added
-- [ ] Service logic unit tests added
+- [x] Service logic unit tests added
 - [ ] Brief renderer component tests added
 - [ ] Public feedback component tests added
 - [ ] Desktop e2e happy path added
@@ -129,6 +129,6 @@ Use this file as the simplest possible implementation tracker. Check items only 
 
 - [ ] Vercel deployment configured
 - [ ] Environment variables configured in deployment
-- [ ] Demo seed data prepared
+- [x] Demo seed data prepared
 - [ ] Demo happy path rehearsed
 - [ ] Backup demo plan prepared

@@ -86,10 +86,10 @@ Objective:
 - secure internal routes while keeping public review frictionless
 
 Detailed tasks:
-- configure `Clerk` in the app
-- protect all internal app routes
-- define explicit public route exceptions
-- define server-side authorization helpers for private mutations
+- ~~configure `Clerk` in the app~~
+- ~~protect all internal app routes~~
+- ~~define explicit public route exceptions~~
+- ~~define server-side authorization helpers for private mutations~~
 - define public mutation boundaries for:
   - client comments
   - follow-up answers
@@ -102,22 +102,25 @@ Outputs:
 - working auth boundary
 - clear internal/public permission map
 
+**Status (2026-05-09):** PARTIAL. Clerk is wired, `/app` is protected, the public brief route remains open, and private API helpers exist in `src/server/auth/internal.ts`. Public client mutations, rate limiting, and final internal/public action rules are still not implemented.
+
 ## Workstream 4: Intake and Asset Pipeline
 
 Objective:
 - make source intake reliable across all supported input types
 
 Detailed tasks:
-- build raw text intake flow
-- build image upload flow
-- build audio upload flow
-- build PDF upload flow
-- build mixed-source folder upload flow
-- define accepted MIME types and upload size limits
-- store asset records before generation starts
-- add upload validation and error states
-- add source labels and display names for uploaded assets
-- define asset lifecycle states:
+- ~~build raw text intake flow~~
+- ~~build image upload flow~~
+- ~~build audio upload flow~~
+- ~~build PDF upload flow~~
+- ~~build mixed-source folder upload flow~~
+- ~~define accepted MIME types and upload size limits~~
+- ~~store asset records before generation starts~~
+- add upload error states
+- ~~add upload validation~~
+- ~~add source labels and display names for uploaded assets~~
+- ~~define asset lifecycle states:~~
   - uploaded
   - queued
   - processing
@@ -125,15 +128,15 @@ Detailed tasks:
   - failed
 - add progress-state payloads the UI can consume
 - document how mixed-source submissions are assembled into one session
-- document that one project always represents one client, even when many intake sessions exist
+- ~~document that one project always represents one client, even when many intake sessions exist~~
 
 Outputs:
 - complete intake API surface
-- persistent source asset tracking
+- ~~persistent source asset tracking~~
 - UI-consumable intake status model
-- Some unit tests in /tests/unit to validate functionality
+- ~~Some unit tests in /tests/unit to validate functionality~~
 
-**Status (2026-05-09):** COMPLETE. UploadThing router wired (4 routes: image/audio/pdf/mixed), API surface built, SourceAsset persistence implemented, validators added. See `src/lib/uploadthing.ts`, `src/server/services/assets.ts`, `src/server/validators/assets.ts`. Unit tests in `tests/unit/assets.test.ts` and `tests/unit/validators.test.ts`. NOTE: WS4 only writes `UPLOADED` status; WS5 owns all subsequent transitions (QUEUED→PROCESSING→PROCESSED/FAILED).
+**Status (2026-05-09):** PARTIAL. Core intake is in place: UploadThing router wired for image/audio/pdf/mixed uploads, text intake route added, `SourceAsset` persistence implemented, MIME validation added, and unit tests exist in `tests/unit/assets.test.ts` and `tests/unit/validators.test.ts`. Remaining gaps are upload error/progress UX, mixed-source submission assembly, and any status transitions beyond the initial `UPLOADED` write owned by Workstream 5.
 
 ## Workstream 5: AI Processing and Brief Generation
 

@@ -1,11 +1,17 @@
-import { createRouteHandler, createUploadthing, type FileRouter } from "uploadthing/next";
+import {
+  createRouteHandler,
+  createUploadthing,
+  type FileRouter,
+} from "uploadthing/next";
+import { UploadThingError } from "uploadthing/server";
 import { z } from "zod";
 
 import { requireInternalAuth } from "@/server/auth";
 import { persistFileAsset } from "@/server/services/assets";
 import {
-  ACCEPTED_AUDIO_TYPES,
   detectSourceType,
+  isAcceptedAudioType,
+  isAcceptedSourceMimeType,
 } from "@/server/validators/assets";
 
 const f = createUploadthing();
@@ -15,6 +21,20 @@ const sessionInput = z.object({
   displayLabel: z.string().max(200).optional(),
   folderLabel: z.string().max(200).optional(),
 });
+
+function assertAcceptedFiles(
+  routeSlug: string,
+  files: ReadonlyArray<{ name: string; type: string }>,
+  isAcceptedMimeType: (mimeType: string) => boolean,
+) {
+  const unsupportedFile = files.find((file) => !isAcceptedMimeType(file.type));
+
+  if (unsupportedFile) {
+    throw new UploadThingError(
+      `${routeSlug} does not accept ${unsupportedFile.type} (${unsupportedFile.name})`,
+    );
+  }
+}
 
 export const uploadRouter = {
   imageUploader: f({
@@ -35,7 +55,7 @@ export const uploadRouter = {
         sessionId: metadata.sessionId,
         sourceType: "IMAGE",
         utKey: file.key,
-        ufsUrl: file.url,
+        ufsUrl: file.ufsUrl,
         mimeType: file.type,
         fileSizeBytes: file.size,
         originalFileName: file.name,
@@ -48,11 +68,12 @@ export const uploadRouter = {
   // UploadThing v7 has no "audio" category — blob accepts all binary files.
   // WS6: set accept="audio/*" on the file input to enforce client-side.
   audioUploader: f({
-    blob: { maxFileSize: "100MB", maxFileCount: 1 },
+    blob: { maxFileSize: "128MB", maxFileCount: 1 },
   })
     .input(sessionInput)
-    .middleware(async ({ input }) => {
+    .middleware(async ({ input, files }) => {
       await requireInternalAuth();
+      assertAcceptedFiles("audioUploader", files, isAcceptedAudioType);
       return {
         sessionId: input.sessionId,
         displayLabel: input.displayLabel,
@@ -61,15 +82,11 @@ export const uploadRouter = {
       };
     })
     .onUploadComplete(async ({ metadata, file }) => {
-      if (!(ACCEPTED_AUDIO_TYPES as readonly string[]).includes(file.type)) {
-        console.error(`audioUploader: rejected non-audio MIME type: ${file.type}`);
-        return;
-      }
       await persistFileAsset({
         sessionId: metadata.sessionId,
         sourceType: "AUDIO",
         utKey: file.key,
-        ufsUrl: file.url,
+        ufsUrl: file.ufsUrl,
         mimeType: file.type,
         fileSizeBytes: file.size,
         originalFileName: file.name,
@@ -97,7 +114,7 @@ export const uploadRouter = {
         sessionId: metadata.sessionId,
         sourceType: "PDF",
         utKey: file.key,
-        ufsUrl: file.url,
+        ufsUrl: file.ufsUrl,
         mimeType: file.type,
         fileSizeBytes: file.size,
         originalFileName: file.name,
@@ -111,11 +128,12 @@ export const uploadRouter = {
   mixedUploader: f({
     image: { maxFileSize: "8MB", maxFileCount: 10 },
     pdf: { maxFileSize: "32MB", maxFileCount: 5 },
-    blob: { maxFileSize: "100MB", maxFileCount: 1 },
+    blob: { maxFileSize: "128MB", maxFileCount: 1 },
   })
     .input(sessionInput)
-    .middleware(async ({ input }) => {
+    .middleware(async ({ input, files }) => {
       await requireInternalAuth();
+      assertAcceptedFiles("mixedUploader", files, isAcceptedSourceMimeType);
       return {
         sessionId: input.sessionId,
         displayLabel: input.displayLabel,
@@ -129,7 +147,7 @@ export const uploadRouter = {
         sessionId: metadata.sessionId,
         sourceType,
         utKey: file.key,
-        ufsUrl: file.url,
+        ufsUrl: file.ufsUrl,
         mimeType: file.type,
         fileSizeBytes: file.size,
         originalFileName: file.name,
@@ -142,4 +160,4 @@ export const uploadRouter = {
 
 export type OurFileRouter = typeof uploadRouter;
 
-export const { handlers } = createRouteHandler({ router: uploadRouter });
+export const handlers = createRouteHandler({ router: uploadRouter });
