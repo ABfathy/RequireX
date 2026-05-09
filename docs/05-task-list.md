@@ -131,6 +131,9 @@ Outputs:
 - complete intake API surface
 - persistent source asset tracking
 - UI-consumable intake status model
+- Some unit tests in /tests/unit to validate functionality
+
+**Status (2026-05-09):** COMPLETE. UploadThing router wired (4 routes: image/audio/pdf/mixed), API surface built, SourceAsset persistence implemented, validators added. See `src/lib/uploadthing.ts`, `src/server/services/assets.ts`, `src/server/validators/assets.ts`. Unit tests in `tests/unit/assets.test.ts` and `tests/unit/validators.test.ts`. NOTE: WS4 only writes `UPLOADED` status; WS5 owns all subsequent transitions (QUEUED→PROCESSING→PROCESSED/FAILED).
 
 ## Workstream 5: AI Processing and Brief Generation
 

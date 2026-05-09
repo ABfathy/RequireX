@@ -214,6 +214,18 @@ Retry policy:
 - do not duplicate snapshots on replay
 - treat invalid contract output as a handled failure with explicit error state
 
+## SourceAsset Status Ownership
+
+**Workstream 4 responsibility:** Intake layer writes `UPLOADED` status when asset is first persisted.
+
+**Workstream 5 responsibility:** Inngest jobs own all subsequent status transitions:
+- `QUEUED` — job created, awaiting execution
+- `PROCESSING` — job running, normalizing source
+- `PROCESSED` — source chunks created, ready for generation
+- `FAILED` — error in extraction or processing
+
+Never skip states. Status is a reliable signal of what work has been done and what chunks exist.
+
 ## Revision and History Model
 
 Use simplified event history plus stable snapshots.
