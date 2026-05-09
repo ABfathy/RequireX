@@ -48,7 +48,7 @@ Use this file as the simplest possible implementation tracker. Check items only 
 
 ## AI Generation
 
-- [ ] Inngest generation job wired
+- [x] Inngest generation job wired
 - [ ] Text normalization implemented
 - [ ] Audio transcription path implemented
 - [ ] PDF extraction path implemented
