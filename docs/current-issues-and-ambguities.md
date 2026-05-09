@@ -16,12 +16,14 @@ These items are no longer open and should be treated as locked:
 
 ## 1. Public Mutation Security Contract
 
-Still needs a concrete write policy for public review actions:
+Resolved:
 
-- is share-token possession enough for comments, answers, and confirmation
-- what rate limiting should exist
-- how duplicate submissions are handled
-- whether old frozen links remain writable after a newer snapshot exists
+- share-token possession is the v1 public write credential
+- comments, answers, and confirmation require an `ACTIVE`, unexpired `ShareLink`
+- public writes are allowed only while the linked snapshot status is `SHARED`
+- `CONFIRMED` and `SUPERSEDED` snapshots are write-closed
+- public endpoints use best-effort per-IP per-share-token rate limiting in app memory
+- confirmation is idempotent once the snapshot is already `CONFIRMED`
 
 ## 2. Regeneration Authority Order
 
@@ -37,11 +39,15 @@ This should be written before Workstream 5 goes too far.
 
 ## 3. Snapshot Mutation Decision Table
 
-The schema is now immutable-first, but the app still needs exact behavior rules for:
+Partially resolved:
+
+- public confirmation mutates snapshot status in place from `SHARED` to `CONFIRMED`
+- client comments and answers create only review/history rows plus `RevisionEvent` rows
+
+Still open:
 
 - when a new snapshot is created
 - when only a `RevisionEvent` is created
-- whether public confirmation mutates snapshot status in place
 - whether restore creates a new snapshot or reactivates an old one
 
 ## 4. Canonical Read Models
