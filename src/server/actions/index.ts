@@ -6,3 +6,13 @@ export {
   requireInternalActor,
   requireInternalAuth,
 } from "@/server/auth";
+
+export {
+  AssetDeleteForbiddenError,
+  AssetNotFoundError,
+  deleteAsset,
+  getSessionAssets,
+  persistFileAsset,
+  persistTextAsset,
+  updateAssetLabel,
+} from "@/server/services/assets";

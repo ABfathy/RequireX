@@ -37,13 +37,13 @@ Use this file as the simplest possible implementation tracker. Check items only 
 
 ## Source Intake
 
-- [ ] Raw text intake implemented
-- [ ] Image upload implemented
-- [ ] Audio upload implemented
-- [ ] PDF upload implemented
-- [ ] Mixed-source folder upload implemented
+- [x] Raw text intake implemented
+- [x] Image upload implemented
+- [x] Audio upload implemented
+- [x] PDF upload implemented
+- [x] Mixed-source folder upload implemented
 - [ ] Mixed-source submission implemented
-- [ ] Upload validation implemented
+- [x] Upload validation implemented
 - [ ] Upload progress states implemented
 
 ## AI Generation
