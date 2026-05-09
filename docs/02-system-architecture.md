@@ -31,6 +31,17 @@ Ship a focused intake-and-briefing web app that:
 Public routes stay open:
 
 - `/brief/[shareToken]`
+- `/api/public/briefs/[shareToken]/comments`
+- `/api/public/briefs/[shareToken]/answers`
+- `/api/public/briefs/[shareToken]/confirm`
+
+Public write boundary:
+
+- public review writes do not use Clerk
+- possession of a valid share token is the public write credential in v1
+- public writes require an `ACTIVE`, unexpired `ShareLink`
+- public writes are allowed only while the linked snapshot is `SHARED`
+- `CONFIRMED` and `SUPERSEDED` snapshots stay readable but become write-closed
 
 Optional bonus:
 
@@ -151,12 +162,13 @@ Mobile support:
 - `POST /api/uploads`
 - `POST /api/folder-uploads`
 - `POST /api/uploadthing`
+- `POST /api/public/briefs/[shareToken]/comments`
+- `POST /api/public/briefs/[shareToken]/answers`
+- `POST /api/public/briefs/[shareToken]/confirm`
 - `POST /api/projects`
 - `POST /api/sessions`
 - `POST /api/generate`
 - `POST /api/regenerate`
-- `POST /api/comments`
-- `POST /api/follow-up-answers`
 - `POST /api/share-links`
 
 ## Primary Data Flow

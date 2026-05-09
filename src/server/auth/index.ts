@@ -6,3 +6,8 @@ export {
   requireInternalActor,
   requireInternalAuth,
 } from "./internal";
+export {
+  assertPublicMutationRateLimit,
+  getRequestClientIp,
+  PublicRateLimitError,
+} from "./public";

@@ -255,6 +255,36 @@ These must be enforced in service code:
 - snapshots are immutable after insertion
 - client comments and answers create review/history rows, not snapshot rewrites
 
+## Public Review Mutation Policy
+
+- public review writes stay outside Clerk and use share-link possession as the v1 public credential
+- a public write is allowed only when the `ShareLink` is `ACTIVE` and not expired
+- a public write is allowed only when the linked `BriefSnapshot.status` is `SHARED`
+- `CONFIRMED` and `SUPERSEDED` snapshots are read-only for public writes
+- brief confirmation mutates `BriefSnapshot.status` in place from `SHARED` to `CONFIRMED`
+- client comments and follow-up answers never mutate brief content directly
+- actor attribution rules:
+  - internal actions use `actorType = INTERNAL_USER` and Clerk `userId` as `actorId`
+  - client actions use `actorType = CLIENT`
+  - system jobs use `actorType = SYSTEM` with nullable `actorId`
+- every client write also creates a `RevisionEvent` with `actorType = CLIENT`
+- `RevisionEvent.actorId` uses normalized client email when available, otherwise `share-link:{shareLinkId}`
+- rate limiting is best-effort and per app instance in v1:
+  - comments: 10 requests per 10 minutes per IP per share token
+  - follow-up answers: 10 requests per 10 minutes per IP per share token
+  - confirmation: 3 requests per 10 minutes per IP per share token
+
+## Client Cannot In V1
+
+- access any internal `/app/**` route or Clerk-protected private API
+- create, revoke, or rotate share links
+- edit generated brief text directly
+- regenerate or restore snapshots
+- upload new intake sources from the public review surface
+- delete or resolve comments and answers through the public API
+- write to snapshots that are `CONFIRMED`, `SUPERSEDED`, revoked, or expired
+- access projects or snapshots other than the one frozen to the possessed share token
+
 ## Naming and Deletion Policy
 
 - deleting a `Workspace` cascades to projects and their related records

@@ -90,19 +90,19 @@ Detailed tasks:
 - ~~protect all internal app routes~~
 - ~~define explicit public route exceptions~~
 - ~~define server-side authorization helpers for private mutations~~
-- define public mutation boundaries for:
+- ~~define public mutation boundaries for:~~
   - client comments
   - follow-up answers
   - brief confirmation
-- define rate-limit assumptions for public endpoints
-- define actor attribution rules for internal vs client actions
-- document what the client can never do in v1
+- ~~define rate-limit assumptions for public endpoints~~
+- ~~define actor attribution rules for internal vs client actions~~
+- ~~document what the client can never do in v1~~
 
 Outputs:
 - working auth boundary
 - clear internal/public permission map
 
-**Status (2026-05-09):** PARTIAL. Clerk is wired, `/app` is protected, the public brief route remains open, and private API helpers exist in `src/server/auth/internal.ts`. Public client mutations, rate limiting, and final internal/public action rules are still not implemented.
+**Status (2026-05-09):** COMPLETE. Clerk protects internal routes and private mutations, while public review writes stay open behind share-token checks instead of Clerk. Public comment, answer, and confirmation endpoints now enforce active-link access, writable snapshot state, best-effort rate limits, and client actor attribution. The v1 client capability limits are documented in `docs/03-brief-contract.md`.
 
 ## Workstream 4: Intake and Asset Pipeline
 

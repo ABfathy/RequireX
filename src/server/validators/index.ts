@@ -14,3 +14,11 @@ export {
   assertExclusiveEvidenceTarget,
   assertFollowUpAnswerConsistency,
 } from "./persistence";
+export {
+  type PublicBriefConfirmInput,
+  PublicBriefConfirmInputSchema,
+  type PublicCommentInput,
+  PublicCommentInputSchema,
+  type PublicFollowUpAnswerInput,
+  PublicFollowUpAnswerInputSchema,
+} from "./public-review";

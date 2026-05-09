@@ -16,7 +16,7 @@ Use this file as the simplest possible implementation tracker. Check items only 
 - [x] Internal routes protected
 - [x] Public brief route left open
 - [x] Internal API authorization helpers added
-- [ ] Public mutation boundaries implemented
+- [x] Public mutation boundaries implemented
 
 ## Data and Persistence
 
