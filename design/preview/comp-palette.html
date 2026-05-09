@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Command palette</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 24px 28px; background: var(--bg-app);}
+.pal {
+  width: 100%; max-width: 520px; margin: 0 auto;
+  border-radius: var(--r-4);
+  background: rgba(20,20,22,0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-2);
+  box-shadow: 0 24px 48px rgba(0,0,0,0.55), 0 8px 16px rgba(0,0,0,0.40);
+  overflow: hidden;
+}
+.search { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border-1);}
+.search svg { color: var(--fg-3); width: 14px; height: 14px;}
+.search input {
+  background: transparent; border: none; outline: none; flex: 1;
+  font-family: var(--font-sans); font-size: 13px; color: var(--fg-1);
+}
+.section { padding: 6px 0;}
+.heading { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-4); padding: 6px 14px 4px; }
+.row { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 10px; padding: 5px 14px; height: 26px; font-size: 13px; color: var(--fg-2); cursor: default;}
+.row svg { width: 14px; height: 14px; color: var(--fg-3);}
+.row.active { background: var(--bg-surface-3); color: var(--fg-1);}
+.row.active svg { color: var(--accent);}
+.kbd { font-family: var(--font-mono); font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.04); color: var(--fg-3); border: 1px solid var(--border-2);}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="pal">
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input value="extract" />
+      <span class="kbd">esc</span>
+    </div>
+    <div class="section">
+      <div class="heading">Actions</div>
+      <div class="row active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg><span>Extract requirements from selected source</span><span class="kbd">⏎</span></div>
+      <div class="row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span>Add new source&hellip;</span><span class="kbd">⌘N</span></div>
+      <div class="row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>Re-extract all sources</span></div>
+    </div>
+    <div class="section">
+      <div class="heading">Recent</div>
+      <div class="row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Extracted 23 reqs from <span class="mono" style="color:var(--fg-3); font-family:var(--font-mono); font-size:12px">payments-spec.pdf</span></span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>RequireX — Editor</title>
+<link rel="icon" href="../../assets/favicon.svg"/>
+<link rel="stylesheet" href="kit.css"/>
+<style>
+/* Editor-page-specific styles. Token defaults come from kit.css + colors_and_type.css. */
+.app { grid-template-rows: 36px 1fr 22px; }
+.app-body { grid-template-columns: var(--sb-w, 232px) 1fr var(--rp-w, 0px); transition: grid-template-columns var(--dur-base) var(--ease-out); }
+.app-body.rp-open { --rp-w: 320px; }
+.app-body.sb-collapsed { --sb-w: 0px; }
+
+/* Sidebar — projects with nested chat threads */
+.psb { background: var(--bg-app); border-right: 1px solid var(--border-1); display: flex; flex-direction: column; min-height: 0; }
+.psb-head { height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-bottom: 1px solid var(--border-1); }
+.psb-brand { display: flex; align-items: center; gap: 8px; flex: 1; }
+.psb-brand .name { font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+.psb-new { background: transparent; border: none; padding: 0; height: 22px; padding: 0 8px; border-radius: 4px; color: var(--fg-3); font-family: var(--font-sans); font-size: 11px; display: inline-flex; align-items: center; gap: 5px; cursor: default; border: 1px solid var(--border-1); }
+.psb-new:hover { color: var(--fg-1); background: var(--bg-surface-1); }
+
+.psb-search { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border-1); }
+.psb-search input { flex: 1; background: transparent; border: none; outline: none; font-family: var(--font-sans); font-size: 12px; color: var(--fg-1); }
+.psb-search input::placeholder { color: var(--fg-4); }
+.psb-search > svg { color: var(--fg-3); }
+.psb-search .kbd { margin-left: auto; }
+
+.psb-scroll { flex: 1; overflow: auto; padding: 6px 0 12px; }
+
+.proj { padding: 0 0 6px; }
+.proj-head { width: 100%; height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px; background: transparent; border: none; cursor: default; text-align: left; }
+.proj-chev { display: grid; place-items: center; transition: transform var(--dur-fast) var(--ease-out); color: var(--fg-4); }
+.proj-chev.is-open { transform: rotate(90deg); }
+.proj-name { flex: 1; font-size: 12.5px; color: var(--fg-1); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-meta { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); }
+.proj-head:hover { background: var(--bg-surface-1); }
+
+.chat { position: relative; width: 100%; height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 28px; background: transparent; border: none; cursor: default; text-align: left; font-size: 12px; color: var(--fg-3); }
+.chat:hover { background: var(--bg-surface-1); color: var(--fg-2); }
+.chat.is-active { background: var(--bg-surface-2); color: var(--fg-1); }
+.chat .rail { position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; background: transparent; border-radius: 1px; }
+.chat.is-active .rail { background: var(--accent); }
+.chat svg { color: var(--fg-4); flex-shrink: 0; }
+.chat.is-active svg { color: var(--accent); }
+.chat .label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat .when { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); }
+
+.psb-foot { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border-1); }
+.psb-foot .av { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-surface-3); display: grid; place-items: center; font-family: var(--font-mono); font-size: 11px; color: var(--fg-1); border: 1px solid var(--border-1); }
+.psb-foot .who { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.psb-foot .who .n { font-size: 12px; color: var(--fg-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.psb-foot .who .e { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Main editor — doc view */
+.docview { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-app); }
+.dv-head { height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--border-1); }
+.dv-crumbs { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-3); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+.dv-crumbs .crumb-last { color: var(--fg-1); font-weight: 500; }
+.dv-actions { display: flex; gap: 4px; align-items: center; }
+.dv-tab { background: transparent; border: 1px solid transparent; height: 22px; padding: 0 8px; font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; cursor: default; }
+.dv-tab.is-on { background: var(--bg-surface-2); color: var(--fg-1); border-color: var(--border-2); }
+.dv-tab:hover { color: var(--fg-1); }
+
+.dv-scroll { flex: 1; overflow: auto; padding: 0 0 80px 0; }
+.doc {
+  max-width: 760px;
+  margin: 24px auto 0;
+  padding: 0 0 60px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--fg-1);
+}
+.doc .frontmatter { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-3); border: 1px solid var(--border-1); border-radius: var(--r-3); background: var(--bg-surface-1); padding: 10px 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin-bottom: 32px; }
+.doc .frontmatter dt { color: var(--fg-4); }
+.doc .frontmatter dd { margin: 0; color: var(--fg-2); }
+
+.dline { display: grid; grid-template-columns: 32px 1fr; column-gap: 14px; padding: 1px 0; align-items: baseline; }
+.dline .ln { user-select: none; text-align: right; font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-4); padding-top: 4px; opacity: 0.7; }
+.dline:hover { background: rgba(255,255,255,0.015); }
+.dline.is-cursor .ln { color: var(--accent); opacity: 1; }
+.dline.is-cursor::before { content: ""; position: absolute; }
+.dline.h1 { padding: 14px 0 6px; }
+.dline.h1 .text { font-size: 24px; font-weight: 500; letter-spacing: -0.01em; }
+.dline.h2 { padding: 18px 0 4px; }
+.dline.h2 .text { font-size: 17px; font-weight: 500; }
+.dline.spacer { padding: 6px 0; }
+.dline.req { padding: 6px 0; }
+.dline .rqid { font-family: var(--font-mono); font-size: 11px; color: var(--fg-4); margin-right: 8px; }
+.dline.req.is-cursor .rqid { color: var(--accent); }
+.dline mark { background: rgba(203,155,111,0.10); color: var(--fg-1); padding: 0 2px; border-radius: 2px; }
+.dline .ev {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 6px;
+  padding: 1px 6px 1px 5px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-1);
+  border-radius: 3px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--fg-3);
+  vertical-align: 1px;
+  cursor: default;
+}
+.doc .ev:hover { color: var(--fg-1); border-color: var(--border-2); }
+.doc .ev svg { color: var(--fg-4); }
+.doc .ev.is-amber { color: var(--accent); border-color: rgba(203,155,111,0.30); background: rgba(203,155,111,0.06); }
+.doc .ev.is-amber svg { color: var(--accent); }
+
+.qcard { margin: 8px 0 4px 46px; padding: 10px 12px; border: 1px dashed rgba(212,163,86,0.35); border-radius: var(--r-3); background: rgba(212,163,86,0.05); display: flex; flex-direction: column; gap: 6px; max-width: 660px; }
+.qcard .qhead { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--warning); font-weight: 500; }
+.qcard .qbody { font-size: 12.5px; color: var(--fg-2); line-height: 1.5; }
+.qcard .qfoot { display: flex; gap: 6px; }
+
+/* Bottom chat bar */
+.chatbar { position: sticky; bottom: 0; left: 0; right: 0; padding: 12px 16px 16px; display: flex; justify-content: center; pointer-events: none; }
+.chatbar-inner { pointer-events: auto; width: 100%; max-width: 760px; background: rgba(20,20,22,0.92); backdrop-filter: blur(12px); border: 1px solid var(--border-2); border-radius: var(--r-4); box-shadow: var(--shadow-e2); display: flex; flex-direction: column; }
+.chatbar-mode { display: flex; padding: 6px 8px 0; gap: 2px; }
+.chatbar-mode button { background: transparent; border: 1px solid transparent; height: 22px; padding: 0 9px; font-family: var(--font-sans); font-size: 11px; color: var(--fg-3); border-radius: 4px; cursor: default; display: inline-flex; align-items: center; gap: 5px; }
+.chatbar-mode button.is-on { background: var(--bg-surface-2); color: var(--fg-1); border-color: var(--border-1); }
+.chatbar-mode button:hover { color: var(--fg-1); }
+.chatbar-input { display: flex; align-items: flex-start; gap: 10px; padding: 6px 12px 10px; }
+.chatbar-input textarea { flex: 1; resize: none; background: transparent; border: none; outline: none; color: var(--fg-1); font-family: var(--font-sans); font-size: 13px; line-height: 1.5; min-height: 44px; max-height: 160px; padding: 6px 0; }
+.chatbar-input textarea::placeholder { color: var(--fg-4); }
+.chatbar-tools { display: flex; gap: 4px; align-items: center; padding-bottom: 4px; }
+.chatbar-send { background: var(--accent); color: var(--accent-fg); border: none; padding: 0; height: 26px; width: 26px; border-radius: 5px; display: grid; place-items: center; cursor: default; }
+.chatbar-send:hover { background: #d6a679; }
+.chatbar-context { display: flex; gap: 6px; padding: 0 12px 8px; flex-wrap: wrap; }
+.chatbar-context .ctx { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 3px; background: var(--bg-surface-2); border: 1px solid var(--border-1); font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+.chatbar-context .ctx svg { color: var(--fg-4); }
+
+/* Right rail */
+.rp { background: var(--bg-app); border-left: 1px solid var(--border-1); display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.rp-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-1); padding: 0 4px; }
+.rp-tab { background: transparent; border: none; padding: 0 10px; height: 36px; font-family: var(--font-sans); font-size: 12px; color: var(--fg-3); cursor: default; border-bottom: 1.5px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 6px; }
+.rp-tab.is-on { color: var(--fg-1); border-bottom-color: var(--accent); }
+.rp-tab svg { color: currentColor; }
+.rp-body { flex: 1; overflow: auto; padding: 10px 12px; }
+
+.src { display: flex; flex-direction: column; gap: 6px; }
+.src-row { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: default; }
+.src-row:hover { background: var(--bg-surface-1); }
+.src-row .ic { color: var(--fg-3); }
+.src-row .meta { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); }
+.src-row .name { font-size: 12px; color: var(--fg-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.history { display: flex; flex-direction: column; gap: 4px; }
+.history-msg { padding: 8px 10px; border-radius: var(--r-3); display: flex; flex-direction: column; gap: 4px; }
+.history-msg.user { background: var(--bg-surface-1); border: 1px solid var(--border-1); }
+.history-msg.ai { background: transparent; }
+.history-msg .who { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); display: flex; gap: 8px; }
+.history-msg .body { font-size: 12px; color: var(--fg-2); line-height: 1.55; }
+
+/* Git-tree (versions) */
+.tree { padding: 6px 4px; }
+.commit { position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 8px; padding: 6px 0; }
+.commit .branch { position: relative; display: flex; justify-content: center; }
+.commit .branch::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--border-2); transform: translateX(-50%); }
+.commit:first-child .branch::before { top: 50%; }
+.commit:last-child .branch::before { bottom: 50%; }
+.commit .node { width: 8px; height: 8px; border-radius: 50%; background: var(--bg-app); border: 1.5px solid var(--fg-3); margin-top: 6px; z-index: 1; }
+.commit.is-current .node { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(203,155,111,0.15); }
+.commit.is-merge .node { background: var(--info); border-color: var(--info); }
+.commit .body { display: flex; flex-direction: column; gap: 2px; padding: 2px 0; }
+.commit .title { font-size: 12.5px; color: var(--fg-1); font-weight: 500; }
+.commit.is-current .title { color: var(--accent); }
+.commit .sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); display: flex; gap: 6px; }
+.commit .sub .auth { color: var(--fg-3); }
+.commit .diff { display: flex; gap: 8px; font-family: var(--font-mono); font-size: 10px; margin-top: 2px; }
+.commit .diff .add { color: var(--success); }
+.commit .diff .del { color: var(--danger); }
+
+/* Pop-over tooltip card for evidence */
+.evidence-pop {
+  position: absolute;
+  z-index: 80;
+  width: 320px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-4);
+  box-shadow: var(--shadow-e2);
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.evidence-pop .head { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--fg-3); }
+.evidence-pop .head svg { color: var(--fg-3); }
+.evidence-pop .head .mono { color: var(--fg-2); font-family: var(--font-mono); }
+.evidence-pop .quote { padding: 8px 10px; border-left: 2px solid var(--border-2); font-size: 12.5px; color: var(--fg-2); line-height: 1.5; background: var(--bg-app); border-radius: 0 var(--r-2) var(--r-2) 0; }
+.evidence-pop .quote em { color: var(--fg-1); font-style: normal; background: rgba(203,155,111,0.10); padding: 0 2px; border-radius: 2px; }
+.evidence-pop .when { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="bits.jsx"></script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// Add a paperclip + send icon to existing Icon set
+Object.assign(Icon, {
+  Send:    (p) => <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12L19 5l-3 14-4-7-7-0z" /></svg>,
+  Paper:   (p) => <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6.21"/><path d="M16 3h5v5"/><path d="M21 3l-9 9"/></svg>,
+  Image:   (p) => <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5-9 9"/></svg>,
+  History: (p) => <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>,
+  Branch:  (p) => <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10"/><path d="M18 10c0-2-1-4-4-4H8"/><path d="M18 14c0 2-1 4-4 4H8"/></svg>,
+  Question:(p) => <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .5-1.5 1-1.5 2"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>,
+  Add:     (p) => <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>,
+});
+
+// ---- Project / chat data ----
+const PROJECTS = [
+  { id: "p1", name: "payments-v2", chats: [
+    { id: "c1", title: "Initial extraction from RFP", when: "12m" },
+    { id: "c2", title: "Resolve §3 ambiguities", when: "8m" },
+    { id: "c3", title: "Compliance pass — ISO 26262", when: "yest" },
+  ]},
+  { id: "p2", name: "settle-engine", chats: [
+    { id: "c4", title: "Reconciliation rules pass", when: "2d" },
+    { id: "c5", title: "Add SOX evidence", when: "5d" },
+  ]},
+  { id: "p3", name: "onboarding-flow-2026", chats: [
+    { id: "c6", title: "Stakeholder brief intake", when: "1w" },
+  ]},
+];
+
+// ---- Document model: array of lines ----
+const DOC = [
+  { kind: "frontmatter" },
+  { kind: "h1", text: "Payments-v2 Requirements" },
+  { kind: "spacer" },
+  { kind: "p", html: <>An overview of the requirements extracted from <mark>5 sources</mark> for the payments-v2 initiative. Each requirement is traced to one or more pieces of evidence; ambiguities are flagged inline.</> },
+  { kind: "spacer" },
+  { kind: "h2", text: "1. Functional" },
+  { kind: "req", id: "REQ-0140", text: "Every POST to /payments MUST include an Idempotency-Key header. Duplicate keys within a 24-hour window return the original response without re-executing the side effect.",
+    evidence: [
+      { kind: "doc", source: "rfp.pdf", loc: "§2.1", quote: <>"Requests must be safely retryable; clients <em>shall include an idempotency key</em> on every payment request."</>, when: "rfp.pdf · §2.1" },
+      { kind: "ticket", source: "JIRA-2502", loc: "thread", quote: <>"Per Eli: <em>24-hour window</em> on idempotency cache, decided on tuesday call."</>, when: "JIRA-2502 · 4d ago" },
+    ]},
+  { kind: "req", id: "REQ-0141", text: "Retries on transient gateway errors (5xx, network) follow exponential backoff with full jitter, capped at 30 s and 6 attempts.",
+    evidence: [{ kind: "code", source: "repo/payments/retry.ts", loc: "L84", quote: <>"<em>const cap = 30_000;</em> // ms — full-jitter exponential"</>, when: "main · 6d ago"}],
+  },
+  { kind: "h2", text: "2. Non-functional" },
+  { kind: "req", id: "REQ-0142", text: "The payments handler must respond within 200 ms at the 99th percentile under nominal load. Breaches escalate to the on-call within one minute.",
+    evidence: [
+      { kind: "doc", source: "payments-spec.pdf", loc: "§3.4 p.12", quote: <>"The payment handler shall respond within <em>200 ms at the 99th percentile</em> under nominal load."</>, when: "spec.pdf · §3.4"},
+      { kind: "transcript", source: "kickoff-call.vtt", loc: "00:24:11", quote: <>"…we agreed on <em>200ms p99</em> as the formal SLO going forward."</>, when: "kickoff-call.vtt · 24:11"},
+      { kind: "ticket", source: "JIRA-2491", loc: "comment", quote: <>"On-call escalation ladder: page within <em>60s</em> on breach."</>, when: "JIRA-2491 · 4d ago"},
+    ], cursor: true },
+  { kind: "question", id: "Q-0003", text: "What's the agreed escalation ladder for breaches that auto-resolve before the 60s window? RFP §3.4 implies 'no escalation' but the kickoff call agreed on a Sev-3 audit entry." },
+  { kind: "req", id: "REQ-0143", text: "All payment events are persisted to the audit log for 7 years (regulatory). Deletion is denied for retention-locked rows.",
+    evidence: [{ kind: "doc", source: "compliance-iso26262.pdf", loc: "§5", quote: <>"Audit retention: <em>7 years minimum</em> for any payment-bearing event."</>, when: "compliance.pdf · §5"}],
+  },
+  { kind: "h2", text: "3. Compliance" },
+  { kind: "req", id: "REQ-0145", text: "Cardholder name and last-4 are encrypted using customer-managed KMS keys. Logs MUST scrub PAN entirely.",
+    evidence: [{ kind: "doc", source: "rfp.pdf", loc: "§7.2", quote: <>"All cardholder data shall be encrypted at rest with <em>customer-managed keys</em>."</>, when: "rfp.pdf · §7.2"}],
+  },
+];
+
+// ---- Components ----
+
+const Sidebar = ({ activeChat, onSelect }) => {
+  const [open, setOpen] = useState({ p1: true, p2: false, p3: false });
+  const toggle = (id) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+
+  return (
+    <aside className="psb">
+      <div className="psb-head">
+        <div className="psb-brand">
+          <Icon.Logo size={18} />
+          <span className="name">RequireX</span>
+        </div>
+        <button className="psb-new"><Icon.Add size={11}/> New</button>
+      </div>
+      <div className="psb-search">
+        <Icon.Search size={13}/>
+        <input placeholder="Search projects, chats…" />
+        <span className="kbd">⌘K</span>
+      </div>
+      <div className="psb-scroll">
+        {PROJECTS.map((p) => (
+          <div className="proj" key={p.id}>
+            <button className="proj-head" onClick={() => toggle(p.id)}>
+              <span className={"proj-chev" + (open[p.id] ? " is-open" : "")}><Icon.ChevronRight size={11}/></span>
+              <span className="proj-name">{p.name}</span>
+              <span className="proj-meta">{p.chats.length}</span>
+            </button>
+            {open[p.id] && p.chats.map((c) => (
+              <button key={c.id} className={"chat" + (c.id === activeChat ? " is-active" : "")} onClick={() => onSelect(c.id)}>
+                <span className="rail" />
+                <Icon.Comment size={12}/>
+                <span className="label">{c.title}</span>
+                <span className="when">{c.when}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="psb-foot">
+        <span className="av">EL</span>
+        <span className="who">
+          <span className="n">Eli Ng</span>
+          <span className="e">eli@requirex.dev</span>
+        </span>
+        <button className="icon-btn" title="Settings"><Icon.Cog size={14}/></button>
+      </div>
+    </aside>
+  );
+};
+
+// Evidence pin
+const EVI_LABEL = { doc: "doc", transcript: "audio", ticket: "ticket", code: "code", image: "img" };
+const EVI_ICON  = { doc: "Doc", transcript: "Mic", ticket: "Ticket", code: "Code", image: "Image" };
+
+const EvidencePin = ({ ev, amber, onHover }) => {
+  const I = Icon[EVI_ICON[ev.kind]] || Icon.Doc;
+  return (
+    <span className={"ev" + (amber ? " is-amber" : "")} onMouseEnter={(e) => onHover(ev, e.currentTarget)} onMouseLeave={() => onHover(null)}>
+      <I size={10}/>
+      <span>{EVI_LABEL[ev.kind] || "src"}</span>
+    </span>
+  );
+};
+
+const QuestionCard = ({ q }) => (
+  <div className="qcard">
+    <div className="qhead"><Icon.Question size={12}/> Open question · <span className="mono" style={{fontFamily:"var(--font-mono)", color:"var(--fg-3)"}}>{q.id}</span></div>
+    <div className="qbody">{q.text}</div>
+    <div className="qfoot">
+      <button className="btn btn-ghost btn-sm">Ask in chat</button>
+      <button className="btn btn-secondary btn-sm">Resolve…</button>
+    </div>
+  </div>
+);
+
+const FrontMatter = () => (
+  <dl className="frontmatter">
+    <dt>title</dt><dd>Payments-v2 Requirements</dd>
+    <dt>project</dt><dd>payments-v2</dd>
+    <dt>version</dt><dd>v0.4.2</dd>
+    <dt>sources</dt><dd>5 (2 docs · 1 transcript · 1 ticket · 1 repo)</dd>
+    <dt>status</dt><dd>Draft — 18 of 23 approved</dd>
+    <dt>updated</dt><dd>2m ago by Eli Ng</dd>
+  </dl>
+);
+
+const Doc = ({ pop, setPop }) => {
+  // Build display lines with line numbers
+  let n = 0;
+  const out = [];
+  DOC.forEach((d, i) => {
+    if (d.kind === "frontmatter") {
+      out.push(<div className="dline spacer" key={i}><span className="ln"></span><div className="text"><FrontMatter /></div></div>);
+      return;
+    }
+    if (d.kind === "spacer") {
+      n += 1;
+      out.push(<div className="dline spacer" key={i}><span className="ln">{n}</span><div className="text">&nbsp;</div></div>);
+      return;
+    }
+    n += 1;
+    if (d.kind === "h1") {
+      out.push(<div className="dline h1" key={i}><span className="ln">{n}</span><div className="text">{d.text}</div></div>);
+    } else if (d.kind === "h2") {
+      out.push(<div className="dline h2" key={i}><span className="ln">{n}</span><div className="text">{d.text}</div></div>);
+    } else if (d.kind === "p") {
+      out.push(<div className="dline" key={i}><span className="ln">{n}</span><div className="text">{d.html}</div></div>);
+    } else if (d.kind === "req") {
+      out.push(
+        <div className={"dline req" + (d.cursor ? " is-cursor" : "")} key={i}>
+          <span className="ln">{n}</span>
+          <div className="text">
+            <span className="rqid">{d.id}</span>
+            <span>{d.text} </span>
+            {d.evidence.map((ev, j) => (
+              <EvidencePin key={j} ev={ev} amber={d.cursor} onHover={(e, anchor) => setPop(e ? { ev: e, anchor } : null)} />
+            ))}
+          </div>
+        </div>
+      );
+    } else if (d.kind === "question") {
+      out.push(<div className="dline" key={i}><span className="ln">{n}</span><div className="text"><QuestionCard q={d}/></div></div>);
+    }
+  });
+  return <div className="doc">{out}</div>;
+};
+
+const ChatBar = () => {
+  const [mode, setMode] = useState("chat");
+  return (
+    <div className="chatbar">
+      <div className="chatbar-inner">
+        <div className="chatbar-mode">
+          {[
+            ["chat", "Chat"],
+            ["update", "Update"],
+            ["clarify", "Clarify"],
+          ].map(([k, l]) => (
+            <button key={k} className={mode === k ? "is-on" : ""} onClick={() => setMode(k)}>{l}</button>
+          ))}
+        </div>
+        <div className="chatbar-context">
+          <span className="ctx"><Icon.Trace size={9}/> REQ-0142</span>
+          <span className="ctx"><Icon.DocLines size={9}/> payments-spec.pdf §3.4</span>
+        </div>
+        <div className="chatbar-input">
+          <textarea placeholder="Ask, clarify, or paste a new source…" defaultValue={mode === "clarify" ? "On REQ-0142, what's the action when p99 breaches but auto-resolves under 60s?" : ""} />
+          <div className="chatbar-tools">
+            <button className="icon-btn" title="Attach"><Icon.Paper size={14}/></button>
+            <button className="icon-btn" title="Image"><Icon.Image size={14}/></button>
+            <button className="chatbar-send" title="Send"><Icon.ArrowRight size={14}/></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Sources = () => {
+  const items = [
+    { kind: "Doc",      name: "rfp.pdf",                  meta: "42 p · 6.2 MB" },
+    { kind: "DocLines", name: "payments-spec.pdf",        meta: "12 p · 2.4 MB" },
+    { kind: "DocLines", name: "compliance-iso26262.pdf",  meta: "128 p · 18 MB" },
+    { kind: "Mic",      name: "kickoff-call.vtt",         meta: "47:12" },
+    { kind: "Ticket",   name: "JIRA-2491",                meta: "8 comments" },
+    { kind: "Ticket",   name: "JIRA-2502",                meta: "3 comments" },
+    { kind: "Code",     name: "repo/payments/handler.ts", meta: "L412" },
+    { kind: "Code",     name: "repo/payments/retry.ts",   meta: "L84" },
+  ];
+  return (
+    <div className="src">
+      {items.map((s) => {
+        const I = Icon[s.kind];
+        return (
+          <div className="src-row" key={s.name}>
+            <span className="ic"><I size={14}/></span>
+            <span className="name">{s.name}</span>
+            <span className="meta">{s.meta}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const History = () => (
+  <div className="history">
+    <div className="history-msg user"><div className="who"><span>Eli Ng</span><span>·</span><span>10m ago</span></div><div className="body">Re-extract using the latest kickoff transcript and merge with what we have.</div></div>
+    <div className="history-msg ai"><div className="who"><span>RequireX</span><span>·</span><span>10m ago</span></div><div className="body">Done. Added evidence to REQ-0142 (p99 SLO) from kickoff-call.vtt @ 24:11. 1 new requirement detected: Sev-3 audit entry for auto-resolved breaches — flagged as Q-0003.</div></div>
+    <div className="history-msg user"><div className="who"><span>Eli Ng</span><span>·</span><span>2m ago</span></div><div className="body">Add JIRA-2491 to the citations on REQ-0142.</div></div>
+    <div className="history-msg ai"><div className="who"><span>RequireX</span><span>·</span><span>2m ago</span></div><div className="body">Linked JIRA-2491 (comment thread) to REQ-0142. Confidence: high.</div></div>
+  </div>
+);
+
+const Versions = () => {
+  const commits = [
+    { id: "v0.4.2", title: "Add JIRA-2491 to REQ-0142", auth: "eli", when: "2m", current: true, add: 1, del: 0 },
+    { id: "v0.4.1", title: "Q-0003 raised: 60s breach window", auth: "system", when: "10m", merge: true, add: 1, del: 0 },
+    { id: "v0.4.0", title: "Re-extract with kickoff transcript", auth: "eli", when: "10m", add: 4, del: 1 },
+    { id: "v0.3.0", title: "Compliance pass — ISO 26262", auth: "mfoster", when: "yest", add: 7, del: 2 },
+    { id: "v0.2.0", title: "Initial draft from RFP", auth: "eli", when: "2d", add: 18, del: 0 },
+  ];
+  return (
+    <div className="tree">
+      {commits.map((c) => (
+        <div className={"commit" + (c.current ? " is-current" : "") + (c.merge ? " is-merge" : "")} key={c.id}>
+          <span className="branch"><span className="node"/></span>
+          <div className="body">
+            <span className="title">{c.title}</span>
+            <span className="sub"><span className="mono">{c.id}</span> · <span className="auth">{c.auth}</span> · {c.when}</span>
+            <span className="diff"><span className="add">+{c.add}</span><span className="del">−{c.del}</span></span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const RightPane = () => {
+  const [tab, setTab] = useState("versions");
+  return (
+    <aside className="rp">
+      <div className="rp-tabs">
+        <button className={"rp-tab" + (tab==="sources"?" is-on":"")} onClick={() => setTab("sources")}><Icon.DocLines size={12}/> Sources</button>
+        <button className={"rp-tab" + (tab==="history"?" is-on":"")} onClick={() => setTab("history")}><Icon.History size={12}/> History</button>
+        <button className={"rp-tab" + (tab==="versions"?" is-on":"")} onClick={() => setTab("versions")}><Icon.Branch size={12}/> Versions</button>
+      </div>
+      <div className="rp-body">
+        {tab === "sources" && <Sources/>}
+        {tab === "history" && <History/>}
+        {tab === "versions" && <Versions/>}
+      </div>
+    </aside>
+  );
+};
+
+const TitleBar = ({ rpOpen, setRpOpen, sbOpen, setSbOpen }) => (
+  <div className="tt">
+    <div className="tt-traffic"><span/><span/><span/></div>
+    <div className="tt-grow tt-search">
+      <Icon.Search size={12}/>
+      <span className="tt-search-text">payments-v2 / Resolve §3 ambiguities</span>
+      <span className="kbd">⌘K</span>
+    </div>
+    <div className="tt-tools">
+      <button className={"icon-btn" + (sbOpen ? " is-active" : "")} title="Sidebar" onClick={() => setSbOpen(!sbOpen)}><Icon.Sidebar size={14}/></button>
+      <button className={"icon-btn" + (rpOpen ? " is-active" : "")} title="Right pane" onClick={() => setRpOpen(!rpOpen)}><Icon.Inspector size={14}/></button>
+    </div>
+  </div>
+);
+
+const StatusBar = () => (
+  <div className="sts">
+    <span className="sts-dot"/>
+    <span>idle</span>
+    <span className="sts-sep">·</span>
+    <Icon.Check size={11}/>
+    <span>23 / 23 traced</span>
+    <span className="sts-sep">·</span>
+    <Icon.Question size={11}/>
+    <span>1 open question</span>
+    <span className="sts-grow"/>
+    <span>v0.4.2</span>
+    <span className="sts-sep">·</span>
+    <span>main</span>
+    <span className="sts-sep">·</span>
+    <span>autosaved</span>
+  </div>
+);
+
+const App = () => {
+  const [pop, setPop] = useState(null);
+  const [rpOpen, setRpOpen] = useState(true);
+  const [sbOpen, setSbOpen] = useState(true);
+  const [activeChat, setActiveChat] = useState("c2");
+  const popRef = useRef(null);
+
+  // Position pop near anchor
+  let popStyle = null;
+  if (pop?.anchor) {
+    const r = pop.anchor.getBoundingClientRect();
+    const top  = r.bottom + 6;
+    const left = Math.min(r.left, window.innerWidth - 340);
+    popStyle = { top: top + "px", left: left + "px" };
+  }
+
+  return (
+    <div className={"app"}>
+      <TitleBar rpOpen={rpOpen} setRpOpen={setRpOpen} sbOpen={sbOpen} setSbOpen={setSbOpen} />
+      <div className={"app-body" + (rpOpen ? " rp-open" : "") + (!sbOpen ? " sb-collapsed" : "")}>
+        {sbOpen && <Sidebar activeChat={activeChat} onSelect={setActiveChat} />}
+        <main className="docview">
+          <div className="dv-head">
+            <div className="dv-crumbs">
+              <span>payments-v2</span>
+              <Icon.ChevronRight size={10}/>
+              <span>requirements</span>
+              <Icon.ChevronRight size={10}/>
+              <span className="crumb-last">v0.4.2 — Draft</span>
+            </div>
+            <div className="dv-actions">
+              <button className="dv-tab is-on">Edit</button>
+              <button className="dv-tab">Preview</button>
+              <span style={{width: 8}}/>
+              <button className="btn btn-ghost btn-sm">Export</button>
+              <button className="btn btn-primary btn-sm">Submit to client</button>
+            </div>
+          </div>
+          <div className="dv-scroll">
+            <Doc pop={pop} setPop={setPop} />
+            <ChatBar/>
+          </div>
+        </main>
+        {rpOpen && <RightPane/>}
+      </div>
+      <StatusBar/>
+      {pop && pop.ev && (
+        <div className="evidence-pop" style={popStyle} ref={popRef}>
+          <div className="head">
+            {(() => { const I = Icon[EVI_ICON[pop.ev.kind]] || Icon.Doc; return <I size={12}/>; })()}
+            <span className="mono">{pop.ev.source}</span>
+            <span style={{marginLeft:"auto", fontFamily:"var(--font-mono)", color:"var(--fg-4)"}}>{pop.ev.loc}</span>
+          </div>
+          <div className="quote">{pop.ev.quote}</div>
+          <div className="when">{pop.ev.when}</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Toolbar</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 22px 24px; gap: 12px;}
+.tb {
+  height: 36px;
+  display: flex; align-items: center; gap: 4px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-surface-1);
+  border-radius: var(--r-3);
+  padding: 0 6px;
+}
+.tb .group { display: flex; align-items: center; gap: 1px;}
+.tb .sep { width: 1px; height: 18px; background: var(--border-1); margin: 0 6px;}
+.tb button {
+  background: transparent; border: none;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  color: var(--fg-3);
+  border-radius: 4px;
+  cursor: default;
+}
+.tb button:hover { background: var(--bg-surface-2); color: var(--fg-1);}
+.tb button.active { background: var(--bg-surface-3); color: var(--accent);}
+.tb svg { width: 14px; height: 14px;}
+.tb .grow { flex: 1;}
+.tb .crumb { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); display: flex; align-items: center; gap: 4px;}
+.tb .crumb b { color: var(--fg-2); font-weight: 500;}
+.tb .crumb svg { width: 10px; height: 10px;}
+
+.status {
+  height: 22px; border-radius: var(--r-2);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-1);
+  display: flex; align-items: center; padding: 0 8px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3);
+  gap: 14px;
+}
+.status .acc { color: var(--accent);}
+.status .ok { color: var(--success);}
+.status .grow { flex: 1;}
+.status .right { display: flex; gap: 14px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="tb">
+    <div class="group">
+      <button title="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button title="Forward"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="sep"></div>
+    <div class="crumb"><b>payments</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6l6 6-6 6"/></svg><span>spec.pdf</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6l6 6-6 6"/></svg><b>REQ-0142</b></div>
+    <div class="grow"></div>
+    <div class="group">
+      <button class="active" title="Extract"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></button>
+      <button title="Filter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18M6 12h12M10 18h4"/></svg></button>
+      <button title="Trace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+  </div>
+  <div class="status">
+    <span class="acc">●</span> <span>extract: idle</span>
+    <span class="ok">✓</span> <span>23 / 23 linked</span>
+    <span class="grow"></span>
+    <div class="right"><span>main</span><span>UTF-8</span><span>Ln 412, Col 24</span></div>
+  </div>
+</div>
+</body>
+</html>

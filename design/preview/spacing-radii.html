@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Radii</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 24px 28px; gap: 14px; }
+.grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.b { aspect-ratio: 1; background: var(--bg-surface-2); border: 1px solid var(--border-1); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; }
+.b .t { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+.b .v { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); }
+.usage { display: flex; gap: 16px; font-size: 11px; color: var(--fg-3); flex-wrap: wrap;}
+.usage b { color: var(--fg-2); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="b" style="border-radius:0"><span class="t">--r-0</span><span class="v">0</span></div>
+    <div class="b" style="border-radius:2px"><span class="t">--r-1</span><span class="v">2</span></div>
+    <div class="b" style="border-radius:4px"><span class="t">--r-2</span><span class="v">4</span></div>
+    <div class="b" style="border-radius:6px"><span class="t">--r-3</span><span class="v">6</span></div>
+    <div class="b" style="border-radius:8px"><span class="t">--r-4</span><span class="v">8</span></div>
+    <div class="b" style="border-radius:12px"><span class="t">--r-5</span><span class="v">12</span></div>
+  </div>
+  <div class="usage"><span><b>r-2</b> chips</span><span><b>r-3</b> buttons, inputs</span><span><b>r-4</b> cards, popovers</span><span><b>r-0</b> editor gutter</span></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Foreground scale</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 24px 28px; gap: 8px; background: var(--bg-app); }
+.row { display: grid; grid-template-columns: 110px 1fr 90px; gap: 16px; align-items: center; padding: 6px 0; }
+.tok { font-family: var(--font-mono); font-size: 11px; color: var(--fg-4); }
+.hex { font-family: var(--font-mono); font-size: 11px; color: var(--fg-4); text-align: right; }
+.demo { font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="row"><span class="tok">--fg-1</span><span class="demo" style="color:#efeee9; font-weight:500">Primary — heading and emphasized</span><span class="hex">#efeee9</span></div>
+  <div class="row"><span class="tok">--fg-2</span><span class="demo" style="color:#c4c4c9">Body — default reading text</span><span class="hex">#c4c4c9</span></div>
+  <div class="row"><span class="tok">--fg-3</span><span class="demo" style="color:#9b9ba2">Secondary — meta, captions</span><span class="hex">#9b9ba2</span></div>
+  <div class="row"><span class="tok">--fg-4</span><span class="demo" style="color:#76767e">Tertiary — placeholder, hint</span><span class="hex">#76767e</span></div>
+  <div class="row"><span class="tok">--fg-disabled</span><span class="demo" style="color:#56565d">Disabled</span><span class="hex">#56565d</span></div>
+</div>
+</body>
+</html>

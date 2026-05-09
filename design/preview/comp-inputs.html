@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Inputs</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 22px 28px; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px;}
+.lbl { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); }
+.input {
+  height: 28px; padding: 0 10px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  color: var(--fg-1);
+  font-family: var(--font-sans); font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+}
+.input.focus { border-color: var(--accent-ring); box-shadow: 0 0 0 2px var(--bg-app), 0 0 0 3.5px var(--accent-ring);}
+.input.error { border-color: var(--danger);}
+.input.search svg { color: var(--fg-3);}
+.placeholder { color: var(--fg-4);}
+.cursor { display: inline-block; width: 1px; height: 14px; background: var(--accent); margin-left: -2px; vertical-align: middle; animation: blink 1.05s steps(2) infinite;}
+@keyframes blink { 50% { opacity: 0;}}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px;}
+.help { font-size: 11px; color: var(--fg-3); }
+.help.err { color: var(--danger); }
+.kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.04); color: var(--fg-3); border: 1px solid var(--border-2); margin-left: auto;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="row">
+    <div class="field">
+      <span class="lbl">Title</span>
+      <div class="input"><span>Latency budget</span><span class="cursor"></span></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Source ID</span>
+      <div class="input focus"><span class="placeholder">REQ-</span></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <span class="lbl">Filter</span>
+      <div class="input search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span class="placeholder">Search requirements&hellip;</span><span class="kbd">⌘K</span></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Owner</span>
+      <div class="input error"><span>e.lin@acme</span></div>
+      <span class="help err">Unrecognized handle.</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

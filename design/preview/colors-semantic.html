@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Semantic colors</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 24px 28px; gap: 12px;}
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;}
+.item { border: 1px solid var(--border-1); border-radius: var(--r-4); padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-surface-1);}
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.row { display: flex; align-items: center; gap: 8px; }
+.name { font-size: 12px; color: var(--fg-2); font-weight: 500; }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 3px 8px 3px 6px; border-radius: var(--r-2); width: fit-content;}
+.tag .d { width: 6px; height: 6px; border-radius: 50%; }
+.hex { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4);}
+
+.s-success .d, .s-success .dot { background: #7eb486;}
+.s-success .tag { background: rgba(126,180,134,0.14); color: #b8d6bd; }
+.s-warning .d, .s-warning .dot { background: #d4a356;}
+.s-warning .tag { background: rgba(212,163,86,0.14); color: #e8caa1; }
+.s-danger .d, .s-danger .dot { background: #c4736a;}
+.s-danger .tag { background: rgba(196,115,106,0.14); color: #e0a9a3; }
+.s-info .d, .s-info .dot { background: #7a9bb8;}
+.s-info .tag { background: rgba(122,155,184,0.14); color: #b4c8da; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="item s-success">
+      <div class="row"><span class="dot"></span><span class="name">success</span></div>
+      <span class="tag"><span class="d"></span>Approved</span>
+      <span class="hex">#7eb486</span>
+    </div>
+    <div class="item s-warning">
+      <div class="row"><span class="dot"></span><span class="name">warning</span></div>
+      <span class="tag"><span class="d"></span>Stale</span>
+      <span class="hex">#d4a356</span>
+    </div>
+    <div class="item s-danger">
+      <div class="row"><span class="dot"></span><span class="name">danger</span></div>
+      <span class="tag"><span class="d"></span>Conflict</span>
+      <span class="hex">#c4736a</span>
+    </div>
+    <div class="item s-info">
+      <div class="row"><span class="dot"></span><span class="name">info</span></div>
+      <span class="tag"><span class="d"></span>In review</span>
+      <span class="hex">#7a9bb8</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

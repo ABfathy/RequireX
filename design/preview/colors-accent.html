@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Accent — Amber</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 26px 30px; gap: 16px;}
+.hero { display: flex; gap: 14px; align-items: stretch; }
+.big { flex: 0 0 160px; height: 110px; border-radius: var(--r-4); background: var(--accent); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px 12px; gap: 2px;}
+.big .h { font-family: var(--font-mono); font-size: 10px; color: rgba(27,20,13,0.7);}
+.big .n { font-family: var(--font-mono); font-size: 11px; color: #1b140d; font-weight: 500;}
+.lineup { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sw { height: 50px; border-radius: var(--r-3); display: flex; align-items: flex-end; padding: 6px 8px; font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+.sw.deep   { background: #a07a55; color: #f3e4d3; }
+.sw.base   { background: #cb9b6f; color: #1b140d; }
+.sw.soft   { background: #e0bc94; color: #3a2615; }
+.sw.tint   { background: rgba(203,155,111,0.14); color: var(--fg-2); border: 1px solid rgba(203,155,111,0.30); }
+.sw.ring   { background: transparent; border: 1.5px solid rgba(203,155,111,0.55); color: var(--accent); }
+.sw.fg     { background: transparent; color: var(--accent); border: 1px dashed var(--border-2);}
+.usage { font-size: 12px; color: var(--fg-3); display: flex; gap: 16px; flex-wrap: wrap;}
+.usage b { color: var(--fg-2); font-weight: 500;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="hero">
+    <div class="big">
+      <span class="h">--accent</span>
+      <span class="n">#cb9b6f</span>
+    </div>
+    <div class="lineup">
+      <div class="sw deep">deep · #a07a55</div>
+      <div class="sw base">base · #cb9b6f</div>
+      <div class="sw soft">soft · #e0bc94</div>
+      <div class="sw tint">soft tint · 14%</div>
+      <div class="sw ring">ring · 55%</div>
+      <div class="sw fg">accent fg</div>
+    </div>
+  </div>
+  <div class="usage"><span><b>Used for</b> primary CTA &middot; focus ring &middot; active-line indicator &middot; selected source</span></div>
+</div>
+</body>
+</html>

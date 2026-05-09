@@ -57,7 +57,7 @@ CREATE TYPE "BriefConfidence" AS ENUM ('LOW', 'MEDIUM', 'HIGH');
 
 -- CreateTable
 CREATE TABLE "Workspace" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
     "slug" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "createdBy" TEXT NOT NULL,
@@ -69,8 +69,8 @@ CREATE TABLE "Workspace" (
 
 -- CreateTable
 CREATE TABLE "Project" (
-    "id" TEXT NOT NULL,
-    "workspaceId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "workspaceId" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "clientName" TEXT NOT NULL,
     "description" TEXT,
@@ -84,8 +84,8 @@ CREATE TABLE "Project" (
 
 -- CreateTable
 CREATE TABLE "IntakeSession" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
     "title" TEXT NOT NULL,
     "status" "SessionStatus" NOT NULL DEFAULT 'DRAFT',
     "createdBy" TEXT NOT NULL,
@@ -98,8 +98,8 @@ CREATE TABLE "IntakeSession" (
 
 -- CreateTable
 CREATE TABLE "SourceAsset" (
-    "id" TEXT NOT NULL,
-    "sessionId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "sessionId" UUID NOT NULL,
     "sourceType" "SourceType" NOT NULL,
     "status" "SourceAssetStatus" NOT NULL DEFAULT 'UPLOADED',
     "displayLabel" TEXT,
@@ -124,8 +124,8 @@ CREATE TABLE "SourceAsset" (
 
 -- CreateTable
 CREATE TABLE "SourceChunk" (
-    "id" TEXT NOT NULL,
-    "sourceAssetId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "sourceAssetId" UUID NOT NULL,
     "kind" "SourceChunkKind" NOT NULL,
     "orderIndex" INTEGER NOT NULL,
     "text" TEXT NOT NULL,
@@ -142,9 +142,9 @@ CREATE TABLE "SourceChunk" (
 
 -- CreateTable
 CREATE TABLE "BriefSnapshot" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "sessionId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "sessionId" UUID NOT NULL,
     "version" INTEGER NOT NULL,
     "status" "BriefSnapshotStatus" NOT NULL DEFAULT 'DRAFT',
     "sourceBundleVersion" INTEGER NOT NULL,
@@ -156,8 +156,8 @@ CREATE TABLE "BriefSnapshot" (
 
 -- CreateTable
 CREATE TABLE "BriefClaim" (
-    "id" TEXT NOT NULL,
-    "snapshotId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "snapshotId" UUID NOT NULL,
     "section" "BriefClaimSection" NOT NULL,
     "orderIndex" INTEGER NOT NULL,
     "text" TEXT NOT NULL,
@@ -169,8 +169,8 @@ CREATE TABLE "BriefClaim" (
 
 -- CreateTable
 CREATE TABLE "BriefQuestion" (
-    "id" TEXT NOT NULL,
-    "snapshotId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "snapshotId" UUID NOT NULL,
     "section" "BriefQuestionSection" NOT NULL,
     "orderIndex" INTEGER NOT NULL,
     "text" TEXT NOT NULL,
@@ -183,12 +183,12 @@ CREATE TABLE "BriefQuestion" (
 
 -- CreateTable
 CREATE TABLE "EvidenceRef" (
-    "id" TEXT NOT NULL,
-    "snapshotId" TEXT NOT NULL,
-    "sourceAssetId" TEXT NOT NULL,
-    "sourceChunkId" TEXT NOT NULL,
-    "claimId" TEXT,
-    "questionId" TEXT,
+    "id" UUID NOT NULL,
+    "snapshotId" UUID NOT NULL,
+    "sourceAssetId" UUID NOT NULL,
+    "sourceChunkId" UUID NOT NULL,
+    "claimId" UUID,
+    "questionId" UUID,
     "sourceType" "SourceType" NOT NULL,
     "label" TEXT NOT NULL,
     "locator" JSONB NOT NULL,
@@ -201,12 +201,12 @@ CREATE TABLE "EvidenceRef" (
 
 -- CreateTable
 CREATE TABLE "BriefComment" (
-    "id" TEXT NOT NULL,
-    "snapshotId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "snapshotId" UUID NOT NULL,
     "section" "BriefCommentSection" NOT NULL,
     "anchorType" "BriefCommentAnchorType" NOT NULL,
-    "claimId" TEXT,
-    "questionId" TEXT,
+    "claimId" UUID,
+    "questionId" UUID,
     "selectionText" TEXT,
     "authorName" TEXT,
     "authorEmail" TEXT,
@@ -220,9 +220,9 @@ CREATE TABLE "BriefComment" (
 
 -- CreateTable
 CREATE TABLE "FollowUpAnswer" (
-    "id" TEXT NOT NULL,
-    "snapshotId" TEXT NOT NULL,
-    "questionId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "snapshotId" UUID NOT NULL,
+    "questionId" UUID NOT NULL,
     "body" TEXT NOT NULL,
     "authorName" TEXT,
     "authorEmail" TEXT,
@@ -234,10 +234,10 @@ CREATE TABLE "FollowUpAnswer" (
 
 -- CreateTable
 CREATE TABLE "RevisionEvent" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "sessionId" TEXT NOT NULL,
-    "snapshotId" TEXT,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "sessionId" UUID NOT NULL,
+    "snapshotId" UUID,
     "type" "RevisionEventType" NOT NULL,
     "actorType" "ActorType" NOT NULL,
     "actorId" TEXT,
@@ -250,8 +250,8 @@ CREATE TABLE "RevisionEvent" (
 
 -- CreateTable
 CREATE TABLE "ShareLink" (
-    "id" TEXT NOT NULL,
-    "snapshotId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "snapshotId" UUID NOT NULL,
     "token" TEXT NOT NULL,
     "status" "ShareLinkStatus" NOT NULL DEFAULT 'ACTIVE',
     "createdBy" TEXT NOT NULL,
@@ -264,10 +264,10 @@ CREATE TABLE "ShareLink" (
 
 -- CreateTable
 CREATE TABLE "ProcessingJob" (
-    "id" TEXT NOT NULL,
-    "sessionId" TEXT NOT NULL,
-    "sourceSnapshotId" TEXT,
-    "resultSnapshotId" TEXT,
+    "id" UUID NOT NULL,
+    "sessionId" UUID NOT NULL,
+    "sourceSnapshotId" UUID,
+    "resultSnapshotId" UUID,
     "type" "ProcessingJobType" NOT NULL,
     "status" "ProcessingJobStatus" NOT NULL DEFAULT 'QUEUED',
     "attemptCount" INTEGER NOT NULL DEFAULT 0,

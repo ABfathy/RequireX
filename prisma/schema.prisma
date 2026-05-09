@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -7,7 +8,7 @@ datasource db {
 }
 
 model Workspace {
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid()) @db.Uuid
   slug      String    @unique
   name      String
   createdBy String
@@ -17,8 +18,8 @@ model Workspace {
 }
 
 model Project {
-  id             String          @id @default(cuid())
-  workspaceId    String
+  id             String          @id @default(uuid()) @db.Uuid
+  workspaceId    String          @db.Uuid
   name           String
   clientName     String
   description    String?         @db.Text
@@ -36,8 +37,8 @@ model Project {
 }
 
 model IntakeSession {
-  id             String          @id @default(cuid())
-  projectId      String
+  id             String          @id @default(uuid()) @db.Uuid
+  projectId      String          @db.Uuid
   title          String
   status         SessionStatus   @default(DRAFT)
   createdBy      String
@@ -56,8 +57,8 @@ model IntakeSession {
 }
 
 model SourceAsset {
-  id               String            @id @default(cuid())
-  sessionId        String
+  id               String            @id @default(uuid()) @db.Uuid
+  sessionId        String            @db.Uuid
   sourceType       SourceType
   status           SourceAssetStatus @default(UPLOADED)
   displayLabel     String?
@@ -86,8 +87,8 @@ model SourceAsset {
 }
 
 model SourceChunk {
-  id            String          @id @default(cuid())
-  sourceAssetId String
+  id            String          @id @default(uuid()) @db.Uuid
+  sourceAssetId String          @db.Uuid
   kind          SourceChunkKind
   orderIndex    Int
   text          String          @db.Text
@@ -107,9 +108,9 @@ model SourceChunk {
 }
 
 model BriefSnapshot {
-  id                  String              @id @default(cuid())
-  projectId           String
-  sessionId           String
+  id                  String              @id @default(uuid()) @db.Uuid
+  projectId           String              @db.Uuid
+  sessionId           String              @db.Uuid
   version             Int
   status              BriefSnapshotStatus @default(DRAFT)
   sourceBundleVersion Int
@@ -133,8 +134,8 @@ model BriefSnapshot {
 }
 
 model BriefClaim {
-  id           String            @id @default(cuid())
-  snapshotId   String
+  id           String            @id @default(uuid()) @db.Uuid
+  snapshotId   String            @db.Uuid
   section      BriefClaimSection
   orderIndex   Int
   text         String            @db.Text
@@ -149,8 +150,8 @@ model BriefClaim {
 }
 
 model BriefQuestion {
-  id           String               @id @default(cuid())
-  snapshotId   String
+  id           String               @id @default(uuid()) @db.Uuid
+  snapshotId   String               @db.Uuid
   section      BriefQuestionSection
   orderIndex   Int
   text         String               @db.Text
@@ -168,12 +169,12 @@ model BriefQuestion {
 }
 
 model EvidenceRef {
-  id            String         @id @default(cuid())
-  snapshotId    String
-  sourceAssetId String
-  sourceChunkId String
-  claimId       String?
-  questionId    String?
+  id            String         @id @default(uuid()) @db.Uuid
+  snapshotId    String         @db.Uuid
+  sourceAssetId String         @db.Uuid
+  sourceChunkId String         @db.Uuid
+  claimId       String?        @db.Uuid
+  questionId    String?        @db.Uuid
   sourceType    SourceType
   label         String
   locator       Json           @db.JsonB
@@ -193,12 +194,12 @@ model EvidenceRef {
 }
 
 model BriefComment {
-  id            String                 @id @default(cuid())
-  snapshotId    String
+  id            String                 @id @default(uuid()) @db.Uuid
+  snapshotId    String                 @db.Uuid
   section       BriefCommentSection
   anchorType    BriefCommentAnchorType
-  claimId       String?
-  questionId    String?
+  claimId       String?                @db.Uuid
+  questionId    String?                @db.Uuid
   selectionText String?                @db.Text
   authorName    String?
   authorEmail   String?
@@ -215,9 +216,9 @@ model BriefComment {
 }
 
 model FollowUpAnswer {
-  id          String        @id @default(cuid())
-  snapshotId  String
-  questionId  String
+  id          String        @id @default(uuid()) @db.Uuid
+  snapshotId  String        @db.Uuid
+  questionId  String        @db.Uuid
   body        String        @db.Text
   authorName  String?
   authorEmail String?
@@ -231,19 +232,19 @@ model FollowUpAnswer {
 }
 
 model RevisionEvent {
-  id        String            @id @default(cuid())
-  projectId String
-  sessionId String
-  snapshotId String?
-  type      RevisionEventType
-  actorType ActorType
-  actorId   String?
-  summary   String
-  metadata  Json?             @db.JsonB
-  createdAt DateTime          @default(now())
-  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  session   IntakeSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  snapshot  BriefSnapshot?    @relation("SnapshotRevisionEvents", fields: [snapshotId], references: [id], onDelete: SetNull)
+  id         String            @id @default(uuid()) @db.Uuid
+  projectId  String            @db.Uuid
+  sessionId  String            @db.Uuid
+  snapshotId String?           @db.Uuid
+  type       RevisionEventType
+  actorType  ActorType
+  actorId    String?
+  summary    String
+  metadata   Json?             @db.JsonB
+  createdAt  DateTime          @default(now())
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session    IntakeSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  snapshot   BriefSnapshot?    @relation("SnapshotRevisionEvents", fields: [snapshotId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
   @@index([sessionId, createdAt])
@@ -251,8 +252,8 @@ model RevisionEvent {
 }
 
 model ShareLink {
-  id         String          @id @default(cuid())
-  snapshotId String
+  id         String          @id @default(uuid()) @db.Uuid
+  snapshotId String          @db.Uuid
   token      String          @unique
   status     ShareLinkStatus @default(ACTIVE)
   createdBy  String
@@ -265,10 +266,10 @@ model ShareLink {
 }
 
 model ProcessingJob {
-  id               String              @id @default(cuid())
-  sessionId        String
-  sourceSnapshotId String?
-  resultSnapshotId String?
+  id               String              @id @default(uuid()) @db.Uuid
+  sessionId        String              @db.Uuid
+  sourceSnapshotId String?             @db.Uuid
+  resultSnapshotId String?             @db.Uuid
   type             ProcessingJobType
   status           ProcessingJobStatus @default(QUEUED)
   attemptCount     Int                 @default(0)

@@ -1,0 +1,42 @@
+/* Shared card chrome — used by every preview/*.html file. Each card is a
+   self-contained HTML page sized to fit a Design System tab card (~700px wide).
+   Cards are skin-only — no titles, no framing — content speaks. */
+
+@import url("../colors_and_type.css");
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-app);
+    color: var(--fg-1);
+    font-family: var(--font-sans);
+    overflow: hidden;
+}
+
+.card {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 100vh;
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.row { display: flex; align-items: center; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.grid { display: grid; gap: 12px; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+.eye {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+}
+
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--fg-3); }
+.dim { color: var(--fg-4); }

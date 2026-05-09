@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Source-kind glyphs</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 24px 28px; gap: 18px; }
+.glyphs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.g {
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-4);
+  background: var(--bg-surface-1);
+  padding: 18px 14px 14px;
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+}
+.g svg { width: 22px; height: 22px; color: var(--fg-2); }
+.g .lbl { font-size: 11px; color: var(--fg-3); letter-spacing: 0.04em; text-transform: uppercase; }
+.g .id  { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="glyphs">
+    <div class="g">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/></svg>
+      <span class="lbl">Document</span>
+      <span class="id">.pdf .docx .md</span>
+    </div>
+    <div class="g">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+      <span class="lbl">Transcript</span>
+      <span class="id">.vtt .txt audio</span>
+    </div>
+    <div class="g">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M10 6v12" stroke-dasharray="2 2"/></svg>
+      <span class="lbl">Ticket</span>
+      <span class="id">JIRA-2491</span>
+    </div>
+    <div class="g">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5"/><path d="M15 7l5 5-5 5"/></svg>
+      <span class="lbl">Code</span>
+      <span class="id">repo/src/&hellip;</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

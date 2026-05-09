@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Sidebar list rows</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 18px 22px; gap: 0; }
+.list {
+  background: var(--bg-app);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-4);
+  overflow: hidden;
+}
+.row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  cursor: default;
+  border-left: 2px solid transparent;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+.row svg { width: 14px; height: 14px; color: var(--fg-3); }
+.row.hover  { background: var(--bg-surface-1); color: var(--fg-1); }
+.row.active { background: var(--bg-surface-2); color: var(--fg-1); border-left-color: var(--accent); }
+.row.active svg { color: var(--accent); }
+.id { font-family: var(--font-mono); font-size: 11px; color: var(--fg-4); }
+.row.active .id { color: var(--fg-3); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-4); }
+.dot.s { background: var(--sage);}
+.dot.w { background: var(--warm-amber);}
+.dot.d { background: var(--terracotta);}
+hr { border: none; border-top: 1px solid var(--border-1); margin: 0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="list">
+    <div class="row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span>payments-spec.pdf</span><span class="id">42</span></div>
+    <hr/>
+    <div class="row hover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg><span>kickoff-call.vtt</span><span class="dot s"></span></div>
+    <hr/>
+    <div class="row active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/></svg><span>JIRA-2491 — Reduce p99</span><span class="id">REQ-0142</span></div>
+    <hr/>
+    <div class="row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 7l-5 5 5 5"/><path d="M15 7l5 5-5 5"/></svg><span>repo/payments/handler.ts</span><span class="dot w"></span></div>
+    <hr/>
+    <div class="row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span>compliance-iso26262.pdf</span><span class="id">128</span></div>
+  </div>
+</div>
+</body>
+</html>

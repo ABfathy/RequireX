@@ -1,0 +1,271 @@
+/* =========================================================================
+   RequireX Design System — colors, type, spacing, motion
+   Single source of truth. Import this file from any preview or UI kit page.
+
+   Theme is dark by default. Add `data-theme="light"` to <html> for light.
+   ========================================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap");
+
+/* ----- Color tokens (raw) ------------------------------------------------- */
+
+:root {
+    /* Neutral scale — warm near-black through paper. Used by both themes. */
+    --neutral-0:  #0a0a0c;
+    --neutral-1:  #0d0d0f;
+    --neutral-2:  #141416;
+    --neutral-3:  #1a1a1d;
+    --neutral-4:  #232327;
+    --neutral-5:  #2c2c31;
+    --neutral-6:  #3a3a40;
+    --neutral-7:  #56565d;
+    --neutral-8:  #76767e;
+    --neutral-9:  #9b9ba2;
+    --neutral-10: #c4c4c9;
+    --neutral-11: #dcdbd6;
+    --neutral-12: #efeee9;
+    --neutral-13: #f6f5f1;
+    --neutral-14: #fbfaf6;
+
+    /* Brand & semantic — muted, never blaring. */
+    --amber-base:    #cb9b6f;   /* primary accent */
+    --amber-soft:    #e0bc94;
+    --amber-deep:    #a07a55;
+    --sage:          #7eb486;   /* success */
+    --terracotta:    #c4736a;   /* danger */
+    --slate-blue:    #7a9bb8;   /* info */
+    --warm-amber:    #d4a356;   /* warning */
+    --plum:          #a78bb5;   /* tertiary tagging */
+
+    /* Default = dark theme */
+    color-scheme: dark;
+
+    --bg-app:         var(--neutral-1);
+    --bg-surface-1:   var(--neutral-2);
+    --bg-surface-2:   var(--neutral-3);
+    --bg-surface-3:   var(--neutral-4);
+    --bg-overlay:     rgba(10, 10, 12, 0.72);
+
+    --fg-1:           var(--neutral-12);  /* primary text, headings */
+    --fg-2:           var(--neutral-10);  /* body text */
+    --fg-3:           var(--neutral-9);   /* secondary / labels */
+    --fg-4:           var(--neutral-8);   /* tertiary / placeholder */
+    --fg-disabled:    var(--neutral-7);
+
+    --border-1:       #1f1f23;            /* hairline borders, dividers */
+    --border-2:       #2a2a2f;            /* slightly stronger */
+    --border-strong:  #3a3a40;
+
+    --accent:         var(--amber-base);
+    --accent-soft:    rgba(203, 155, 111, 0.14);
+    --accent-ring:    rgba(203, 155, 111, 0.55);
+    --accent-fg:      #1b140d;            /* text on solid amber */
+
+    --success:        var(--sage);
+    --success-soft:   rgba(126, 180, 134, 0.14);
+    --warning:        var(--warm-amber);
+    --warning-soft:   rgba(212, 163, 86, 0.14);
+    --danger:         var(--terracotta);
+    --danger-soft:    rgba(196, 115, 106, 0.14);
+    --info:           var(--slate-blue);
+    --info-soft:      rgba(122, 155, 184, 0.14);
+
+    /* Code / syntax — quiet, mid-saturation */
+    --syn-keyword:    #b48cc4;
+    --syn-string:     #a3c293;
+    --syn-number:     #d8a373;
+    --syn-comment:    #6a6a72;
+    --syn-fn:         #88a8c9;
+    --syn-type:       #c9b078;
+    --syn-punct:      var(--fg-3);
+}
+
+[data-theme="light"] {
+    color-scheme: light;
+
+    --bg-app:         var(--neutral-13);
+    --bg-surface-1:   var(--neutral-14);
+    --bg-surface-2:   #ffffff;
+    --bg-surface-3:   var(--neutral-12);
+    --bg-overlay:     rgba(20, 20, 22, 0.32);
+
+    --fg-1:           #1a1a1c;
+    --fg-2:           #2f2f33;
+    --fg-3:           #56565d;
+    --fg-4:           #76767e;
+    --fg-disabled:    #b0b0b6;
+
+    --border-1:       #e6e4dd;
+    --border-2:       #d8d6cd;
+    --border-strong:  #b9b6ab;
+
+    --accent:         #b07f4f;
+    --accent-soft:    rgba(176, 127, 79, 0.10);
+    --accent-ring:    rgba(176, 127, 79, 0.40);
+    --accent-fg:      #fbfaf6;
+
+    --success:        #4f8a5a;
+    --warning:        #a87527;
+    --danger:         #a05248;
+    --info:           #4d7796;
+
+    --syn-keyword:    #7d4f8c;
+    --syn-string:     #4f7745;
+    --syn-number:     #97612e;
+    --syn-comment:    #8a8a90;
+    --syn-fn:         #3f6388;
+    --syn-type:       #7a5c1e;
+    --syn-punct:      #56565d;
+}
+
+/* ----- Typography --------------------------------------------------------- */
+
+:root {
+    --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+    /* Weight ramp */
+    --fw-300: 300;
+    --fw-400: 400;
+    --fw-500: 500;
+    --fw-600: 600;
+    --fw-700: 700;
+
+    /* Type scale (px). Tight, dense, IDE-style. */
+    --t-2xs: 10px;     /* eyebrow labels, tracked uppercase */
+    --t-xs:  11px;     /* status, captions */
+    --t-sm:  12px;     /* meta, tooltip, table dense */
+    --t-base:13px;     /* sidebar / toolbar UI */
+    --t-md:  14px;     /* body default */
+    --t-lg:  16px;     /* section heading */
+    --t-xl:  20px;     /* dialog title */
+    --t-2xl: 24px;     /* page heading */
+    --t-3xl: 32px;     /* marketing display sm */
+    --t-4xl: 44px;     /* marketing display md */
+    --t-5xl: 64px;     /* marketing display lg */
+    --t-6xl: 88px;     /* marketing hero */
+
+    --lh-tight:   1.15;
+    --lh-snug:    1.3;
+    --lh-normal:  1.5;
+    --lh-loose:   1.65;
+
+    --tr-tight:   -0.02em;
+    --tr-snug:    -0.01em;
+    --tr-normal:   0;
+    --tr-wide:    0.04em;
+    --tr-eyebrow: 0.08em;
+}
+
+/* Semantic type roles. Apply with class names or as CSS vars in a wrapper. */
+.h-display, .h1, .h2, .h3, .h4, .eyebrow, .body, .body-sm, .meta, .code, .num {
+    font-family: var(--font-sans);
+    color: var(--fg-1);
+}
+
+.h-display {
+    font-family: var(--font-sans);
+    font-weight: var(--fw-500);
+    font-size: var(--t-5xl);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--tr-tight);
+}
+.h1 { font-weight: var(--fw-500); font-size: var(--t-3xl); line-height: var(--lh-tight); letter-spacing: var(--tr-tight); }
+.h2 { font-weight: var(--fw-500); font-size: var(--t-2xl); line-height: var(--lh-snug);  letter-spacing: var(--tr-snug); }
+.h3 { font-weight: var(--fw-500); font-size: var(--t-xl);  line-height: var(--lh-snug);  letter-spacing: var(--tr-snug); }
+.h4 { font-weight: var(--fw-500); font-size: var(--t-lg);  line-height: var(--lh-snug);  letter-spacing: 0; }
+
+.eyebrow {
+    font-weight: var(--fw-500);
+    font-size: var(--t-2xs);
+    line-height: 1;
+    letter-spacing: var(--tr-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg-3);
+}
+
+.body    { font-size: var(--t-md);   line-height: var(--lh-normal); color: var(--fg-2); }
+.body-sm { font-size: var(--t-sm);   line-height: var(--lh-normal); color: var(--fg-2); }
+.meta    { font-size: var(--t-xs);   line-height: var(--lh-snug);   color: var(--fg-3); }
+
+.code, .num {
+    font-family: var(--font-mono);
+    font-feature-settings: "ss01", "cv11";
+    letter-spacing: 0;
+}
+.code { font-size: var(--t-sm); color: var(--fg-2); }
+.num  { font-size: inherit;     color: inherit;     font-variant-numeric: tabular-nums; }
+
+/* ----- Spacing ------------------------------------------------------------ */
+
+:root {
+    --s-0:   0;
+    --s-1:   4px;
+    --s-2:   8px;
+    --s-3:   12px;
+    --s-4:   16px;
+    --s-5:   20px;
+    --s-6:   24px;
+    --s-7:   32px;
+    --s-8:   40px;
+    --s-9:   56px;
+    --s-10:  80px;
+    --s-11: 120px;
+}
+
+/* ----- Radii -------------------------------------------------------------- */
+
+:root {
+    --r-0: 0;
+    --r-1: 2px;
+    --r-2: 4px;
+    --r-3: 6px;
+    --r-4: 8px;
+    --r-5: 12px;
+    --r-full: 9999px;
+}
+
+/* ----- Elevation ---------------------------------------------------------- */
+
+:root {
+    /* Dark theme defaults; light theme overrides below. */
+    --shadow-e1: 0 1px 2px rgba(0,0,0,0.32), 0 0 0 1px rgba(0,0,0,0.4);
+    --shadow-e2: 0 6px 16px rgba(0,0,0,0.40), 0 2px 4px rgba(0,0,0,0.30), 0 0 0 1px rgba(0,0,0,0.5);
+    --shadow-e3: 0 24px 48px rgba(0,0,0,0.55), 0 8px 16px rgba(0,0,0,0.40), 0 0 0 1px rgba(0,0,0,0.5);
+    --shadow-focus: 0 0 0 2px var(--bg-app), 0 0 0 3.5px var(--accent-ring);
+}
+
+[data-theme="light"] {
+    --shadow-e1: 0 1px 2px rgba(34, 30, 22, 0.06), 0 0 0 1px rgba(34, 30, 22, 0.06);
+    --shadow-e2: 0 6px 18px rgba(34, 30, 22, 0.10), 0 2px 4px rgba(34, 30, 22, 0.05), 0 0 0 1px rgba(34, 30, 22, 0.06);
+    --shadow-e3: 0 30px 60px rgba(34, 30, 22, 0.18), 0 8px 16px rgba(34, 30, 22, 0.08), 0 0 0 1px rgba(34, 30, 22, 0.06);
+    --shadow-focus: 0 0 0 2px var(--bg-app), 0 0 0 3.5px var(--accent-ring);
+}
+
+/* ----- Motion ------------------------------------------------------------- */
+
+:root {
+    --ease-out:   cubic-bezier(0.2, 0, 0, 1);
+    --ease-in:    cubic-bezier(0.6, 0, 1, 0.4);
+    --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
+
+    --dur-instant: 80ms;
+    --dur-fast:    120ms;
+    --dur-base:    200ms;
+    --dur-slow:    320ms;
+}
+
+/* ----- Base ---------------------------------------------------------------- */
+
+html, body {
+    background: var(--bg-app);
+    color: var(--fg-1);
+    font-family: var(--font-sans);
+    font-size: var(--t-md);
+    line-height: var(--lh-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+::selection { background: var(--accent-soft); color: var(--fg-1); }

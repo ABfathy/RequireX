@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Surface scale</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 24px 28px; }
+.scale { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; border-radius: var(--r-4); overflow: hidden; border: 1px solid var(--border-1); }
+.s { height: 84px; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px 10px; gap: 2px; }
+.s .name { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); }
+.s .hex  { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+.s.dark .name, .s.dark .hex { color: rgba(255,255,255,0.55); }
+.s.dark .name { color: rgba(255,255,255,0.7); }
+.legend { display: flex; gap: 14px; margin-top: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="scale">
+    <div class="s dark" style="background:#0a0a0c"><span class="name">--neutral-0</span><span class="hex">#0a0a0c</span></div>
+    <div class="s dark" style="background:#0d0d0f"><span class="name">bg-app</span><span class="hex">#0d0d0f</span></div>
+    <div class="s dark" style="background:#141416"><span class="name">surface-1</span><span class="hex">#141416</span></div>
+    <div class="s dark" style="background:#1a1a1d"><span class="name">surface-2</span><span class="hex">#1a1a1d</span></div>
+    <div class="s dark" style="background:#232327"><span class="name">surface-3</span><span class="hex">#232327</span></div>
+    <div class="s dark" style="background:#2c2c31"><span class="name">--neutral-5</span><span class="hex">#2c2c31</span></div>
+    <div class="s dark" style="background:#3a3a40"><span class="name">border-strong</span><span class="hex">#3a3a40</span></div>
+  </div>
+  <div class="legend"><span>Dark theme surfaces</span><span>1px hairlines, no shadows</span></div>
+</div>
+</body>
+</html>

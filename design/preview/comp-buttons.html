@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<title>Buttons</title>
+<link rel="stylesheet" href="_card.css"/>
+<style>
+.card { padding: 22px 28px; gap: 14px; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid transparent;
+  cursor: default;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.btn.sm { height: 24px; padding: 0 9px; font-size: 12px; border-radius: 5px;}
+.btn.lg { height: 32px; padding: 0 14px; font-size: 13px;}
+.btn-primary { background: var(--accent); color: var(--accent-fg); }
+.btn-primary:hover { background: #d6a679; }
+.btn-secondary { background: var(--bg-surface-2); color: var(--fg-1); border-color: var(--border-2); }
+.btn-secondary:hover { background: var(--bg-surface-3); }
+.btn-ghost { background: transparent; color: var(--fg-2); }
+.btn-ghost:hover { background: var(--bg-surface-2); color: var(--fg-1); }
+.btn-danger { background: transparent; color: var(--danger); border-color: var(--border-2);}
+.btn-danger:hover { background: var(--danger-soft); }
+.btn-disabled { background: var(--bg-surface-2); color: var(--fg-disabled); border-color: var(--border-1); }
+.btn-focus { background: var(--bg-surface-2); color: var(--fg-1); border-color: var(--border-2); box-shadow: 0 0 0 2px var(--bg-app), 0 0 0 3.5px var(--accent-ring);}
+.kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,0.3); color: var(--fg-3); border: 1px solid rgba(255,255,255,0.06);}
+.btn-primary .kbd { background: rgba(0,0,0,0.18); color: rgba(27,20,13,0.65); border-color: rgba(0,0,0,0.18);}
+.lbl { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-4); width: 70px;}
+.line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="line"><span class="lbl">Default</span>
+    <button class="btn btn-primary">Run extraction <span class="kbd">⏎</span></button>
+    <button class="btn btn-secondary">Cancel</button>
+    <button class="btn btn-ghost">Skip</button>
+    <button class="btn btn-danger">Discard</button>
+  </div>
+  <div class="line"><span class="lbl">States</span>
+    <button class="btn btn-secondary">Default</button>
+    <button class="btn btn-secondary" style="background:var(--bg-surface-3)">Hover</button>
+    <button class="btn btn-focus">Focus</button>
+    <button class="btn btn-disabled">Disabled</button>
+  </div>
+  <div class="line"><span class="lbl">Sizes</span>
+    <button class="btn btn-secondary sm">Small</button>
+    <button class="btn btn-secondary">Medium</button>
+    <button class="btn btn-secondary lg">Large</button>
+  </div>
+</div>
+</body>
+</html>
