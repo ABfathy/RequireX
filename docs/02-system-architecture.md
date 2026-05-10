@@ -1,5 +1,26 @@
 # System Architecture
 
+## Current Implementation Note
+
+This architecture is still directionally correct, but the live repo only implements part of it today.
+
+Already real in code:
+
+- protected internal app access with Clerk
+- public review mutation routes for comments, answers, and confirmation
+- UploadThing-backed file intake routes
+- asset persistence for uploaded files and pasted text
+- generation/regeneration request APIs backed by persisted processing jobs
+- Prisma models for projects, sessions, assets, chunks, snapshots, evidence, comments, answers, share links, revision events, and jobs
+
+Still target-state rather than implemented:
+
+- the actual AI generation pipeline
+- source normalization and chunk creation jobs
+- snapshot rendering in the internal and public UIs
+- project/session creation flows
+- share-link creation flow
+
 ## Architecture Goal
 
 Ship a focused intake-and-briefing web app that:
@@ -153,48 +174,51 @@ Mobile support:
 ### Internal Routes
 
 - `/app`
+
+Planned later if the internal app is expanded beyond the current shell:
+
 - `/app/projects/[projectId]`
 - `/app/projects/[projectId]/sessions/[sessionId]`
 - `/app/settings`
 
-### Route Handler Examples
+### Current Route Handlers
 
-- `POST /api/uploads`
-- `POST /api/folder-uploads`
 - `POST /api/uploadthing`
+- `GET /api/sessions/[sessionId]/assets`
+- `POST /api/sessions/[sessionId]/assets`
+- `PATCH /api/assets/[assetId]`
+- `DELETE /api/assets/[assetId]`
+- `POST /api/generate`
+- `POST /api/regenerate`
 - `POST /api/public/briefs/[shareToken]/comments`
 - `POST /api/public/briefs/[shareToken]/answers`
 - `POST /api/public/briefs/[shareToken]/confirm`
+- `POST /api/inngest`
+
+### Planned Route Handlers
+
 - `POST /api/projects`
 - `POST /api/sessions`
-- `POST /api/generate`
-- `POST /api/regenerate`
 - `POST /api/share-links`
 
 ## Primary Data Flow
 
 ### A. Internal Intake Flow
 
-1. Internal user creates or opens a project.
-2. User starts an intake session.
-3. User uploads text, audio, image, and/or PDF inputs, either one by one or as one mixed-source folder.
+1. Internal user opens the internal workspace.
+2. The target end state is that the user creates or opens a project and session, but those creation flows are not wired yet.
+3. Text and file intake APIs already exist for session assets.
 4. File inputs are stored through `UploadThing`, and source metadata is persisted in Postgres.
-5. Generation job is queued.
-6. UI shows processing state and partial progress.
-7. Job normalizes sources into addressable chunks.
-8. AI generates a contract-shaped brief.
-9. The brief snapshot is stored.
-10. The internal user reviews and refines if needed.
+5. Generation can already be requested and a processing job is queued.
+6. The current gap is that the Inngest pipeline stops at `PIPELINE_NOT_IMPLEMENTED`.
+7. The intended next behavior is source normalization into chunks, AI generation, snapshot persistence, and brief rendering.
 
 ### B. Public Review Flow
 
-1. Internal user creates a share link.
-2. Client opens the link with minimal friction.
-3. Client reads the brief.
-4. Client highlights sections or targets specific brief areas with inline comments.
-5. Client answers follow-up questions through structured inputs.
-6. Internal user reviews feedback.
-7. Internal user triggers regeneration into a new snapshot.
+1. The backend shape assumes an internal user creates a share link, but share-link creation is not implemented yet.
+2. The public route exists, but the page is still mock-backed.
+3. The public mutation backend for comments, answers, and confirmation is already implemented once a valid share link exists.
+4. The missing piece is loading a real snapshot into the page and wiring the UI to those APIs.
 
 ### C. Internal Refinement Flow
 
@@ -206,7 +230,7 @@ Mobile support:
 
 ## Async Job Design
 
-Each extraction/regeneration job should run in durable steps:
+Target durable job design:
 
 1. validate request
 2. fetch source asset metadata

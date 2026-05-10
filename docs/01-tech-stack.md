@@ -1,5 +1,15 @@
 # Tech Stack Choice
 
+## Current Implementation Note
+
+The stack choices in this file are still the intended direction, but the repo is at different levels of completion across them:
+
+- `Next.js`, `Tailwind`, `Clerk`, `Prisma`, `UploadThing`, and `Inngest` are already wired in code
+- the schema, migration, and seed path exist for the Postgres-backed data model, but production database verification is still pending
+- `@google/genai` on `Vertex AI` remains the planned AI layer, but the real generation pipeline is not implemented yet
+- `Vitest` is configured and already used for unit tests
+- `React Testing Library`, `jest-dom`, `Playwright`, and automated accessibility coverage are still planned rather than integrated
+
 ## Chosen Stack
 
 - Frontend and app server: `Next.js` App Router on `Vercel`

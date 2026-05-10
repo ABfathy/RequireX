@@ -1,125 +1,146 @@
-# 7-Day Hackathon Roadmap
+# Roadmap Status
 
-## Overall Rule
+Last reviewed on 2026-05-10.
 
-Days 1 and 2 are for plan confirmation and implementation setup. Core scope should freeze at the end of Day 2.
+This file is now a status readout of the original 7-day roadmap rather than a future-tense schedule.
 
-## Day 1: Decision Lock
+## Planned Vs Actual
 
-- confirm the stack
-- confirm brief contract
-- confirm route model
-- confirm project/session model
-- confirm internal vs public permissions
-- confirm citation UX
-- confirm testing stack
+The original plan assumed the team would reach end-to-end generation and public review by the middle of the week, then use the last days for polish and demo prep.
 
-Deliverables:
+The actual repo state is different:
 
-- approved docs package
-- accepted schema outline
-- accepted UI layout
+- platform, auth, schema, uploads, and public review mutations are ahead
+- project/session UI, snapshot generation, snapshot rendering, and share-link creation are behind
+- the main remaining work is integration, not foundational setup
 
-## Day 2: Skeleton and Setup
+## Day-by-Day Status
 
-- scaffold app
-- configure auth
-- configure database and upload/storage provider
-- configure job runner
-- configure AI client
-- configure test frameworks
-- scaffold internal and public route shells
+### Day 1: Decision Lock
 
-Deliverables:
+Status: EFFECTIVELY COMPLETE
 
-- repo scaffold
-- working auth shell
-- working database connection
-- working upload/storage connection
-- working test harness
+What landed:
 
-## Day 3: Intake and Data Layer
+- stack direction documented
+- brief contract documented
+- route and auth model documented
+- project/session model documented
 
-- implement project/session flows
-- implement upload handling
-- implement mixed-source folder upload
-- persist source metadata
-- implement basic processing states
-- implement initial Prisma schema and migrations
+### Day 2: Skeleton and Setup
 
-Deliverables:
+Status: MOSTLY COMPLETE
 
-- upload pipeline reachable
-- sources stored
-- projects and sessions persisted
+What landed:
 
-## Day 4: AI Generation Loop
+- app shell exists
+- auth is configured
+- Prisma schema and migration exist
+- upload/storage integration exists
+- Inngest is configured
+- internal and public route shells exist
 
-- implement normalization steps
-- implement generation job
-- validate output into contract shape
-- persist snapshots and revision events
-- render first generated brief
+What did not fully land:
 
-Deliverables:
+- test framework setup is only partial
+- hosted deployment verification is still pending
 
-- end-to-end generation from at least text and one file type
-- first stable brief rendering
+### Day 3: Intake and Data Layer
 
-## Day 5: Review and Refinement
+Status: PARTIAL
 
-- implement citation UX
-- implement selected-section refinement
-- implement client share links
-- implement public inline comment and answer flows
-- implement optional access-code gate only if core public review is already stable
+What landed:
 
-Deliverables:
+- text and file intake endpoints exist
+- source metadata persistence exists
+- asset lifecycle model exists in schema
+- initial schema and migrations are done
 
-- public review works
-- internal refinement works
-- evidence references visible
+What is still missing:
 
-## Day 6: Polish and Quality
+- real project/session creation flows
+- clear mixed-source submission behavior in the UI
+- user-facing progress and error states for intake
 
-- responsive support
-- animation and novelty integration
-- mobile haptics integration
-- regression fixes
-- add missing tests
-- accessibility fixes
+### Day 4: AI Generation Loop
 
-Deliverables:
+Status: NOT COMPLETE
 
-- stable desktop internal workflow
-- stable mobile public review
-- polished demo behavior
+What landed:
 
-## Day 7: Hardening and Demo Prep
+- generation and regeneration requests create processing jobs
+- Inngest triggers are wired
 
-- bug triage only
-- test pass review
-- fallback messaging for failure states
-- seed data or demo project setup
-- prepare demo script
-- prepare backup screenshots and flows
-- build the landing page only if the core workflow is already complete and stable
+What is still missing:
 
-Deliverables:
+- actual source normalization
+- model call
+- contract validation
+- snapshot persistence
+- first real generated brief
 
-- deployment ready
-- demo ready
-- low-risk presentation flow
+### Day 5: Review and Refinement
 
-## Scope Freeze Rules
+Status: PARTIAL
 
-After Day 2:
+What landed:
 
-- no new major product areas
-- no new automation channels
-- no multi-tenant pivot
-- no large schema redesign unless blocked
+- public review mutation backend for comments, answers, and confirmation
+- revision events for those public actions
 
-After Day 5:
+What is still missing:
 
-- only fixes, polish, and safe enhancements
+- share-link creation
+- public page bound to real snapshot data
+- selected-section refinement
+- internal feedback visibility
+- regenerate-from-feedback loop
+
+### Day 6: Polish and Quality
+
+Status: NOT STARTED
+
+Still missing:
+
+- responsive verification
+- accessibility pass
+- motion/haptics work
+- meaningful component/e2e coverage
+
+### Day 7: Hardening and Demo Prep
+
+Status: NOT STARTED
+
+Still missing:
+
+- demo rehearsal
+- backup demo path
+- deployment hardening
+- final integration pass across the whole workflow
+
+## Current Roadmap
+
+The effective roadmap from the current repo state is now:
+
+1. Finish the internal happy path.
+2. Implement one reliable text-first generation pipeline.
+3. Render real snapshots internally.
+4. Make the public share/review path real.
+5. Close the feedback-to-regeneration loop.
+6. Harden with tests, accessibility checks, and demo rehearsal.
+
+## Scope Freeze Guidance
+
+At this point, do not expand scope until the following is real:
+
+- session-backed intake from the UI
+- one successful snapshot generation path
+- real internal brief rendering
+- real public review from a share link
+
+Prefer cutting:
+
+- broad multimodal coverage before text-first reliability
+- novelty motion before demo-path stability
+- access-code gating before share-link creation
+- revision diff polish before feedback visibility

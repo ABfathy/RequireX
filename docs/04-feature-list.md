@@ -1,5 +1,15 @@
 # Feature List
 
+## Current Implementation Note
+
+This file describes the intended feature set, not just the shipped surface area.
+
+As of 2026-05-10:
+
+- backend foundations for auth, intake, assets, generation requests, and public review mutations are implemented
+- the internal workspace and public brief pages exist mostly as UI shells with mock content
+- the highest-risk missing pieces are snapshot generation, snapshot rendering, and share-link creation
+
 ## Core V1 Features
 
 ### Internal Workspace
@@ -105,7 +115,7 @@
 
 V1 is successful only if:
 
-- all core source types work
+- at least one reliable source path works end to end, with text-first as the minimum acceptable fallback
 - a valid brief snapshot is generated
 - evidence references are visible
 - the public review flow works without auth

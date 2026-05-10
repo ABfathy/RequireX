@@ -2,7 +2,7 @@
 
 Desktop-first AI intake and project-brief generation for the Softworks x AISprint hackathon.
 
-This repository currently contains the planning and architecture package for the 7-day build. The product goal is to take messy client inputs like text, audio, screenshots, and PDFs, then generate a clean, structured project brief with evidence-backed citations and a shareable client review link.
+This repository now contains the planning package plus an active implementation scaffold for the 7-day build. The current codebase includes the app shell, auth wiring, persistence models, upload routes, generation request plumbing, and public review mutation APIs, with the end-to-end brief generation and rendering flow still in progress.
 
 ## Core Idea
 
@@ -74,6 +74,7 @@ Detailed planning:
 - [docs/08-testing-strategy.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/08-testing-strategy.md)
 - [docs/09-current-state.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/09-current-state.md)
 - [docs/10-current-plan.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/10-current-plan.md)
+- [docs/11-next-steps.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/11-next-steps.md)
 
 ## Current Repo Scripts
 

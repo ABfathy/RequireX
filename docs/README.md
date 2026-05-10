@@ -1,6 +1,8 @@
 # Docs Index
 
-This folder is the planning source of truth for the hackathon build.
+This folder is the working source of truth for the hackathon build.
+
+Some files describe the intended product shape, while [09-current-state.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/09-current-state.md) and [11-next-steps.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/11-next-steps.md) describe what is actually implemented and what should happen next.
 
 Recommended reading order:
 
@@ -14,6 +16,7 @@ Recommended reading order:
 8. [08-testing-strategy.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/08-testing-strategy.md)
 9. [09-current-state.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/09-current-state.md)
 10. [10-current-plan.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/10-current-plan.md)
+11. [11-next-steps.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/11-next-steps.md)
 
 Primary external brief:
 
@@ -31,6 +34,7 @@ Primary external brief:
 - `08-testing-strategy.md`: the quality bar and the test stack
 - `09-current-state.md`: live checklist for what is and is not implemented
 - `10-current-plan.md`: coach-facing workflow summary for plan approval
+- `11-next-steps.md`: implementation priorities based on the repo as it exists today
 
 ## Implementation Checkpoints
 

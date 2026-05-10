@@ -1,5 +1,25 @@
 # Current Plan
 
+## Current Repo Note
+
+This plan still reflects the intended product workflow, but the repository has moved past pure planning.
+
+What is already implemented in some form:
+
+- internal auth and protected app shell
+- file and text intake persistence
+- UploadThing routes for the main source types
+- generation and regeneration request plumbing
+- public review mutation APIs
+
+What remains missing from the actual working product:
+
+- real project/session management in the UI
+- the AI generation pipeline
+- persisted snapshot rendering in the internal and public pages
+- share-link creation
+- the feedback-to-regeneration loop in the UI
+
 This document is intended for hackathon coaches and mentors. It explains the current product plan, the expected workflow, and the parts we want to validate early before full implementation.
 
 ## What We Are Building
