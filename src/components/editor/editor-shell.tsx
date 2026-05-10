@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "@/lib/hooks/use-theme";
 
 import { CommandPalette } from "./command-palette";
-import { DocView } from "./doc-view";
+import { type AppState, DocView } from "./doc-view";
 import { ProjectSidebar } from "./project-sidebar";
 import { RightPane } from "./right-pane";
 import { StatusBar } from "./statusbar";
@@ -13,13 +13,18 @@ import { TitleBar } from "./titlebar";
 
 type RightTab = "sources" | "chat" | "revisions";
 
-export function EditorShell() {
+interface EditorShellProps {
+  session?: { id: string; title: string } | null;
+}
+
+export function EditorShell({ session }: EditorShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightOpen,   setRightOpen]   = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [rightTab,    setRightTab]    = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
+  const appState: AppState = session ? "no-sources" : "no-session";
 
   /* ⌘K shortcut */
   useEffect(() => {
@@ -84,10 +89,9 @@ export function EditorShell() {
           )}
         </div>
 
-        {/* DocView — no real session yet, so state is "no-session" */}
         <DocView
-          appState="no-session"
-          sessionName={null}
+          appState={appState}
+          sessionName={session?.title ?? null}
           selectedReq={selectedReq}
           onSelectReq={handleSelectReq}
           onAddSources={handleOpenSources}
@@ -96,13 +100,13 @@ export function EditorShell() {
         {/* Right pane */}
         <div className="overflow-hidden" style={{ minWidth: 0 }}>
           {rightOpen && (
-            <RightPane activeTab={rightTab} onTabChange={setRightTab} />
+            <RightPane activeTab={rightTab} onTabChange={setRightTab} sessionId={session?.id} />
           )}
         </div>
       </div>
 
       {/* StatusBar */}
-      <StatusBar selectedReq={selectedReq} sessionName={null} />
+      <StatusBar selectedReq={selectedReq} sessionName={session?.title ?? null} />
 
       {/* Command palette (portal-like fixed overlay) */}
       {paletteOpen && (

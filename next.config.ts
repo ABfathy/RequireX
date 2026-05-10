@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: rootDir,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "img.clerk.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

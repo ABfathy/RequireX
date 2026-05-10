@@ -80,6 +80,8 @@ Never access `process.env` directly. Import from:
 
 Copy `env.example` → `.env.local` to set up. Minimum needed locally: `DATABASE_URL`, Clerk keys.
 
+`SEED_USER_ID` — set to your Clerk user ID (`user_2...`) before running `pnpm prisma:seed` so seed data is owned by your account and the editor loads a real session. Find it in the Clerk dashboard or via `window.Clerk.user.id` in the browser console.
+
 ### Intake API (Workstream 4)
 
 UploadThing router at `src/lib/uploadthing.ts` — 4 routes:
@@ -107,6 +109,16 @@ Service layer: `src/server/services/assets.ts` — `persistFileAsset`, `persistT
 Validators: `src/server/validators/assets.ts` — `detectSourceType(mimeType)`, `TextAssetInputSchema`, `UpdateLabelInputSchema`, `TEXT_MAX_CHARS` (500 000).
 
 Unit tests in `tests/unit/` — not yet wired to Vitest runner (Workstream 10).
+
+### Editor State Machine
+
+`AppState` (defined in `src/components/editor/doc-view.tsx`): `no-session → no-sources → generating → failed → ready`.
+
+`src/app/app/page.tsx` is an async server component — it queries `prisma.intakeSession.findFirst` by `clerkUserId` and passes `{ id, title } | null` to `EditorShell`. `EditorShell` derives `appState` from the presence of the session prop and threads `sessionName` (title) to `DocView`/`StatusBar` and `sessionId` (id) to `RightPane`.
+
+### Images
+
+`next.config.ts` allows `img.clerk.com` as a remote pattern for `next/image` (required for the settings panel avatar).
 
 ### Planned Integrations (not yet wired)
 

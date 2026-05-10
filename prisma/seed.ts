@@ -3,16 +3,29 @@ import { createPrismaClient } from "../src/lib/prisma-client";
 const prisma = createPrismaClient();
 
 async function main() {
+  const userId = process.env.SEED_USER_ID ?? "user_demo_admin";
+
+  if (userId === "user_demo_admin") {
+    console.warn(
+      "⚠  SEED_USER_ID is not set — seeding with placeholder ID.\n" +
+      "   The editor will show 'No project selected'.\n" +
+      "   Set SEED_USER_ID=<your Clerk user ID> in .env and re-run pnpm prisma:seed.\n" +
+      "   Find your ID in the Clerk dashboard under Users, or from the network tab after signing in.",
+    );
+  } else {
+    console.log(`Seeding as user: ${userId}`);
+  }
+
   const workspace = await prisma.workspace.upsert({
     where: { slug: "requirex-demo" },
     update: {
       name: "RequireX Demo Workspace",
-      createdBy: "user_demo_admin",
+      createdBy: userId,
     },
     create: {
       slug: "requirex-demo",
       name: "RequireX Demo Workspace",
-      createdBy: "user_demo_admin",
+      createdBy: userId,
     },
   });
 
@@ -31,7 +44,7 @@ async function main() {
       description:
         "Demo project showing mixed-source intake, snapshot versioning, and evidence-backed brief generation.",
       status: "ACTIVE",
-      createdBy: "user_demo_admin",
+      createdBy: userId,
     },
   });
 
@@ -40,7 +53,7 @@ async function main() {
       projectId: project.id,
       title: "Initial Retail Intake",
       status: "REVIEW_READY",
-      createdBy: "user_demo_admin",
+      createdBy: userId,
     },
   });
 
@@ -77,7 +90,7 @@ async function main() {
       customId: "asset_requirex_pdf_demo",
       folderLabel: "kickoff-folder",
       providerMetadata: {
-        uploadedBy: "user_demo_admin",
+        uploadedBy: userId,
       },
       processedAt: new Date(),
     },
@@ -99,7 +112,7 @@ async function main() {
       customId: "asset_requirex_audio_demo",
       folderLabel: "kickoff-folder",
       providerMetadata: {
-        uploadedBy: "user_demo_admin",
+        uploadedBy: userId,
       },
       processedAt: new Date(),
     },
@@ -121,7 +134,7 @@ async function main() {
       customId: "asset_requirex_image_demo",
       folderLabel: "kickoff-folder",
       providerMetadata: {
-        uploadedBy: "user_demo_admin",
+        uploadedBy: userId,
       },
       processedAt: new Date(),
     },
@@ -200,7 +213,7 @@ async function main() {
       version: 1,
       status: "SUPERSEDED",
       sourceBundleVersion: 1,
-      createdBy: "user_demo_admin",
+      createdBy: userId,
     },
   });
 
@@ -303,7 +316,7 @@ async function main() {
       snapshotId: snapshotV1.id,
       token: "requirex-demo-v1",
       status: "ACTIVE",
-      createdBy: "user_demo_admin",
+      createdBy: userId,
     },
   });
 
@@ -369,7 +382,7 @@ async function main() {
       version: 2,
       status: "DRAFT",
       sourceBundleVersion: 2,
-      createdBy: "user_demo_admin",
+      createdBy: userId,
     },
   });
 

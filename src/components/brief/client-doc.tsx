@@ -3,8 +3,8 @@
 import { Send } from "lucide-react";
 
 import {
-  RequirementCard,
   type Requirement,
+  RequirementCard,
 } from "@/components/brief/requirement-card";
 import { Button } from "@/components/ui/button";
 

@@ -4,8 +4,8 @@ import { useState } from "react";
 
 import { ClientDoc } from "@/components/brief/client-doc";
 import { ClientHeader } from "@/components/brief/client-header";
-import { RevisionPanel, type Revision } from "@/components/brief/revision-panel";
 import type { Requirement } from "@/components/brief/requirement-card";
+import { type Revision,RevisionPanel } from "@/components/brief/revision-panel";
 import { useTheme } from "@/lib/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
