@@ -110,6 +110,16 @@ Validators: `src/server/validators/assets.ts` — `detectSourceType(mimeType)`, 
 
 Unit tests in `tests/unit/` — not yet wired to Vitest runner (Workstream 10).
 
+### Editor State Machine
+
+`AppState` (defined in `src/components/editor/doc-view.tsx`): `no-session → no-sources → generating → failed → ready`.
+
+`src/app/app/page.tsx` is an async server component — it queries `prisma.intakeSession.findFirst` by `clerkUserId` and passes `{ id, title } | null` to `EditorShell`. `EditorShell` derives `appState` from the presence of the session prop and threads `sessionName` (title) to `DocView`/`StatusBar` and `sessionId` (id) to `RightPane`.
+
+### Images
+
+`next.config.ts` allows `img.clerk.com` as a remote pattern for `next/image` (required for the settings panel avatar).
+
 ### Planned Integrations (not yet wired)
 
 - **Inngest** — async job processing (env vars exist, SDK not imported)
