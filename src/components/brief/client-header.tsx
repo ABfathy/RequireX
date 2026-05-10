@@ -1,9 +1,10 @@
 "use client";
 
 import { Check, History, Moon, Sun } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
-import { RxLogo } from "@/components/rx-logo";
+import { RxLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { IconBtn } from "@/components/ui/icon-btn";
 
@@ -31,32 +32,43 @@ function ClientHeader({
   const [submitted, setSubmitted] = useState(false);
 
   return (
-    <header className="flex items-center gap-3 px-6 border-b border-border bg-background shrink-0 h-12">
-      {/* Brand */}
-      <div className="flex items-center gap-[7px] text-[13px] font-semibold tracking-[-0.015em] text-fg-1">
+    <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 border-b border-border bg-background shrink-0 h-12 min-w-0">
+      {/* Brand — links back to landing page */}
+      <Link
+        href="/"
+        className="flex items-center gap-[7px] text-[13px] font-semibold tracking-[-0.015em] text-fg-1 shrink-0 rounded-[4px] transition-colors duration-[120ms] hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        aria-label="RequireX — go to home"
+      >
         <RxLogo size={15} className="text-accent" />
-        <span>RequireX</span>
+        <span className="hidden sm:inline" translate="no">RequireX</span>
+      </Link>
+
+      {/* Separator — desktop only */}
+      <div className="hidden sm:block w-px h-4 bg-border shrink-0" />
+
+      {/* Doc name — truncates on small screens */}
+      <div className="flex items-center gap-1.5 min-w-0 flex-1 sm:flex-none">
+        <span className="text-[13px] text-fg-3 font-normal truncate min-w-0">
+          {docName}
+        </span>
+        <span className="text-fg-4 text-[13px] shrink-0 hidden xs:inline">·</span>
+        <span className="text-[13px] text-fg-4 font-mono shrink-0 hidden xs:inline">
+          {specVersion}
+        </span>
       </div>
-
-      {/* Separator */}
-      <div className="w-px h-4 bg-border" />
-
-      {/* Doc name */}
-      <span className="text-[13px] text-fg-3 font-normal">
-        {docName} · {specVersion}
-      </span>
 
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Status */}
-      <span className="font-mono text-[10.5px] text-fg-4">
-        {reqCount} requirements · {needsInputCount} need your input
+      {/* Req count — hidden on mobile */}
+      <span className="hidden md:block font-mono text-[10.5px] text-fg-4 shrink-0">
+        {reqCount} req · {needsInputCount} need input
       </span>
 
       {/* Controls */}
       <IconBtn
-        title="Revision history"
+        aria-label="Revision history"
+        aria-pressed={revOpen}
         active={revOpen}
         onClick={onToggleRev}
       >
@@ -64,7 +76,7 @@ function ClientHeader({
       </IconBtn>
 
       <IconBtn
-        title={theme === "dark" ? "Light mode" : "Dark mode"}
+        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         onClick={onToggleTheme}
       >
         {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
@@ -72,13 +84,19 @@ function ClientHeader({
 
       {/* Submit */}
       {submitted ? (
-        <Button variant="secondary" size="sm">
-          <Check size={12} />
-          Submitted
+        <Button variant="secondary" size="sm" className="shrink-0">
+          <Check size={12} aria-hidden="true" />
+          <span className="hidden sm:inline">Submitted</span>
         </Button>
       ) : (
-        <Button variant="default" size="sm" onClick={() => setSubmitted(true)}>
-          Submit feedback
+        <Button
+          variant="default"
+          size="sm"
+          className="shrink-0"
+          onClick={() => setSubmitted(true)}
+        >
+          <span className="sm:hidden">Submit</span>
+          <span className="hidden sm:inline">Submit feedback</span>
         </Button>
       )}
     </header>

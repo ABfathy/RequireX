@@ -53,29 +53,42 @@ function RequirementCard({ req }: RequirementCardProps) {
           : "border-border hover:border-border-strong",
       )}
     >
-      {/* Header row */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="font-mono text-xs text-fg-4">{req.id}</span>
-        <Pill tone={STATUS_TONE[req.status] ?? "neutral"}>
-          {STATUS_LABEL[req.status] ?? req.status}
-        </Pill>
-        <span className="flex-1" />
-        {req.tags.map((t) => (
-          <Tag key={t}>{t}</Tag>
-        ))}
-        <button
-          className={cn(
-            "flex items-center gap-[5px] py-[3px] px-2 rounded-sm",
-            "bg-transparent border border-border text-[11px] text-fg-4 cursor-default",
-            "opacity-0 group-hover:opacity-100",
-            "transition-all duration-fast ease-out-app",
-            "hover:border-border-focus hover:text-fg-1",
-          )}
-          onClick={() => setCommentOpen((o) => !o)}
-        >
-          <MessageSquare size={11} />
-          <span>{commentOpen ? "Close" : "Comment"}</span>
-        </button>
+      {/* Header row — stacks vertically on mobile, single row on sm+ */}
+      <div className="flex flex-col gap-1.5 mb-2 sm:flex-row sm:items-center sm:gap-2">
+        {/* Left: ID + status — never overflow, always first */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono text-xs text-fg-4 shrink-0">{req.id}</span>
+          <Pill tone={STATUS_TONE[req.status] ?? "neutral"}>
+            {STATUS_LABEL[req.status] ?? req.status}
+          </Pill>
+        </div>
+
+        {/* Desktop spacer */}
+        <span className="hidden sm:flex flex-1" />
+
+        {/* Right: tags + comment button — wraps as a unit */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {req.tags.map((t) => (
+            <Tag key={t}>{t}</Tag>
+          ))}
+          <button
+            type="button"
+            aria-label={commentOpen ? "Close comment" : "Add comment"}
+            aria-expanded={commentOpen}
+            className={cn(
+              "flex items-center gap-[5px] py-[3px] px-2 rounded-sm",
+              "bg-transparent border border-border text-[11px] text-fg-4 cursor-pointer",
+              "sm:opacity-0 sm:group-hover:opacity-100",
+              "transition-all duration-fast ease-out-app",
+              "hover:border-border-focus hover:text-fg-1",
+              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent",
+            )}
+            onClick={() => setCommentOpen((o) => !o)}
+          >
+            <MessageSquare size={11} aria-hidden="true" />
+            <span>{commentOpen ? "Close" : "Comment"}</span>
+          </button>
+        </div>
       </div>
 
       {/* Title */}

@@ -40,12 +40,15 @@ function QuestionBlock({ question, onSubmitAnswer }: QuestionBlockProps) {
       <div className="text-[12.5px] text-fg-2 leading-normal mb-2">
         {question}
       </div>
+      <label htmlFor="question-answer-input" className="sr-only">Your answer</label>
       <textarea
-        className="w-full bg-surface-1 border border-border rounded-sm p-1.5 px-[9px] font-sans text-[12.5px] text-fg-1 outline-none resize-none transition-colors duration-fast ease-out-app focus:border-border-focus placeholder:text-fg-4"
+        id="question-answer-input"
+        className="w-full bg-surface-1 border border-border rounded-sm p-1.5 px-[9px] font-sans text-[12.5px] text-fg-1 resize-none transition-colors duration-fast ease-out-app focus-visible:outline-none focus-visible:border-border-focus focus-visible:ring-1 focus-visible:ring-accent placeholder:text-fg-4"
         rows={2}
         placeholder="Type your answer…"
         value={answerText}
         onChange={(e) => setAnswerText(e.target.value)}
+        autoComplete="off"
       />
       {answerText.trim() && (
         <div className="mt-1.5">

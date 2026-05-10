@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   Check,
   ChevronRight,
   Code,
@@ -56,6 +57,7 @@ export const Icons = {
   Refresh:      icon(RefreshCw),
   Check:        icon(Check),
   X:            icon(X),
+  ArrowRight:   icon(ArrowRight),
 } as const;
 
 export function RxLogo({ size = 16, className }: { size?: number; className?: string }) {

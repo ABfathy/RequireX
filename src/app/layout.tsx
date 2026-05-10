@@ -14,8 +14,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark" className="h-full antialiased">
+    <html lang="en" data-theme="dark" className="h-full antialiased" style={{ colorScheme: "dark" }}>
       <head>
+        <meta name="theme-color" content="#141517" />
         <link
           rel="preconnect"
           href="https://fonts.googleapis.com"

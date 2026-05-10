@@ -8,6 +8,8 @@ import { Pill } from "@/components/ui/pill";
 import { Tag } from "@/components/ui/tag";
 
 /* ── Types ─────────────────────────────────────────────── */
+export type AppState = "no-session" | "no-sources" | "generating" | "failed" | "ready";
+
 type Tone = "success" | "info" | "warning" | "danger" | "neutral";
 
 type LineType =
@@ -22,7 +24,7 @@ interface EvidenceRef {
   sourceName: string;
 }
 
-interface DocLineData {
+export interface DocLineData {
   lineNum: number;
   type: LineType;
   text?: string;
@@ -34,19 +36,19 @@ interface DocLineData {
 }
 
 const STATUS_TONE: Record<string, Tone> = {
-  approved:   "success",
+  approved:    "success",
   "in-review": "info",
-  draft:      "neutral",
-  conflict:   "danger",
-  stale:      "warning",
+  draft:       "neutral",
+  conflict:    "danger",
+  stale:       "warning",
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  approved:   "Approved",
+  approved:    "Approved",
   "in-review": "In review",
-  draft:      "Draft",
-  conflict:   "Conflict",
-  stale:      "Stale",
+  draft:       "Draft",
+  conflict:    "Conflict",
+  stale:       "Stale",
 };
 
 /* ── EvidenceBit ────────────────────────────────────────── */
@@ -54,7 +56,10 @@ function EvidenceBit({ ev }: { ev: EvidenceRef }) {
   const [show, setShow] = useState(false);
   return (
     <span
-      className="relative inline-flex items-center gap-1 ml-1.5 px-1.5 h-[18px] rounded-[3px] border cursor-default select-none"
+      className="relative inline-flex items-center gap-1 ml-1.5 px-1.5 h-[18px] rounded-[3px] border cursor-default select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)]"
+      tabIndex={0}
+      role="button"
+      aria-label={`Evidence: ${ev.sourceName} — ${ev.ref}`}
       style={{
         background: "var(--surface-3)",
         borderColor: "var(--border-strong)",
@@ -64,13 +69,16 @@ function EvidenceBit({ ev }: { ev: EvidenceRef }) {
       }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
     >
-      <Icons.FileText size={9} />
+      <Icons.FileText size={9} aria-hidden="true" />
       <span>{ev.ref}</span>
 
       {show && (
         <span
           className="absolute bottom-full left-0 mb-1.5 z-50 rounded-[6px] border p-2.5 min-w-[200px] max-w-[300px]"
+          role="tooltip"
           style={{
             background: "var(--surface-3)",
             borderColor: "var(--border-strong)",
@@ -109,19 +117,28 @@ function DocLine({
   const isActive = isReq && line.reqId === selectedReq;
 
   const heights: Partial<Record<LineType, string>> = {
-    h1: "min-h-[32px] py-1",
-    h2: "min-h-[28px] py-0.5",
+    h1:    "min-h-[32px] py-1",
+    h2:    "min-h-[28px] py-0.5",
     blank: line.small ? "h-[8px]" : "h-[16px]",
   };
   const heightCls = heights[line.type] ?? "min-h-[21px]";
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (isReq && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      onSelectReq(line.reqId!);
+    }
+  }
+
   return (
     <div
-      className={`flex items-start w-full transition-colors duration-[80ms] ${isReq ? "cursor-pointer" : ""}`}
-      style={{
-        background: isActive ? "var(--accent-subtle)" : undefined,
-      }}
+      className={`flex items-start w-full transition-colors duration-[80ms] ${isReq ? "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]" : ""}`}
+      style={{ background: isActive ? "var(--accent-subtle)" : undefined }}
+      role={isReq ? "button" : undefined}
+      tabIndex={isReq ? 0 : undefined}
+      aria-pressed={isReq ? isActive : undefined}
       onClick={isReq ? () => onSelectReq(line.reqId!) : undefined}
+      onKeyDown={isReq ? handleKeyDown : undefined}
     >
       {/* Gutter */}
       <div
@@ -132,6 +149,7 @@ function DocLine({
           color: "var(--fg-muted)",
           userSelect: "none",
         }}
+        aria-hidden="true"
       >
         {line.type !== "blank" ? line.lineNum : ""}
       </div>
@@ -141,7 +159,7 @@ function DocLine({
         className={`flex items-center gap-2 flex-1 pr-6 ${heightCls}`}
         style={{ minWidth: 0 }}
       >
-        {(line.type === "h1") && (
+        {line.type === "h1" && (
           <span
             className="text-[21px] font-semibold tracking-[-0.02em] leading-tight"
             style={{ color: "var(--fg-primary)" }}
@@ -149,7 +167,7 @@ function DocLine({
             {line.text}
           </span>
         )}
-        {(line.type === "h2") && (
+        {line.type === "h2" && (
           <span
             className="text-[13px] font-semibold uppercase tracking-[0.06em]"
             style={{ color: "var(--fg-tertiary)" }}
@@ -157,7 +175,7 @@ function DocLine({
             {line.text}
           </span>
         )}
-        {(line.type === "meta") && (
+        {line.type === "meta" && (
           <span
             className="text-[11px]"
             style={{ fontFamily: "var(--font-mono)", color: "var(--fg-muted)" }}
@@ -165,7 +183,7 @@ function DocLine({
             {line.text}
           </span>
         )}
-        {(line.type === "req-title") && (
+        {line.type === "req-title" && (
           <span
             className="text-[14px] font-medium"
             style={{ color: "var(--fg-primary)" }}
@@ -173,7 +191,7 @@ function DocLine({
             {line.text}
           </span>
         )}
-        {(line.type === "req-header") && (
+        {line.type === "req-header" && (
           <div className="flex items-center gap-2 w-full">
             <span
               className="text-[11px] font-medium"
@@ -192,7 +210,7 @@ function DocLine({
             ))}
           </div>
         )}
-        {(line.type === "body") && (
+        {line.type === "body" && (
           <span
             className="text-[14px] leading-[1.65]"
             style={{ color: "var(--fg-secondary)" }}
@@ -208,6 +226,101 @@ function DocLine({
   );
 }
 
+/* ── Empty states ───────────────────────────────────────── */
+function EmptyDoc({ state, onAddSources }: { state: AppState; onAddSources?: () => void }) {
+  if (state === "no-session") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
+        <Icons.FileText size={28} aria-hidden="true" className="text-[var(--fg-disabled)]" />
+        <div>
+          <p className="text-[15px] font-medium mb-1" style={{ color: "var(--fg-secondary)" }}>
+            No project selected
+          </p>
+          <p className="text-[13px] leading-[1.65]" style={{ color: "var(--fg-muted)" }}>
+            Open a project from the sidebar to get started.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "no-sources") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
+        <Icons.Upload size={28} aria-hidden="true" className="text-[var(--fg-disabled)]" />
+        <div>
+          <p className="text-[15px] font-medium mb-1" style={{ color: "var(--fg-secondary)" }}>
+            No sources yet
+          </p>
+          <p className="text-[13px] leading-[1.65] mb-4" style={{ color: "var(--fg-muted)" }}>
+            Add PDFs, transcripts, or paste text in the Sources panel to begin.
+          </p>
+          {onAddSources && (
+            <button
+              type="button"
+              onClick={onAddSources}
+              className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-[5px] text-[12px] font-medium border transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ color: "var(--fg-secondary)", borderColor: "var(--border-strong)" }}
+            >
+              <Icons.PanelRight size={12} aria-hidden="true" />
+              <span>Open Sources</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "generating") {
+    return (
+      <div className="flex flex-col h-full py-6 px-[52px] pr-6" aria-live="polite" aria-busy="true">
+        <div className="flex items-center gap-2 mb-6">
+          <span
+            className="size-[8px] rounded-full animate-pulse shrink-0"
+            style={{ background: "var(--warning)" }}
+            aria-hidden="true"
+          />
+          <span className="text-[13px]" style={{ color: "var(--fg-tertiary)" }}>
+            Generating brief…
+          </span>
+        </div>
+        {[80, 60, 90, 50, 70].map((w, i) => (
+          <div key={i} className="flex items-center gap-3 mb-3">
+            <div
+              className="h-[14px] rounded-[3px] animate-pulse"
+              style={{ width: `${w}%`, background: "var(--surface-3)" }}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (state === "failed") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
+        <div
+          className="size-7 rounded-full flex items-center justify-center"
+          style={{ background: "color-mix(in srgb, var(--danger) 12%, transparent)" }}
+          aria-hidden="true"
+        >
+          <Icons.X size={14} style={{ color: "var(--danger)" }} />
+        </div>
+        <div>
+          <p className="text-[15px] font-medium mb-1" style={{ color: "var(--fg-secondary)" }}>
+            Generation failed
+          </p>
+          <p className="text-[13px] leading-[1.65]" style={{ color: "var(--fg-muted)" }}>
+            The pipeline could not complete. Check sources and try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 /* ── ChatBar ────────────────────────────────────────────── */
 function ChatBar() {
   const [value, setValue] = useState("");
@@ -220,19 +333,19 @@ function ChatBar() {
   return (
     <div
       className="shrink-0 border-t"
-      style={{
-        borderColor: "var(--border)",
-        background: "var(--background)",
-      }}
+      style={{ borderColor: "var(--border)", background: "var(--background)" }}
     >
-      <div
-        className="flex items-center gap-2.5 h-[52px] px-4"
-      >
+      <div className="flex items-center gap-2.5 h-[52px] px-4">
         <Icons.MessageSquare
           size={14}
+          aria-hidden="true"
           className="shrink-0 text-[var(--fg-muted)]"
         />
+        <label htmlFor="doc-chat-input" className="sr-only">
+          Chat input
+        </label>
         <input
+          id="doc-chat-input"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
@@ -242,8 +355,10 @@ function ChatBar() {
             }
           }}
           placeholder="Ask about requirements, request changes, upload sources…"
-          className="flex-1 bg-transparent outline-none text-[13px]"
+          className="flex-1 bg-transparent text-[13px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] rounded-[3px]"
           style={{ color: "var(--fg-primary)" }}
+          autoComplete="off"
+          spellCheck={false}
         />
         <IconButton label="Attach source">
           <Icons.Upload size={14} />
@@ -257,13 +372,26 @@ function ChatBar() {
 }
 
 /* ── DocView ────────────────────────────────────────────── */
-interface DocViewProps {
+export interface DocViewProps {
+  appState?: AppState;
+  sessionName?: string | null;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
+  onAddSources?: () => void;
   lines?: DocLineData[];
 }
 
-export function DocView({ selectedReq, onSelectReq, lines = [] }: DocViewProps) {
+export function DocView({
+  appState = "no-session",
+  sessionName,
+  selectedReq,
+  onSelectReq,
+  onAddSources,
+  lines = [],
+}: DocViewProps) {
+  const canGenerate = appState === "ready" || appState === "no-sources";
+  const generateDisabled = appState === "no-sources" || appState === "no-session";
+
   return (
     <div
       className="flex flex-col flex-1 overflow-hidden h-full"
@@ -272,51 +400,51 @@ export function DocView({ selectedReq, onSelectReq, lines = [] }: DocViewProps) 
       {/* Topbar */}
       <div
         className="flex items-center h-8 px-4 gap-3 shrink-0 border-b"
-        style={{
-          background: "var(--surface-1)",
-          borderColor: "var(--border)",
-        }}
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         {/* Breadcrumbs */}
         <div
-          className="flex items-center gap-1.5 text-[12px] flex-1"
+          className="flex items-center gap-1.5 text-[12px] flex-1 min-w-0"
           style={{ color: "var(--fg-tertiary)" }}
         >
-          <span>payments-v2</span>
-          <span style={{ color: "var(--border-focus)" }}>/</span>
-          <span>requirements</span>
-          <span style={{ color: "var(--border-focus)" }}>/</span>
-          <span style={{ color: "var(--fg-secondary)" }}>spec-v2.1</span>
+          <span className="truncate" style={{ color: "var(--fg-secondary)" }}>
+            {sessionName ?? "—"}
+          </span>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] cursor-pointer"
+            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
             style={{ color: "var(--fg-tertiary)" }}
           >
-            <Icons.Filter size={11} />
+            <Icons.Filter size={11} aria-hidden="true" />
             <span>Filter</span>
           </button>
           <button
             type="button"
-            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] cursor-pointer"
-            style={{
-              background: "var(--accent)",
-              color: "var(--accent-fg)",
-            }}
+            disabled={generateDisabled}
+            title={generateDisabled ? "Add sources first" : undefined}
+            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            style={
+              canGenerate && !generateDisabled
+                ? { background: "var(--accent)", color: "var(--accent-fg)" }
+                : { background: "var(--surface-3)", color: "var(--fg-muted)" }
+            }
           >
-            <Icons.Download size={11} />
-            <span>Export</span>
+            <Icons.Download size={11} aria-hidden="true" />
+            <span>Generate Brief</span>
           </button>
         </div>
       </div>
 
       {/* Doc scroll */}
       <div className="flex-1 overflow-y-auto py-4">
-        {lines.length === 0 ? (
-          <EmptyDoc />
+        {appState !== "ready" ? (
+          <EmptyDoc state={appState} onAddSources={onAddSources} />
+        ) : lines.length === 0 ? (
+          <EmptyDoc state="no-sources" onAddSources={onAddSources} />
         ) : (
           lines.map((line, i) => (
             <DocLine
@@ -331,28 +459,6 @@ export function DocView({ selectedReq, onSelectReq, lines = [] }: DocViewProps) 
 
       {/* Chat bar */}
       <ChatBar />
-    </div>
-  );
-}
-
-function EmptyDoc() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
-      <Icons.FileText size={32} className="text-[var(--fg-disabled)]" />
-      <div>
-        <p
-          className="text-[15px] font-medium mb-1"
-          style={{ color: "var(--fg-secondary)" }}
-        >
-          No requirements extracted yet
-        </p>
-        <p
-          className="text-[13px] leading-[1.65]"
-          style={{ color: "var(--fg-muted)" }}
-        >
-          Add sources and start a chat to extract requirements.
-        </p>
-      </div>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { ClientDoc } from "@/components/brief/client-doc";
 import { ClientHeader } from "@/components/brief/client-header";
 import { RevisionPanel, type Revision } from "@/components/brief/revision-panel";
 import type { Requirement } from "@/components/brief/requirement-card";
+import { useTheme } from "@/lib/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
 /* ── Mock data (matches design/client.html) ─────────── */
@@ -91,14 +92,7 @@ const MOCK_REVISIONS: Revision[] = [
 
 export default function BriefClientShell() {
   const [revOpen, setRevOpen] = useState(false);
-  const [theme, setTheme] = useState("dark");
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () =>
-    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const needsInputCount = MOCK_REQUIREMENTS.filter((r) => r.question).length;
 
@@ -117,8 +111,8 @@ export default function BriefClientShell() {
 
       <div
         className={cn(
-          "grid min-h-0 overflow-hidden transition-all duration-base ease-out-app",
-          revOpen ? "grid-cols-[1fr_240px]" : "grid-cols-[1fr]",
+          "relative grid min-h-0 overflow-hidden transition-all duration-base ease-out-app",
+          revOpen ? "sm:grid-cols-[1fr_240px]" : "grid-cols-[1fr]",
         )}
       >
         <ClientDoc
@@ -133,10 +127,13 @@ export default function BriefClientShell() {
         />
 
         {revOpen && (
-          <RevisionPanel
-            revisions={MOCK_REVISIONS}
-            onClose={() => setRevOpen(false)}
-          />
+          /* On mobile: full-screen overlay. On sm+: sidebar column */
+          <div className="absolute inset-0 z-20 sm:relative sm:inset-auto sm:z-auto">
+            <RevisionPanel
+              revisions={MOCK_REVISIONS}
+              onClose={() => setRevOpen(false)}
+            />
+          </div>
         )}
       </div>
     </div>

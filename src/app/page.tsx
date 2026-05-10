@@ -1,15 +1,19 @@
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 
-import { RxLogo } from "@/components/icons";
+import { Icons, RxLogo } from "@/components/icons";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
   return (
     <main
-      className="min-h-screen flex flex-col items-center justify-center px-6 py-16"
+      className="relative min-h-screen flex flex-col items-center justify-center px-6 py-16"
       style={{ background: "var(--background)" }}
     >
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       {/* Center card */}
       <div className="w-full max-w-[480px]">
         {/* Brand */}
@@ -25,7 +29,7 @@ export default function HomePage() {
 
         {/* Headline */}
         <h1
-          className="text-[33px] font-semibold leading-[1.15] tracking-[-0.02em] mb-4"
+          className="text-[33px] font-semibold leading-[1.15] tracking-[-0.02em] mb-4 text-balance"
           style={{ color: "var(--fg-primary)" }}
         >
           Requirements engineering,{" "}
@@ -33,7 +37,7 @@ export default function HomePage() {
         </h1>
 
         <p
-          className="text-[15px] leading-[1.65] mb-8"
+          className="text-[15px] leading-[1.65] mb-8 text-pretty"
           style={{ color: "var(--fg-tertiary)" }}
         >
           Ingest PDFs, transcripts, tickets, and code. RequireX extracts,
@@ -46,38 +50,40 @@ export default function HomePage() {
           <Show when="signed-out">
             <SignUpButton mode="redirect">
               <Button
-                className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] cursor-pointer"
+                className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--background)] cursor-pointer"
                 style={{
                   background: "var(--accent)",
                   color: "var(--accent-fg)",
+                  touchAction: "manipulation",
                 }}
               >
-                Get started
+                Get Started
               </Button>
             </SignUpButton>
             <SignInButton mode="redirect">
               <Button
-                className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] border cursor-pointer"
+                className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] border hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--background)] cursor-pointer"
                 style={{
                   background: "transparent",
                   color: "var(--fg-secondary)",
                   borderColor: "var(--border-strong)",
+                  touchAction: "manipulation",
                 }}
               >
-                Sign in
+                Sign In
               </Button>
             </SignInButton>
           </Show>
           <Show when="signed-in">
             <Link
               href="/app"
-              className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms]"
+              className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--background)]"
               style={{
                 background: "var(--accent)",
                 color: "var(--accent-fg)",
               }}
             >
-              Open workspace
+              Open Workspace
             </Link>
             <UserButton />
           </Show>
@@ -90,22 +96,16 @@ export default function HomePage() {
         <div className="grid grid-cols-2 gap-3">
           <NavCard
             href="/app"
-            label="Internal workspace"
+            label="Internal Workspace"
             description="Editor, chat, source ingestion, revision history."
             prefetch={false}
           />
           <NavCard
             href="/brief/demo-share-token"
-            label="Client brief view"
+            label="Client Brief View"
             description="Shareable review link — comment, answer, approve."
           />
         </div>
-
-        {/* Footer */}
-        <p
-          className="mt-8 text-[11px] text-center"
-          style={{ color: "var(--fg-disabled)" }}
-        ></p>
       </div>
     </main>
   );
@@ -126,17 +126,25 @@ function NavCard({
     <Link
       href={href}
       prefetch={prefetch}
-      className="block p-4 rounded-[8px] border transition-colors duration-[120ms] group"
+      className="block p-4 rounded-[8px] border transition-colors duration-[120ms] group hover:bg-[var(--surface-2)] hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
       style={{
         background: "var(--surface-1)",
         borderColor: "var(--border)",
       }}
     >
-      <div
-        className="text-[12px] font-medium mb-1"
-        style={{ color: "var(--fg-secondary)" }}
-      >
-        {label}
+      <div className="flex items-start justify-between gap-1 mb-1">
+        <span
+          className="text-[12px] font-medium"
+          style={{ color: "var(--fg-secondary)" }}
+        >
+          {label}
+        </span>
+        <Icons.ArrowRight
+          size={11}
+          aria-hidden="true"
+          className="shrink-0 mt-px transition-transform duration-[120ms] group-hover:translate-x-0.5"
+          style={{ color: "var(--fg-muted)" }}
+        />
       </div>
       <div
         className="text-[11px] leading-[1.5]"

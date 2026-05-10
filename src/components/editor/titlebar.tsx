@@ -1,6 +1,6 @@
 "use client";
 
-import { Icons, RxLogo } from "@/components/icons";
+import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
 
@@ -12,7 +12,6 @@ interface TitleBarProps {
   onToggleRight: () => void;
   onToggleTheme: () => void;
   onOpenPalette: () => void;
-  projectName?: string;
 }
 
 export function TitleBar({
@@ -23,7 +22,6 @@ export function TitleBar({
   onToggleRight,
   onToggleTheme,
   onOpenPalette,
-  projectName,
 }: TitleBarProps) {
   return (
     <div
@@ -38,7 +36,7 @@ export function TitleBar({
         <button
           type="button"
           onClick={onOpenPalette}
-          className="flex items-center gap-2 h-[22px] px-3 rounded-[5px] border transition-colors duration-[120ms] cursor-pointer"
+          className="flex items-center gap-2 h-[22px] px-3 rounded-[5px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
           style={{
             background: "var(--surface-2)",
             borderColor: "var(--border-strong)",

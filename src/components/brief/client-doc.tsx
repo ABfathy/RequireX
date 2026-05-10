@@ -23,7 +23,7 @@ function ClientDoc({ title, meta, requirements }: ClientDocProps) {
   const sections = [...new Set(requirements.map((r) => r.section))];
 
   return (
-    <div className="flex-1 overflow-auto flex flex-col items-center py-10 px-12 pb-20">
+    <div className="flex-1 overflow-auto flex flex-col items-center py-6 px-4 pb-16 sm:py-10 sm:px-12 sm:pb-20">
       <div className="w-full max-w-[920px] flex flex-col">
         {/* Title */}
         <div className="text-2xl font-semibold tracking-[-0.02em] text-fg-1 leading-[1.2] mb-2">
@@ -31,7 +31,7 @@ function ClientDoc({ title, meta, requirements }: ClientDocProps) {
         </div>
 
         {/* Meta row */}
-        <div className="font-mono text-xs text-fg-4 mb-8 flex gap-2.5">
+        <div className="font-mono text-xs text-fg-4 mb-8 flex flex-wrap gap-x-2.5 gap-y-1">
           <span>{meta.project}</span>
           <span className="text-border-focus">·</span>
           <span>{meta.version}</span>

@@ -209,6 +209,10 @@ button, input, textarea, select {
 ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; border: 2px solid var(--background); }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-focus); }
 
+button, [role="button"] {
+  touch-action: manipulation;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

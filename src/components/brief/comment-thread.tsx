@@ -44,13 +44,15 @@ function CommentThread({ isOpen, onClose, onSubmitComment }: CommentThreadProps)
             CL
           </div>
           <div className="flex-1 flex flex-col gap-1.5">
+            <label htmlFor="comment-input" className="sr-only">Comment</label>
             <textarea
-              className="w-full bg-surface-1 border border-border rounded-md p-[7px] px-2.5 font-sans text-[12.5px] text-fg-1 outline-none resize-none min-h-9 transition-colors duration-fast ease-out-app focus:border-border-strong placeholder:text-fg-4"
+              id="comment-input"
+              className="w-full bg-surface-1 border border-border rounded-md p-[7px] px-2.5 font-sans text-[12.5px] text-fg-1 resize-none min-h-9 transition-colors duration-fast ease-out-app focus-visible:outline-none focus-visible:border-border-strong focus-visible:ring-1 focus-visible:ring-accent placeholder:text-fg-4"
               rows={2}
-              autoFocus
               placeholder="Add a comment or suggest a change…"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
+              autoComplete="off"
             />
             {commentText.trim() && (
               <div className="flex gap-1.5">
