@@ -80,6 +80,8 @@ Never access `process.env` directly. Import from:
 
 Copy `env.example` → `.env.local` to set up. Minimum needed locally: `DATABASE_URL`, Clerk keys.
 
+`SEED_USER_ID` — set to your Clerk user ID (`user_2...`) before running `pnpm prisma:seed` so seed data is owned by your account and the editor loads a real session. Find it in the Clerk dashboard or via `window.Clerk.user.id` in the browser console.
+
 ### Intake API (Workstream 4)
 
 UploadThing router at `src/lib/uploadthing.ts` — 4 routes:

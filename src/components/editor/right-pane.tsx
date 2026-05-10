@@ -22,6 +22,7 @@ export interface SourceItem {
 export interface RightPaneProps {
   activeTab: RightTab;
   onTabChange: (tab: RightTab) => void;
+  sessionId?: string;
   /* sources tab */
   sources?: SourceItem[];
   sourcesLoading?: boolean;
