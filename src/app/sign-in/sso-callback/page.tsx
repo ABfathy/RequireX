@@ -1,6 +1,6 @@
 "use client";
 
-import { SignIn, useAuth } from "@clerk/nextjs";
+import { AuthenticateWithRedirectCallback, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -18,7 +18,7 @@ function Spinner() {
   );
 }
 
-export default function SignInPage() {
+export default function SignInSSOCallback() {
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
 
@@ -32,13 +32,13 @@ export default function SignInPage() {
     }
   }, [isLoaded, isSignedIn, router]);
 
-  if (!isLoaded || isSignedIn) {
-    return <Spinner />;
-  }
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
-      <SignIn />
-    </main>
+    <>
+      <Spinner />
+      <AuthenticateWithRedirectCallback
+        signInForceRedirectUrl="/app"
+        signUpForceRedirectUrl="/app"
+      />
+    </>
   );
 }

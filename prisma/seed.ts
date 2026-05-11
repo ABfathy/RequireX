@@ -514,6 +514,140 @@ async function main() {
     ],
   });
 
+  /* ─── Extra projects for sidebar density ─────────────────── */
+  const userWorkspaceSlug = `ws-${userId.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+  const userWorkspace = await prisma.workspace.upsert({
+    where: { slug: userWorkspaceSlug },
+    update: { name: "My Workspace", createdBy: userId },
+    create: {
+      slug: userWorkspaceSlug,
+      name: "My Workspace",
+      createdBy: userId,
+    },
+  });
+
+  const extraProjects = [
+    {
+      name: "Acme Logistics Portal",
+      clientName: "Acme Logistics",
+      description: "Driver dispatch + customer tracking portal.",
+      sessions: [
+        {
+          title: "Discovery call notes",
+          assets: [
+            {
+              kind: "TEXT" as const,
+              status: "PROCESSED" as const,
+              label: "Kickoff meeting notes",
+              text: "Acme needs a single portal for dispatchers and customers. Real-time GPS tracking, SMS notifications, and a driver mobile app are the three pillars.",
+            },
+            {
+              kind: "TEXT" as const,
+              status: "UPLOADED" as const,
+              label: "Founder voicemail transcript",
+              text: "Hey, just wanted to add — we'd love this to integrate with our existing Twilio account. Also, the drivers really push back on anything that needs typing.",
+            },
+          ],
+        },
+        {
+          title: "Stakeholder interviews",
+          assets: [
+            {
+              kind: "TEXT" as const,
+              status: "PROCESSED" as const,
+              label: "Ops manager interview",
+              text: "Dispatch currently happens in a shared spreadsheet. We need shift handoff tooling and incident logging built in from day one.",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Northwind Mobile Banking",
+      clientName: "Northwind Bank",
+      description: "Compliance-first mobile banking refresh.",
+      sessions: [
+        {
+          title: "Compliance + UX intake",
+          assets: [
+            {
+              kind: "TEXT" as const,
+              status: "PROCESSED" as const,
+              label: "Compliance constraints memo",
+              text: "All flows must support biometric step-up, transaction signing, and an offline lockout mode. KYC handled by an external partner.",
+            },
+            {
+              kind: "TEXT" as const,
+              status: "FAILED" as const,
+              label: "Voice memo (failed transcription)",
+              text: "[transcription failed]",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Glimmer Wedding Planner",
+      clientName: "Glimmer Events",
+      description: "Couples + planner collaboration app.",
+      sessions: [
+        {
+          title: "Vendor + couple flows",
+          assets: [
+            {
+              kind: "TEXT" as const,
+              status: "UPLOADED" as const,
+              label: "Pasted client brief",
+              text: "Glimmer wants couples to invite their planner, share Pinterest-style mood boards, and approve vendor quotes inside the app. Planners need a separate dashboard view.",
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  for (const p of extraProjects) {
+    await prisma.project.deleteMany({
+      where: { workspaceId: userWorkspace.id, name: p.name },
+    });
+    const proj = await prisma.project.create({
+      data: {
+        workspaceId: userWorkspace.id,
+        name: p.name,
+        clientName: p.clientName,
+        description: p.description,
+        status: "ACTIVE",
+        createdBy: userId,
+      },
+    });
+    for (const sessionSpec of p.sessions) {
+      const sess = await prisma.intakeSession.create({
+        data: {
+          projectId: proj.id,
+          title: sessionSpec.title,
+          status: "COLLECTING",
+          createdBy: userId,
+        },
+      });
+      for (const a of sessionSpec.assets) {
+        await prisma.sourceAsset.create({
+          data: {
+            sessionId: sess.id,
+            sourceType: "TEXT",
+            status: a.status,
+            displayLabel: a.label,
+            mimeType: "text/plain",
+            textContent: a.text,
+            providerMetadata: { origin: "seed" },
+            processedAt: a.status === "PROCESSED" ? new Date() : null,
+            errorMessage:
+              a.status === "FAILED" ? "Audio could not be transcribed." : null,
+          },
+        });
+      }
+    }
+  }
+
   console.log(
     JSON.stringify(
       {
@@ -521,6 +655,8 @@ async function main() {
         projectId: project.id,
         sessionId: session.id,
         shareToken: shareLinkV1.token,
+        userWorkspaceId: userWorkspace.id,
+        extraProjects: extraProjects.map((p) => p.name),
       },
       null,
       2,

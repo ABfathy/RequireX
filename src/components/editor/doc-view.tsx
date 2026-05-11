@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
@@ -375,12 +375,25 @@ function EmptyDoc({
 }
 
 /* ── ChatBar ────────────────────────────────────────────── */
-function ChatBar() {
+interface ChatBarProps {
+  onAttachFiles?: (files: File[]) => Promise<void>;
+}
+
+function ChatBar({ onAttachFiles }: ChatBarProps) {
   const [value, setValue] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleSend() {
     if (!value.trim()) return;
     setValue("");
+  }
+
+  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
+    if (picked.length > 0 && onAttachFiles) {
+      void onAttachFiles(picked);
+    }
   }
 
   return (
@@ -413,9 +426,21 @@ function ChatBar() {
           autoComplete="off"
           spellCheck={false}
         />
-        <IconButton label="Attach source">
+        <IconButton
+          label="Attach source"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!onAttachFiles}
+        >
           <Icons.Upload size={14} />
         </IconButton>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,application/pdf,audio/*"
+          className="hidden"
+          onChange={handleFilePick}
+        />
         <IconButton label="Send message" onClick={handleSend}>
           <Icons.Send size={14} />
         </IconButton>
@@ -427,21 +452,25 @@ function ChatBar() {
 /* ── DocView ────────────────────────────────────────────── */
 export interface DocViewProps {
   appState?: AppState;
+  projectName?: string | null;
   sessionName?: string | null;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
   onAddSources?: () => void;
   onGenerateBrief?: () => void;
+  onAttachFiles?: (files: File[]) => Promise<void>;
   lines?: DocLineData[];
 }
 
 export function DocView({
   appState = "no-session",
+  projectName,
   sessionName,
   selectedReq,
   onSelectReq,
   onAddSources,
   onGenerateBrief,
+  onAttachFiles,
   lines = [],
 }: DocViewProps) {
   const canGenerate = appState === "ready" || appState === "no-sources";
@@ -460,10 +489,18 @@ export function DocView({
       >
         {/* Breadcrumbs */}
         <div
-          className="flex items-center gap-1.5 text-[12px] flex-1 min-w-0"
+          className="flex items-center gap-1 text-[12px] flex-1 min-w-0"
           style={{ color: "var(--fg-tertiary)" }}
         >
-          <span className="truncate" style={{ color: "var(--fg-secondary)" }}>
+          {projectName && (
+            <>
+              <span className="truncate shrink-0 max-w-[180px] font-medium" style={{ color: "var(--fg-secondary)" }}>
+                {projectName}
+              </span>
+              <Icons.ChevronRight size={11} aria-hidden="true" className="shrink-0 opacity-40" />
+            </>
+          )}
+          <span className="truncate" style={{ color: projectName ? "var(--fg-tertiary)" : "var(--fg-secondary)" }}>
             {sessionName ?? "—"}
           </span>
         </div>
@@ -515,7 +552,7 @@ export function DocView({
       </div>
 
       {/* Chat bar */}
-      <ChatBar />
+      <ChatBar onAttachFiles={onAttachFiles} />
     </div>
   );
 }

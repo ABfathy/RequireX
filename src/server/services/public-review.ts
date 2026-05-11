@@ -1,3 +1,10 @@
+import {
+  ActorType,
+  BriefQuestionStatus,
+  BriefSnapshotStatus,
+  ShareLinkStatus,
+} from "../../../generated/prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import {
   assertCommentSnapshotConsistency,

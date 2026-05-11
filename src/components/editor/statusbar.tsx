@@ -57,15 +57,10 @@ export function StatusBar({
 
       {/* Selected req */}
       {selectedReq && (
-        <>
-          <span className="font-mono" style={{ color: "var(--accent)" }}>
-            {selectedReq}
-          </span>
-          <Sep />
-        </>
+        <span className="font-mono" style={{ color: "var(--accent)" }}>
+          {selectedReq}
+        </span>
       )}
-
-      <span>RequireX</span>
     </div>
   );
 }

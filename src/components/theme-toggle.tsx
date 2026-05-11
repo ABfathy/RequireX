@@ -1,23 +1,40 @@
 "use client";
 
+import { useTheme } from "next-themes";
+
 import { Icons } from "@/components/icons";
-import { useTheme } from "@/lib/hooks/use-theme";
+import { useMounted } from "@/lib/hooks/use-mounted";
 
 export function ThemeToggle() {
-  const { theme, toggle } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const mounted = useMounted();
+
+  const isDark = resolvedTheme !== "light";
 
   return (
     <button
       type="button"
-      onClick={toggle}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={
+        mounted
+          ? isDark
+            ? "Switch to light mode"
+            : "Switch to dark mode"
+          : "Toggle theme"
+      }
+      suppressHydrationWarning
       className="inline-grid place-items-center w-8 h-8 rounded-[6px] transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
       style={{ color: "var(--fg-muted)" }}
     >
-      {theme === "dark"
-        ? <Icons.Sun size={15} />
-        : <Icons.Moon size={15} />
-      }
+      {mounted ? (
+        isDark ? (
+          <Icons.Sun size={15} />
+        ) : (
+          <Icons.Moon size={15} />
+        )
+      ) : (
+        <span aria-hidden="true" style={{ width: 15, height: 15 }} />
+      )}
     </button>
   );
 }

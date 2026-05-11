@@ -1,122 +1,46 @@
 # Feature List
 
-## Current Implementation Note
+## Implemented
 
-This file describes the intended feature set, not just the shipped surface area.
+- Internal auth flow with custom Clerk pages
+- Protected internal workspace route
+- Automatic workspace bootstrap per user
+- Project list loading and active-project switching
+- New project creation with automatic initial intake session
+- Source listing for the active session
+- Pasted-text source creation
+- File uploads for image, PDF, and audio source inputs
+- Source rename
+- Source delete with status guardrails
+- Public review comment API
+- Public review follow-up answer API
+- Public review confirmation API
+- Public review rate limiting
+- Revision-event audit writes for public review mutations
 
-As of 2026-05-10:
+## Partial
 
-- backend foundations for auth, intake, assets, generation requests, and public review mutations are implemented
-- the internal workspace and public brief pages exist mostly as UI shells with mock content
-- the highest-risk missing pieces are snapshot generation, snapshot rendering, and share-link creation
+- Internal editor UI: interactive, but brief content is still placeholder data
+- Public brief UI: designed and responsive, but still placeholder data
+- Generation requests: API and job dispatch exist, processing does not
+- Regeneration requests: API and job dispatch exist, processing does not
+- Revision history: persistence model exists, UI is not connected
 
-## Core V1 Features
+## Missing
 
-### Internal Workspace
+- Source chunking
+- Evidence extraction
+- Brief snapshot creation
+- Brief snapshot rendering in `/app`
+- Snapshot-backed public brief rendering in `/brief/[shareToken]`
+- Share-link creation flow from the internal app
+- Internal review / approval workflow over generated snapshots
+- Real revision browser
+- E2E tests
+- Accessibility automation
 
-- internal sign-in for team members
-- shared workspace for the hackathon team
-- project creation
-- one client per project
-- intake session creation inside a project
-- project/session sidebar history
+## Explicitly Not True Anymore
 
-### Source Intake
-
-- raw text input or pasted messages
-- image upload
-- audio upload
-- PDF upload
-- mixed-source folder upload
-- mixed-source intake in the same session
-- upload status and processing states
-
-### AI Brief Generation
-
-- asynchronous generation flow
-- plain-language summary output
-- goals and success criteria output
-- ambiguities output
-- follow-up questions output
-- claim-level evidence references
-- confidence tagging on generated claims
-
-### Internal Review and Refinement
-
-- read structured brief in the center workspace
-- inspect evidence for each claim or question
-- select a section or claim for refinement
-- AI-assisted rewrite or clarification flow
-- new snapshot creation after regeneration
-- revision timeline
-
-### Public Client Review
-
-- unique public share link
-- no mandatory client account
-- readable public brief layout
-- inline comments on highlighted sections or targeted brief areas
-- follow-up question answers through structured inputs
-- brief confirmation action
-
-### Persistence
-
-- save projects
-- save sessions
-- save assets and metadata
-- save snapshots
-- save revision events
-- save comments and answers
-
-## Important UX Features
-
-- desktop-first internal authoring flow
-- mobile support for public review
-- light mobile support for internal access
-- compact citation affordance
-- clean loading and async progress states
-- reduced-motion compatibility
-
-## Novelty Features That Still Fit Scope
-
-- revision diff review between brief versions
-- tasteful landing background treatment with `react-bits`
-- subtle workspace transitions with `animejs`
-- mobile success haptics with `web-haptics`
-- codex-like brief-first workspace shell
-
-## Stretch Features
-
-- optional access-code gate before viewing the brief
-- client display name capture
-- source asset preview thumbnails
-- confidence-based highlighting
-- templated AI refinement prompts
-
-## Deferred Features
-
-- broad document format support beyond text, image, audio, and PDF
-- direct client inline editing of brief text
-- multi-tenant SaaS workspace model
-- task management or PM boards
-- invoicing, proposals, or contracts
-- deep CRM functionality
-- third-party intake automation like `n8n` during the hackathon build
-
-## Explicit Non-Goals
-
-- generic AI chat app
-- project management platform
-- omnichannel CRM
-- no-code automation suite
-- heavy analytics dashboard
-
-## Acceptance Bar
-
-V1 is successful only if:
-
-- at least one reliable source path works end to end, with text-first as the minimum acceptable fallback
-- a valid brief snapshot is generated
-- evidence references are visible
-- the public review flow works without auth
-- revisions create stable history
+- The repo is not just a planning package.
+- Source ingestion is not "next"; it is already implemented.
+- Public review mutations are not speculative; they are implemented and tested.

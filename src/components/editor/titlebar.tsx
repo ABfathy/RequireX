@@ -1,13 +1,16 @@
 "use client";
 
-import { Icons } from "@/components/icons";
+import Link from "next/link";
+
+import { Icons, RxLogo } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
+import { useIsMac } from "@/lib/hooks/use-is-mac";
 
 interface TitleBarProps {
   sidebarOpen: boolean;
   rightOpen: boolean;
-  theme: "dark" | "light";
+  theme: "dark" | "light" | null;
   onToggleSidebar: () => void;
   onToggleRight: () => void;
   onToggleTheme: () => void;
@@ -23,6 +26,7 @@ export function TitleBar({
   onToggleTheme,
   onOpenPalette,
 }: TitleBarProps) {
+  const isMac = useIsMac();
   return (
     <div
       className="flex items-center h-8 px-3 gap-3 border-b shrink-0 select-none"
@@ -31,6 +35,22 @@ export function TitleBar({
         borderColor: "var(--border)",
       }}
     >
+      {/* Brand */}
+      <Link
+        href="/"
+        className="flex items-center gap-1.5 h-[22px] px-2 rounded-[4px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] shrink-0"
+        aria-label="RequireX — go to home"
+      >
+        <RxLogo size={13} className="text-[var(--accent)]" />
+        <span
+          className="text-[12px] font-semibold tracking-[-0.01em]"
+          style={{ color: "var(--fg-primary)" }}
+          translate="no"
+        >
+          RequireX
+        </span>
+      </Link>
+
       {/* Center search trigger */}
       <div className="flex-1 flex justify-center px-4">
         <button
@@ -50,7 +70,7 @@ export function TitleBar({
           <span className="flex-1 text-left text-[12px]">
             Search requirements…
           </span>
-          <Kbd>⌘K</Kbd>
+          <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>
         </button>
       </div>
 
@@ -72,11 +92,18 @@ export function TitleBar({
         </IconButton>
         <IconButton
           label={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            theme === null
+              ? "Toggle theme"
+              : theme === "dark"
+                ? "Switch to light mode"
+                : "Switch to dark mode"
           }
           onClick={onToggleTheme}
+          suppressHydrationWarning
         >
-          {theme === "dark" ? (
+          {theme === null ? (
+            <span aria-hidden="true" style={{ width: 14, height: 14 }} />
+          ) : theme === "dark" ? (
             <Icons.Sun size={14} />
           ) : (
             <Icons.Moon size={14} />

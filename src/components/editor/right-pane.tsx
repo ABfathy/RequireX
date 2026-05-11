@@ -5,6 +5,9 @@ import { useRef, useState } from "react";
 import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 
+import { AddTextDialog } from "./add-text-dialog";
+import { SourcePreviewModal } from "./source-preview-modal";
+
 /* ── Types ─────────────────────────────────────────────── */
 type RightTab = "sources" | "chat" | "revisions";
 
@@ -22,6 +25,8 @@ export interface SourceItem {
   sourceType: SourceType;
   status: SourceStatus;
   createdAt: string;
+  fileUrl?: string;
+  mimeType?: string;
 }
 
 export interface RightPaneProps {
@@ -39,6 +44,7 @@ export interface RightPaneProps {
     files: File[],
     onProgress: (progress: number) => void,
   ) => Promise<void>;
+  onUploadFiles?: (files: File[]) => Promise<void>;
   onRetrySourceLoad?: () => void;
 }
 
@@ -121,11 +127,12 @@ interface SourceRowProps {
   item: SourceItem;
   onDelete?: (id: string) => void;
   onRename?: (id: string, label: string) => void;
+  onPreview?: (item: SourceItem) => void;
 }
 
-function SourceRow({ item, onDelete, onRename }: SourceRowProps) {
-  const [editing, setEditing] = useState(false);
-  const [editVal, setEditVal] = useState(item.label);
+function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
+  const [editing, setEditing]     = useState(false);
+  const [editVal, setEditVal]     = useState(item.label);
   const [confirming, setConfirming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -157,7 +164,7 @@ function SourceRow({ item, onDelete, onRename }: SourceRowProps) {
 
   return (
     <div
-      className="group flex items-center gap-2 px-3 py-2 transition-colors duration-[120ms] hover:bg-[var(--surface-3)]"
+      className="group flex items-center gap-2 px-3 py-2 transition-[background-color] duration-[120ms] hover:bg-[var(--surface-3)]"
       role="listitem"
     >
       {/* Type icon */}
@@ -197,60 +204,76 @@ function SourceRow({ item, onDelete, onRename }: SourceRowProps) {
           </button>
         )}
         <span
-          className="text-[10px] truncate"
-          style={{
-            color: "var(--fg-disabled)",
-            fontFamily: "var(--font-mono)",
-          }}
+          className="text-[10px] truncate tabular-nums"
+          style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
         >
           {relTime}
         </span>
       </div>
 
-      {/* Status dot + label */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* Right action area — fixed width so nothing shifts on hover or confirm */}
+      <div className="relative flex items-center justify-end shrink-0 w-[50px] h-6">
         {confirming ? (
+          /* Delete confirmation: two icon buttons, no text, no layout jump */
           <div className="flex items-center gap-1">
-            <span className="text-[10px]" style={{ color: "var(--danger)" }}>
-              Delete?
-            </span>
             <button
               type="button"
-              onClick={() => {
-                onDelete?.(item.id);
-                setConfirming(false);
-              }}
-              className="text-[10px] font-medium focus-visible:outline-none focus-visible:underline cursor-pointer"
-              style={{ color: "var(--danger)" }}
+              aria-label="Cancel delete"
+              onClick={() => setConfirming(false)}
+              className="inline-flex items-center justify-center size-[22px] rounded-[4px] transition-[transform,background-color,color] duration-[120ms] hover:bg-[var(--surface-2)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ color: "var(--fg-muted)" }}
             >
-              Yes
+              <Icons.X size={11} />
             </button>
             <button
               type="button"
-              onClick={() => setConfirming(false)}
-              className="text-[10px] focus-visible:outline-none focus-visible:underline cursor-pointer"
-              style={{ color: "var(--fg-muted)" }}
+              aria-label="Confirm delete"
+              onClick={() => { onDelete?.(item.id); setConfirming(false); }}
+              className="inline-flex items-center justify-center size-[22px] rounded-[4px] transition-[transform,background-color] duration-[120ms] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{
+                background: "color-mix(in srgb, var(--danger) 15%, transparent)",
+                color: "var(--danger)",
+              }}
             >
-              No
+              <Icons.Check size={11} />
             </button>
           </div>
         ) : (
           <>
+            {/* Status dot — sits in place, cross-fades with action buttons */}
             <span
-              className="size-[6px] rounded-full shrink-0 opacity-70"
+              className={`absolute inset-0 m-auto size-[6px] rounded-full transition-opacity duration-[150ms] pointer-events-none ${
+                onPreview ?? onDelete
+                  ? "opacity-60 group-hover:opacity-0"
+                  : "opacity-60"
+              }`}
               style={{ background: STATUS_DOT[item.status] }}
-              title={STATUS_LABEL[item.status]}
               aria-label={STATUS_LABEL[item.status]}
+              role="img"
             />
-            {onDelete && (
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms]">
-                <IconButton
-                  label={`Delete ${item.label}`}
-                  onClick={() => setConfirming(true)}
-                >
-                  <Icons.X size={11} />
-                </IconButton>
-              </span>
+
+            {/* Action buttons — overlay the dot, fade in on hover */}
+            {(onPreview ?? onDelete) && (
+              <div className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-[150ms]">
+                {onPreview && (
+                  <IconButton
+                    label={`Preview ${item.label}`}
+                    onClick={() => onPreview(item)}
+                    className="active:scale-[0.96] transition-[transform,background-color,color]"
+                  >
+                    <Icons.Eye size={11} />
+                  </IconButton>
+                )}
+                {onDelete && (
+                  <IconButton
+                    label={`Delete ${item.label}`}
+                    onClick={() => setConfirming(true)}
+                    className="active:scale-[0.96] transition-[transform,background-color,color]"
+                  >
+                    <Icons.X size={11} />
+                  </IconButton>
+                )}
+              </div>
             )}
           </>
         )}
@@ -276,110 +299,6 @@ function SkeletonRow() {
           className="h-[8px] w-1/2 rounded-[3px] animate-pulse"
           style={{ background: "var(--surface-3)" }}
         />
-      </div>
-    </div>
-  );
-}
-
-/* ── TextPasteArea ──────────────────────────────────────── */
-const TEXT_MAX = 500_000;
-
-interface TextPasteAreaProps {
-  onSubmit?: (text: string) => Promise<void>;
-  onCancel: () => void;
-}
-
-function TextPasteArea({ onSubmit, onCancel }: TextPasteAreaProps) {
-  const [value, setValue] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit() {
-    if (!value.trim() || !onSubmit) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await onSubmit(value.trim());
-      onCancel();
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Failed to save. Try again.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const over = value.length > TEXT_MAX;
-
-  return (
-    <div
-      className="mx-3 mb-3 rounded-[6px] border overflow-hidden"
-      style={{
-        borderColor: "var(--border-strong)",
-        background: "var(--surface-1)",
-      }}
-    >
-      <label htmlFor="text-paste-input" className="sr-only">
-        Paste text content
-      </label>
-      <textarea
-        id="text-paste-input"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Paste client context, notes, or requirements…"
-        rows={6}
-        className="w-full bg-transparent text-[12px] leading-[1.6] resize-none p-2.5 focus-visible:outline-none"
-        style={{ color: "var(--fg-primary)" }}
-        autoComplete="off"
-        spellCheck={false}
-      />
-
-      <div
-        className="flex items-center justify-between px-2.5 py-2 border-t gap-2"
-        style={{ borderColor: "var(--border)" }}
-      >
-        <span
-          className="text-[10px]"
-          style={{
-            color: over ? "var(--danger)" : "var(--fg-disabled)",
-            fontFamily: "var(--font-mono)",
-          }}
-          aria-live="polite"
-        >
-          {value.length.toLocaleString()} / {TEXT_MAX.toLocaleString()}
-        </span>
-
-        {error && (
-          <span
-            className="text-[10px] flex-1"
-            style={{ color: "var(--danger)" }}
-            aria-live="polite"
-          >
-            {error}
-          </span>
-        )}
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 cursor-pointer"
-            style={{ color: "var(--fg-tertiary)" }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!value.trim() || over || submitting || !onSubmit}
-            className="h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
-          >
-            {submitting ? "Saving…" : "Add source"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -534,7 +453,22 @@ function SourcesTab({
   onUpload,
   onRetry,
 }: SourcesTabProps) {
+  onUploadFiles?: (files: File[]) => Promise<void>;
+  onRetry?: () => void;
+}
+
+function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText, onUploadFiles, onRetry }: SourcesTabProps) {
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
+    if (picked.length > 0 && onUploadFiles) {
+      void onUploadFiles(picked);
+    }
+  }
 
   return (
     <>
@@ -583,6 +517,7 @@ function SourcesTab({
               item={item}
               onDelete={onDelete}
               onRename={onRename}
+              onPreview={setPreviewItem}
             />
           ))}
         </div>
@@ -598,18 +533,14 @@ function SourcesTab({
         />
       )}
 
-      {/* Text paste area or Add button */}
+      {/* Add buttons */}
       <div className="px-3 pb-3 mt-1">
-        {pasteOpen ? (
-          <TextPasteArea
-            onSubmit={onSubmitText}
-            onCancel={() => setPasteOpen(false)}
-          />
-        ) : (
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setPasteOpen(true)}
-            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer w-full"
+            disabled={!onSubmitText}
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
             style={{
               color: "var(--fg-tertiary)",
               borderColor: "var(--border)",
@@ -617,10 +548,46 @@ function SourcesTab({
             }}
           >
             <Icons.Plus size={12} aria-hidden="true" />
-            <span>Add text source</span>
+            <span>Add text</span>
           </button>
-        )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!onUploadFiles}
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
+            style={{
+              color: "var(--fg-tertiary)",
+              borderColor: "var(--border)",
+              background: "transparent",
+            }}
+          >
+            <Icons.FileText size={12} aria-hidden="true" />
+            <span>Upload files</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,application/pdf,audio/*"
+            className="hidden"
+            onChange={handleFilePick}
+          />
+        </div>
       </div>
+
+      {pasteOpen && (
+        <AddTextDialog
+          onSubmit={onSubmitText}
+          onClose={() => setPasteOpen(false)}
+        />
+      )}
+
+      {previewItem && (
+        <SourcePreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+        />
+      )}
     </>
   );
 }
@@ -665,13 +632,13 @@ export function RightPane({
   onRenameSource,
   onSubmitText,
   onUploadSources,
+  onUploadFiles,
   onRetrySourceLoad,
 }: RightPaneProps) {
   return (
     <aside
-      className="flex flex-col h-full overflow-hidden border-l"
+      className="flex flex-col h-full w-full overflow-hidden border-l"
       style={{
-        width: 268,
         background: "var(--surface-2)",
         borderColor: "var(--border)",
       }}
@@ -729,6 +696,7 @@ export function RightPane({
             onRename={onRenameSource}
             onSubmitText={onSubmitText}
             onUpload={onUploadSources}
+            onUploadFiles={onUploadFiles}
             onRetry={onRetrySourceLoad}
           />
         )}

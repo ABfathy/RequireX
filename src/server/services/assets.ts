@@ -1,3 +1,5 @@
+import { SourceAssetStatus, SourceType } from "../../../generated/prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { TEXT_MAX_CHARS } from "@/server/validators/assets";
 
@@ -93,6 +95,7 @@ export async function getSessionAssets(sessionId: string) {
       fileSizeBytes: true,
       errorMessage: true,
       createdAt: true,
+      ufsUrl: true,
     },
   });
 }
