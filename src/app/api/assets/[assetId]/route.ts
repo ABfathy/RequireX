@@ -10,9 +10,36 @@ import {
   deleteAsset,
   updateAssetLabel,
 } from "@/server/services/assets";
+import { prisma } from "@/lib/prisma";
 import { UpdateLabelInputSchema } from "@/server/validators/assets";
 
 type RouteContext = { params: Promise<{ assetId: string }> };
+
+export async function GET(_req: NextRequest, { params }: RouteContext) {
+  try {
+    await requireInternalAuth();
+    const { assetId } = await params;
+    const asset = await prisma.sourceAsset.findUnique({
+      where: { id: assetId },
+      select: {
+        id: true,
+        sourceType: true,
+        mimeType: true,
+        ufsUrl: true,
+        textContent: true,
+      },
+    });
+    if (!asset) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ asset });
+  } catch (err) {
+    if (isInternalAuthorizationError(err)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
 
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   try {

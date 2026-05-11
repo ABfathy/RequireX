@@ -90,6 +90,7 @@ export async function getSessionAssets(sessionId: string) {
       fileSizeBytes: true,
       errorMessage: true,
       createdAt: true,
+      ufsUrl: true,
     },
   });
 }

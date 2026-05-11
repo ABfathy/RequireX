@@ -56,6 +56,8 @@ type ApiAsset = {
   status: SourceItem["status"];
   displayLabel: string | null;
   originalFileName: string | null;
+  mimeType: string | null;
+  ufsUrl: string | null;
   createdAt: string;
 };
 
@@ -75,6 +77,8 @@ function assetToSource(a: ApiAsset): SourceItem {
     sourceType: mapSourceType(a.sourceType),
     status: a.status,
     createdAt: a.createdAt,
+    fileUrl: a.ufsUrl ?? undefined,
+    mimeType: a.mimeType ?? undefined,
   };
 }
 

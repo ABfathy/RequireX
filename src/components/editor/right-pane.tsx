@@ -6,6 +6,7 @@ import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 
 import { AddTextDialog } from "./add-text-dialog";
+import { SourcePreviewModal } from "./source-preview-modal";
 
 /* ── Types ─────────────────────────────────────────────── */
 type RightTab = "sources" | "chat" | "revisions";
@@ -19,6 +20,8 @@ export interface SourceItem {
   sourceType: SourceType;
   status: SourceStatus;
   createdAt: string;
+  fileUrl?: string;
+  mimeType?: string;
 }
 
 export interface RightPaneProps {
@@ -104,9 +107,10 @@ interface SourceRowProps {
   item: SourceItem;
   onDelete?: (id: string) => void;
   onRename?: (id: string, label: string) => void;
+  onPreview?: (item: SourceItem) => void;
 }
 
-function SourceRow({ item, onDelete, onRename }: SourceRowProps) {
+function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
   const [editing, setEditing]     = useState(false);
   const [editVal, setEditVal]     = useState(item.label);
   const [confirming, setConfirming] = useState(false);
@@ -209,21 +213,29 @@ function SourceRow({ item, onDelete, onRename }: SourceRowProps) {
         ) : (
           <>
             <span
-              className="size-[6px] rounded-full shrink-0 opacity-70"
+              className="size-[6px] rounded-full shrink-0 opacity-70 group-hover:opacity-0 transition-opacity duration-[120ms]"
               style={{ background: STATUS_DOT[item.status] }}
               title={STATUS_LABEL[item.status]}
               aria-label={STATUS_LABEL[item.status]}
             />
-            {onDelete && (
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms]">
+            <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms] flex items-center gap-0.5">
+              {onPreview && (
+                <IconButton
+                  label={`Preview ${item.label}`}
+                  onClick={() => onPreview(item)}
+                >
+                  <Icons.Eye size={11} />
+                </IconButton>
+              )}
+              {onDelete && (
                 <IconButton
                   label={`Delete ${item.label}`}
                   onClick={() => setConfirming(true)}
                 >
                   <Icons.X size={11} />
                 </IconButton>
-              </span>
-            )}
+              )}
+            </span>
           </>
         )}
       </div>
@@ -267,6 +279,7 @@ interface SourcesTabProps {
 
 function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText, onUploadFiles, onRetry }: SourcesTabProps) {
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -323,6 +336,7 @@ function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText,
               item={item}
               onDelete={onDelete}
               onRename={onRename}
+              onPreview={setPreviewItem}
             />
           ))}
         </div>
@@ -382,6 +396,13 @@ function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText,
         <AddTextDialog
           onSubmit={onSubmitText}
           onClose={() => setPasteOpen(false)}
+        />
+      )}
+
+      {previewItem && (
+        <SourcePreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
         />
       )}
     </>
