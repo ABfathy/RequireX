@@ -77,9 +77,8 @@ export function ProjectSidebar({
   return (
     <>
       <aside
-        className="flex flex-col h-full overflow-hidden border-r"
+        className="flex flex-col h-full w-full overflow-hidden border-r"
         style={{
-          width: 220,
           background: "var(--surface-1)",
           borderColor: "var(--border)",
         }}
