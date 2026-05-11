@@ -1,33 +1,28 @@
+import { z } from "zod";
+
 import {
   BriefCommentAnchorType,
   BriefCommentSection,
-} from "@prisma/client";
-import { z } from "zod";
+} from "../../../generated/prisma/client";
 
 const optionalTrimmedString = (max: number) =>
-  z.preprocess(
-    (value) => {
-      if (typeof value !== "string") {
-        return value;
-      }
-
-      const trimmed = value.trim();
-      return trimmed.length === 0 ? undefined : trimmed;
-    },
-    z.string().max(max).optional(),
-  );
-
-const optionalEmail = z.preprocess(
-  (value) => {
+  z.preprocess((value) => {
     if (typeof value !== "string") {
       return value;
     }
 
     const trimmed = value.trim();
-    return trimmed.length === 0 ? undefined : trimmed.toLowerCase();
-  },
-  z.string().email().max(320).optional(),
-);
+    return trimmed.length === 0 ? undefined : trimmed;
+  }, z.string().max(max).optional());
+
+const optionalEmail = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed.toLowerCase();
+}, z.string().email().max(320).optional());
 
 export const PublicCommentInputSchema = z
   .object({
@@ -71,8 +66,7 @@ export const PublicCommentInputSchema = z
     if (input.anchorType === "TEXT_RANGE" && !input.selectionText) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "selectionText is required when anchorType is TEXT_RANGE.",
+        message: "selectionText is required when anchorType is TEXT_RANGE.",
         path: ["selectionText"],
       });
     }

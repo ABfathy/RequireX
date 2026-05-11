@@ -1,10 +1,3 @@
-import {
-  ActorType,
-  BriefQuestionStatus,
-  BriefSnapshotStatus,
-  ShareLinkStatus,
-} from "@prisma/client";
-
 import { prisma } from "@/lib/prisma";
 import {
   assertCommentSnapshotConsistency,
@@ -13,6 +6,13 @@ import {
   type PublicCommentInput,
   type PublicFollowUpAnswerInput,
 } from "@/server/validators";
+
+import {
+  ActorType,
+  BriefQuestionStatus,
+  BriefSnapshotStatus,
+  ShareLinkStatus,
+} from "../../../generated/prisma/client";
 
 type PublicReviewDb = {
   shareLink: {
@@ -97,7 +97,8 @@ function toClientAttribution(
     authorEmail?: string;
   },
 ): ClientAttribution {
-  const authorEmail = normalizeOptionalString(input.authorEmail)?.toLowerCase() ?? null;
+  const authorEmail =
+    normalizeOptionalString(input.authorEmail)?.toLowerCase() ?? null;
   const authorName = normalizeOptionalString(input.authorName);
 
   return {
@@ -181,11 +182,15 @@ export async function createPublicComment(
       : null;
 
     if (input.claimId && !claim) {
-      throw new PublicReviewValidationError("claimId is invalid for this request.");
+      throw new PublicReviewValidationError(
+        "claimId is invalid for this request.",
+      );
     }
 
     if (input.questionId && !question) {
-      throw new PublicReviewValidationError("questionId is invalid for this request.");
+      throw new PublicReviewValidationError(
+        "questionId is invalid for this request.",
+      );
     }
 
     try {
@@ -198,7 +203,9 @@ export async function createPublicComment(
       });
     } catch (error) {
       throw new PublicReviewValidationError(
-        error instanceof Error ? error.message : "Invalid public comment target.",
+        error instanceof Error
+          ? error.message
+          : "Invalid public comment target.",
       );
     }
 
@@ -284,7 +291,9 @@ export async function createPublicFollowUpAnswer(
       });
     } catch (error) {
       throw new PublicReviewValidationError(
-        error instanceof Error ? error.message : "Invalid follow-up answer target.",
+        error instanceof Error
+          ? error.message
+          : "Invalid follow-up answer target.",
       );
     }
 

@@ -1,5 +1,6 @@
-import { SourceType } from "@prisma/client";
 import { z } from "zod";
+
+import { SourceType } from "../../../generated/prisma/client";
 
 export const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",

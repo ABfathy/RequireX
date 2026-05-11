@@ -1,42 +1,21 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 import {
   isInternalAuthorizationError,
   requireInternalAuth,
 } from "@/server/auth/internal";
-import {
-  BriefGenerationRequestError,
-  requestBriefRegeneration,
-} from "@/server/services/brief-generation";
 
-const regenerateRequestSchema = z.object({
-  sessionId: z.string().min(1),
-  sourceSnapshotId: z.string().min(1),
-});
+const legacyRegenerationDisabled = {
+  error: "LEGACY_GENERATION_FLOW_DISABLED",
+  message:
+    "Submit text through the Sources panel to run the single text brief Inngest event.",
+};
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const auth = await requireInternalAuth();
-    const body = regenerateRequestSchema.parse(await request.json());
-    const job = await requestBriefRegeneration({
-      sessionId: body.sessionId,
-      sourceSnapshotId: body.sourceSnapshotId,
-      requestedBy: auth.clerkUserId,
-    });
+    await requireInternalAuth();
 
-    return NextResponse.json(
-      {
-        jobId: job.id,
-        sessionId: job.sessionId,
-        sourceSnapshotId: job.sourceSnapshotId,
-        status: job.status,
-        type: job.type,
-      },
-      {
-        status: 202,
-      },
-    );
+    return NextResponse.json(legacyRegenerationDisabled, { status: 410 });
   } catch (error) {
     if (isInternalAuthorizationError(error)) {
       return NextResponse.json(
@@ -46,31 +25,6 @@ export async function POST(request: Request) {
         },
         {
           status: error.status,
-        },
-      );
-    }
-
-    if (error instanceof BriefGenerationRequestError) {
-      return NextResponse.json(
-        {
-          error: error.code,
-          message: error.message,
-        },
-        {
-          status: error.status,
-        },
-      );
-    }
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          error: "INVALID_REQUEST",
-          message:
-            "Request body must include a valid sessionId and sourceSnapshotId.",
-        },
-        {
-          status: 400,
         },
       );
     }

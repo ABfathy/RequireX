@@ -8,14 +8,23 @@ import { Pill } from "@/components/ui/pill";
 import { Tag } from "@/components/ui/tag";
 
 /* ── Types ─────────────────────────────────────────────── */
-export type AppState = "no-session" | "no-sources" | "generating" | "failed" | "ready";
+export type AppState =
+  | "no-session"
+  | "no-sources"
+  | "generating"
+  | "failed"
+  | "ready";
 
 type Tone = "success" | "info" | "warning" | "danger" | "neutral";
 
 type LineType =
-  | "h1" | "h2" | "meta"
-  | "req-header" | "req-title"
-  | "body" | "blank";
+  | "h1"
+  | "h2"
+  | "meta"
+  | "req-header"
+  | "req-title"
+  | "body"
+  | "blank";
 
 interface EvidenceRef {
   sourceId: string;
@@ -36,19 +45,19 @@ export interface DocLineData {
 }
 
 const STATUS_TONE: Record<string, Tone> = {
-  approved:    "success",
+  approved: "success",
   "in-review": "info",
-  draft:       "neutral",
-  conflict:    "danger",
-  stale:       "warning",
+  draft: "neutral",
+  conflict: "danger",
+  stale: "warning",
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  approved:    "Approved",
+  approved: "Approved",
   "in-review": "In review",
-  draft:       "Draft",
-  conflict:    "Conflict",
-  stale:       "Stale",
+  draft: "Draft",
+  conflict: "Conflict",
+  stale: "Stale",
 };
 
 /* ── EvidenceBit ────────────────────────────────────────── */
@@ -87,7 +96,10 @@ function EvidenceBit({ ev }: { ev: EvidenceRef }) {
         >
           <span
             className="block text-[10px] font-medium mb-1"
-            style={{ color: "var(--fg-secondary)", fontFamily: "var(--font-mono)" }}
+            style={{
+              color: "var(--fg-secondary)",
+              fontFamily: "var(--font-mono)",
+            }}
           >
             {ev.sourceName}
           </span>
@@ -113,12 +125,12 @@ function DocLine({
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
 }) {
-  const isReq    = !!line.reqId;
+  const isReq = !!line.reqId;
   const isActive = isReq && line.reqId === selectedReq;
 
   const heights: Partial<Record<LineType, string>> = {
-    h1:    "min-h-[32px] py-1",
-    h2:    "min-h-[28px] py-0.5",
+    h1: "min-h-[32px] py-1",
+    h2: "min-h-[28px] py-0.5",
     blank: line.small ? "h-[8px]" : "h-[16px]",
   };
   const heightCls = heights[line.type] ?? "min-h-[21px]";
@@ -227,16 +239,32 @@ function DocLine({
 }
 
 /* ── Empty states ───────────────────────────────────────── */
-function EmptyDoc({ state, onAddSources }: { state: AppState; onAddSources?: () => void }) {
+function EmptyDoc({
+  state,
+  onAddSources,
+}: {
+  state: AppState;
+  onAddSources?: () => void;
+}) {
   if (state === "no-session") {
     return (
       <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
-        <Icons.FileText size={28} aria-hidden="true" className="text-[var(--fg-disabled)]" />
+        <Icons.FileText
+          size={28}
+          aria-hidden="true"
+          className="text-[var(--fg-disabled)]"
+        />
         <div>
-          <p className="text-[15px] font-medium mb-1" style={{ color: "var(--fg-secondary)" }}>
+          <p
+            className="text-[15px] font-medium mb-1"
+            style={{ color: "var(--fg-secondary)" }}
+          >
             No project selected
           </p>
-          <p className="text-[13px] leading-[1.65]" style={{ color: "var(--fg-muted)" }}>
+          <p
+            className="text-[13px] leading-[1.65]"
+            style={{ color: "var(--fg-muted)" }}
+          >
             Open a project from the sidebar to get started.
           </p>
         </div>
@@ -247,12 +275,22 @@ function EmptyDoc({ state, onAddSources }: { state: AppState; onAddSources?: () 
   if (state === "no-sources") {
     return (
       <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
-        <Icons.Upload size={28} aria-hidden="true" className="text-[var(--fg-disabled)]" />
+        <Icons.Upload
+          size={28}
+          aria-hidden="true"
+          className="text-[var(--fg-disabled)]"
+        />
         <div>
-          <p className="text-[15px] font-medium mb-1" style={{ color: "var(--fg-secondary)" }}>
+          <p
+            className="text-[15px] font-medium mb-1"
+            style={{ color: "var(--fg-secondary)" }}
+          >
             No sources yet
           </p>
-          <p className="text-[13px] leading-[1.65] mb-4" style={{ color: "var(--fg-muted)" }}>
+          <p
+            className="text-[13px] leading-[1.65] mb-4"
+            style={{ color: "var(--fg-muted)" }}
+          >
             Add PDFs, transcripts, or paste text in the Sources panel to begin.
           </p>
           {onAddSources && (
@@ -260,7 +298,10 @@ function EmptyDoc({ state, onAddSources }: { state: AppState; onAddSources?: () 
               type="button"
               onClick={onAddSources}
               className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-[5px] text-[12px] font-medium border transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-              style={{ color: "var(--fg-secondary)", borderColor: "var(--border-strong)" }}
+              style={{
+                color: "var(--fg-secondary)",
+                borderColor: "var(--border-strong)",
+              }}
             >
               <Icons.PanelRight size={12} aria-hidden="true" />
               <span>Open Sources</span>
@@ -273,7 +314,11 @@ function EmptyDoc({ state, onAddSources }: { state: AppState; onAddSources?: () 
 
   if (state === "generating") {
     return (
-      <div className="flex flex-col h-full py-6 px-[52px] pr-6" aria-live="polite" aria-busy="true">
+      <div
+        className="flex flex-col h-full py-6 px-[52px] pr-6"
+        aria-live="polite"
+        aria-busy="true"
+      >
         <div className="flex items-center gap-2 mb-6">
           <span
             className="size-[8px] rounded-full animate-pulse shrink-0"
@@ -301,16 +346,24 @@ function EmptyDoc({ state, onAddSources }: { state: AppState; onAddSources?: () 
       <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
         <div
           className="size-7 rounded-full flex items-center justify-center"
-          style={{ background: "color-mix(in srgb, var(--danger) 12%, transparent)" }}
+          style={{
+            background: "color-mix(in srgb, var(--danger) 12%, transparent)",
+          }}
           aria-hidden="true"
         >
           <Icons.X size={14} style={{ color: "var(--danger)" }} />
         </div>
         <div>
-          <p className="text-[15px] font-medium mb-1" style={{ color: "var(--fg-secondary)" }}>
+          <p
+            className="text-[15px] font-medium mb-1"
+            style={{ color: "var(--fg-secondary)" }}
+          >
             Generation failed
           </p>
-          <p className="text-[13px] leading-[1.65]" style={{ color: "var(--fg-muted)" }}>
+          <p
+            className="text-[13px] leading-[1.65]"
+            style={{ color: "var(--fg-muted)" }}
+          >
             The pipeline could not complete. Check sources and try again.
           </p>
         </div>
@@ -378,6 +431,7 @@ export interface DocViewProps {
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
   onAddSources?: () => void;
+  onGenerateBrief?: () => void;
   lines?: DocLineData[];
 }
 
@@ -387,10 +441,12 @@ export function DocView({
   selectedReq,
   onSelectReq,
   onAddSources,
+  onGenerateBrief,
   lines = [],
 }: DocViewProps) {
   const canGenerate = appState === "ready" || appState === "no-sources";
-  const generateDisabled = appState === "no-sources" || appState === "no-session";
+  const generateDisabled =
+    appState === "no-sources" || appState === "no-session";
 
   return (
     <div
@@ -426,6 +482,7 @@ export function DocView({
             type="button"
             disabled={generateDisabled}
             title={generateDisabled ? "Add sources first" : undefined}
+            onClick={onGenerateBrief}
             className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             style={
               canGenerate && !generateDisabled
