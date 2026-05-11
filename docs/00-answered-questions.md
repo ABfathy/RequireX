@@ -22,5 +22,4 @@ Q5 - when client receives brief view should the client be allowed to respond in 
 Action: Remove chat from the client view in brief make it a complete brief view with the possibility of highlighting lines and sections with comments and drop downs for questions. explore the idea of adding a small branch view on the right that shows something like a git tree history of previous updates but bench it for now.
 
 
--- Also change the project name into RequireX everywhere where the name BriefForge is mentioned
 

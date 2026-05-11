@@ -6,7 +6,10 @@ import { useState } from "react";
 import { ClientDoc } from "@/components/brief/client-doc";
 import { ClientHeader } from "@/components/brief/client-header";
 import type { Requirement } from "@/components/brief/requirement-card";
-import { type Revision,RevisionPanel } from "@/components/brief/revision-panel";
+import {
+  type Revision,
+  RevisionPanel,
+} from "@/components/brief/revision-panel";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { cn } from "@/lib/utils";
 
