@@ -43,6 +43,28 @@
 - `env.example` — added `SEED_USER_ID=`
 - Lint fixes: import sort in `brief/[shareToken]/page.tsx` and `brief/client-doc.tsx`, `eslint-disable` comment for font link in `layout.tsx`
 
+#### UI / Auth polish ✅ (committed as `77f1394`)
+
+- `src/app/layout.tsx` — `ClerkProvider` now has full dark appearance (`variables`: colorPrimary `#7a9bb8`, colorBackground `#1c1e21`, Geist font, matching input/text colors); `modalBackdrop` uses CSS class string (style objects silently dropped in Clerk v7); `ClerkModalGuard` mounted inside provider
+- `src/components/clerk-modal-guard.tsx` — new client component; calls `closeUserProfile/closeSignIn/closeSignUp` on every `pathname` change so Clerk modals don't persist across routes
+- `src/app/sign-in/[[...sign-in]]/page.tsx` — RequireX logo + back-link, `clerkAppearance` variables only (no `elements` style objects), `routing="path"` + `path="/sign-in"`
+- `src/app/sign-up/[[...sign-up]]/page.tsx` — same treatment as sign-in
+- `src/app/sign-in/sso-callback/page.tsx` — **new**: `<AuthenticateWithRedirectCallback />` + `<div id="clerk-captcha" />`; fixes Google OAuth stuck-in-loading bug
+- `src/app/sign-up/sso-callback/page.tsx` — same for sign-up OAuth flow
+- `src/components/editor/settings-panel.tsx` — `openUserProfile()` via `useClerk` (opens Clerk UserProfile modal); `<Image priority>` on avatar to prevent flash; hover preload wired in sidebar
+- `src/components/editor/project-sidebar.tsx` — avatar preload on `onMouseEnter`; `useCallback` dep is `[user]` not `[user?.imageUrl]` (React Compiler requirement)
+- `src/app/loading.tsx` — animated root loading: top progress bar, RxLogo with pulse ring, "Initializing workspace_" blinking cursor, shimmer skeleton lines
+- `src/app/app/loading.tsx` — **new**: editor shell skeleton matching exact geometry (TitleBar, Sidebar, DocView, StatusBar) using `Bone` component with `animate-pulse`
+- `src/app/error.tsx` — styled route error page: pulsing danger icon, digest badge, "Try again" + "Go home" buttons with staggered fade-up
+- `src/app/global-error.tsx` — styled fatal error page (owns `<html>/<body>`), inline styles only
+
+**Key lessons learned:**
+- Clerk v7 `elements` with inline style objects are silently ignored — only `variables` work reliably
+- `routing="path"` is required on `<SignIn>`/`<SignUp>` on custom route pages or multi-step flows break
+- `[[...sign-in]]` catch-all does NOT handle OAuth callbacks correctly — need dedicated `sso-callback/page.tsx` with `<AuthenticateWithRedirectCallback />`
+- `<div id="clerk-captcha" />` must be in the DOM on any page where Clerk calls `signUp.create()` (including OAuth callback pages for new users)
+- Worktree dev server needs its own `.env` with all keys (not just `DATABASE_URL`)
+
 ---
 
 ## Actionable Next Steps (Priority Order)

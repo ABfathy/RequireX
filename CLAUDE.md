@@ -64,6 +64,12 @@ Clerk handles auth. Middleware in `src/proxy.ts` protects `/app/**` via `auth.pr
 
 Always use these helpers in server actions/API routes — never trust client-passed user IDs.
 
+**Clerk appearance:** `ClerkProvider` in `layout.tsx` uses `variables` only — `elements` with inline style objects are silently dropped in Clerk v7. Custom sign-in/sign-up pages use `routing="path"` + `path` prop or multi-step flows break.
+
+**OAuth SSO callbacks:** Dedicated pages at `src/app/sign-in/sso-callback/page.tsx` and `src/app/sign-up/sso-callback/page.tsx` render `<AuthenticateWithRedirectCallback />` with `<div id="clerk-captcha" />`. Do NOT rely on the `[[...sign-in]]` catch-all for SSO callbacks — it gets stuck.
+
+**ClerkModalGuard** (`src/components/clerk-modal-guard.tsx`) — closes all Clerk modals on route change. Mounted inside `ClerkProvider` in `layout.tsx`.
+
 ### Data Model (Prisma + PostgreSQL)
 
 Core flow: `Workspace → Project → IntakeSession → SourceAsset → SourceChunk → BriefSnapshot → BriefClaim/BriefQuestion → EvidenceRef`
