@@ -14,17 +14,26 @@ export function useTheme() {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light") {
+    if (stored) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTheme("light");
+      setTheme(stored === "light" ? "light" : "dark");
+      return;
     }
+    // No manual preference — follow the system setting and keep listening
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setTheme(mq.matches ? "dark" : "light");
+    const listener = (e: MediaQueryListEvent) =>
+      setTheme(e.matches ? "dark" : "light");
+    mq.addEventListener("change", listener);
+    return () => mq.removeEventListener("change", listener);
   }, []);
 
-  /* Sync to DOM + persist on every change */
+  /* Sync to DOM + persist + broadcast on every change */
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.style.colorScheme = theme;
     localStorage.setItem(STORAGE_KEY, theme);
+    window.dispatchEvent(new CustomEvent("rx-theme-change", { detail: theme }));
   }, [theme]);
 
   function toggle() {

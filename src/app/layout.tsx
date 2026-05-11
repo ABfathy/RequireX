@@ -1,9 +1,9 @@
 import "./globals.css";
 
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 
 import { ClerkModalGuard } from "@/components/clerk-modal-guard";
+import { ThemedClerkProvider } from "@/components/clerk-provider";
 
 export const metadata: Metadata = {
   title: "RequireX",
@@ -35,30 +35,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen text-foreground">
-        <ClerkProvider
-          appearance={{
-            variables: {
-              colorBackground: "#1c1e21",
-              colorText: "#efeee9",
-              colorTextSecondary: "#9a9a9e",
-              colorPrimary: "#7a9bb8",
-              colorNeutral: "#efeee9",
-              colorInputBackground: "#141517",
-              colorInputText: "#efeee9",
-              colorTextOnPrimaryBackground: "#06121e",
-              colorAlphaShade: "#efeee9",
-              borderRadius: "8px",
-              fontFamily: "Geist, system-ui, sans-serif",
-              fontSize: "14px",
-            },
-            elements: {
-              modalBackdrop: "!bg-black/60 !backdrop-blur-md",
-            },
-          }}
-        >
+        <ThemedClerkProvider>
           <ClerkModalGuard />
           {children}
-        </ClerkProvider>
+        </ThemedClerkProvider>
       </body>
     </html>
   );
