@@ -86,7 +86,7 @@ function EmptyState({
       <div style={{ color: "var(--fg-disabled)" }}>{icon}</div>
       <p
         className="text-[11px] leading-[1.5] whitespace-pre-line"
-        style={{ color: "var(--fg-muted)" }}
+        style={{ color: "var(--fg-muted)", textWrap: "pretty" } as React.CSSProperties}
       >
         {message}
       </p>
@@ -347,7 +347,7 @@ function SourcesTab({
   }
 
   return (
-    <>
+    <div className="flex flex-col min-h-full">
       <SectionLabel>Ingested sources</SectionLabel>
 
       {/* Error state */}
@@ -409,7 +409,7 @@ function SourcesTab({
       )}
 
       {/* Add buttons */}
-      <div className="px-3 pb-3 mt-1">
+      <div className="px-3 pb-3 pt-2 mt-auto border-t" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -463,7 +463,7 @@ function SourcesTab({
           onClose={() => setPreviewItem(null)}
         />
       )}
-    </>
+    </div>
   );
 }
 

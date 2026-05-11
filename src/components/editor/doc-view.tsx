@@ -131,6 +131,7 @@ function DocLine({
   const heights: Partial<Record<LineType, string>> = {
     h1: "min-h-[32px] py-1",
     h2: "min-h-[28px] py-0.5",
+    body: "min-h-[22px] py-0.5",
     blank: line.small ? "h-[8px]" : "h-[16px]",
   };
   const heightCls = heights[line.type] ?? "min-h-[21px]";
@@ -174,7 +175,7 @@ function DocLine({
         {line.type === "h1" && (
           <span
             className="text-[21px] font-semibold tracking-[-0.02em] leading-tight"
-            style={{ color: "var(--fg-primary)" }}
+            style={{ color: "var(--fg-primary)", textWrap: "balance" } as React.CSSProperties}
           >
             {line.text}
           </span>
@@ -225,7 +226,7 @@ function DocLine({
         {line.type === "body" && (
           <span
             className="text-[14px] leading-[1.65]"
-            style={{ color: "var(--fg-secondary)" }}
+            style={{ color: "var(--fg-secondary)", textWrap: "pretty" } as React.CSSProperties}
           >
             {line.text}
             {line.evidence?.map((ev, i) => (
