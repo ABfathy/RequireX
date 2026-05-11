@@ -3,9 +3,10 @@ import {
   createUploadthing,
   type FileRouter,
 } from "uploadthing/next";
-import { UploadThingError } from "uploadthing/server";
+import { UploadThingError, UTApi } from "uploadthing/server";
 import { z } from "zod";
 
+import { serverEnv } from "@/lib/env/server";
 import { requireInternalAuth } from "@/server/auth";
 import { persistFileAsset } from "@/server/services/assets";
 import {
@@ -15,6 +16,10 @@ import {
 } from "@/server/validators/assets";
 
 const f = createUploadthing();
+
+export const utapi = new UTApi({
+  token: serverEnv.UPLOADTHING_TOKEN,
+});
 
 const sessionInput = z.object({
   sessionId: z.string().min(1),

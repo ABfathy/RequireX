@@ -7,6 +7,7 @@ import {
 import {
   deleteProject,
   ProjectNotFoundError,
+  ProjectUploadCleanupError,
 } from "@/server/services/projects";
 
 type RouteContext = {
@@ -39,6 +40,16 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
           message: error.message,
         },
         { status: 404 },
+      );
+    }
+
+    if (error instanceof ProjectUploadCleanupError) {
+      return NextResponse.json(
+        {
+          error: "PROJECT_UPLOAD_CLEANUP_FAILED",
+          message: error.message,
+        },
+        { status: 502 },
       );
     }
 

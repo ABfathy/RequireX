@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { utapi } from "@/lib/uploadthing";
 
 import type { SourceAssetStatus } from "../../../generated/prisma/client";
 
@@ -33,6 +34,13 @@ export class ProjectNotFoundError extends Error {
   constructor(projectId: string) {
     super(`Project not found: ${projectId}`);
     this.name = "ProjectNotFoundError";
+  }
+}
+
+export class ProjectUploadCleanupError extends Error {
+  constructor(message = "Failed to delete UploadThing files for project.") {
+    super(message);
+    this.name = "ProjectUploadCleanupError";
   }
 }
 
@@ -202,11 +210,40 @@ export async function deleteProject(projectId: string, clerkUserId: string) {
     },
     select: {
       id: true,
+      sessions: {
+        select: {
+          sourceAssets: {
+            where: {
+              utKey: {
+                not: null,
+              },
+            },
+            select: {
+              utKey: true,
+            },
+          },
+        },
+      },
     },
   });
 
   if (!project) {
     throw new ProjectNotFoundError(projectId);
+  }
+
+  const uploadThingKeys = project.sessions
+    .flatMap((session) => session.sourceAssets)
+    .map((asset) => asset.utKey)
+    .filter((utKey): utKey is string => Boolean(utKey));
+
+  if (uploadThingKeys.length > 0) {
+    try {
+      await utapi.deleteFiles(uploadThingKeys);
+    } catch (error) {
+      throw new ProjectUploadCleanupError(
+        error instanceof Error ? error.message : undefined,
+      );
+    }
   }
 
   await prisma.project.delete({
