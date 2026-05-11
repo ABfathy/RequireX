@@ -5,6 +5,8 @@ import { useRef, useState } from "react";
 import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 
+import { AddTextDialog } from "./add-text-dialog";
+
 /* ── Types ─────────────────────────────────────────────── */
 type RightTab = "sources" | "chat" | "revisions";
 
@@ -251,98 +253,6 @@ function SkeletonRow() {
   );
 }
 
-/* ── TextPasteArea ──────────────────────────────────────── */
-const TEXT_MAX = 500_000;
-
-interface TextPasteAreaProps {
-  onSubmit?: (text: string) => Promise<void>;
-  onCancel: () => void;
-}
-
-function TextPasteArea({ onSubmit, onCancel }: TextPasteAreaProps) {
-  const [value, setValue]       = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-
-  async function handleSubmit() {
-    if (!value.trim() || !onSubmit) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await onSubmit(value.trim());
-      onCancel();
-    } catch {
-      setError("Failed to save. Try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const over = value.length > TEXT_MAX;
-
-  return (
-    <div
-      className="mx-3 mb-3 rounded-[6px] border overflow-hidden"
-      style={{ borderColor: "var(--border-strong)", background: "var(--surface-1)" }}
-    >
-      <label htmlFor="text-paste-input" className="sr-only">
-        Paste text content
-      </label>
-      <textarea
-        id="text-paste-input"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Paste client context, notes, or requirements…"
-        rows={6}
-        className="w-full bg-transparent text-[12px] leading-[1.6] resize-none p-2.5 focus-visible:outline-none"
-        style={{ color: "var(--fg-primary)" }}
-        autoComplete="off"
-        spellCheck={false}
-      />
-
-      <div
-        className="flex items-center justify-between px-3 py-2 border-t gap-2"
-        style={{ borderColor: "var(--border)" }}
-      >
-        <span
-          className="text-[10px]"
-          style={{ color: over ? "var(--danger)" : "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
-          aria-live="polite"
-        >
-          {value.length.toLocaleString()} / {TEXT_MAX.toLocaleString()}
-        </span>
-
-        {error && (
-          <span className="text-[10px] flex-1" style={{ color: "var(--danger)" }} aria-live="polite">
-            {error}
-          </span>
-        )}
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 cursor-pointer"
-            style={{ color: "var(--fg-tertiary)" }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!value.trim() || over || submitting || !onSubmit}
-            className="h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
-          >
-            {submitting ? "Saving…" : "Add source"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── SourcesTab ─────────────────────────────────────────── */
 interface SourcesTabProps {
   sources?: SourceItem[];
@@ -426,54 +336,54 @@ function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText,
         />
       )}
 
-      {/* Text paste area or Add buttons */}
+      {/* Add buttons */}
       <div className="px-3 pb-3 mt-1">
-        {pasteOpen ? (
-          <TextPasteArea
-            onSubmit={onSubmitText}
-            onCancel={() => setPasteOpen(false)}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPasteOpen(true)}
+            disabled={!onSubmitText}
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
+            style={{
+              color: "var(--fg-tertiary)",
+              borderColor: "var(--border)",
+              background: "transparent",
+            }}
+          >
+            <Icons.Plus size={12} aria-hidden="true" />
+            <span>Add text</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!onUploadFiles}
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
+            style={{
+              color: "var(--fg-tertiary)",
+              borderColor: "var(--border)",
+              background: "transparent",
+            }}
+          >
+            <Icons.FileText size={12} aria-hidden="true" />
+            <span>Upload files</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,application/pdf,audio/*"
+            className="hidden"
+            onChange={handleFilePick}
           />
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setPasteOpen(true)}
-              disabled={!onSubmitText}
-              className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
-              style={{
-                color: "var(--fg-tertiary)",
-                borderColor: "var(--border)",
-                background: "transparent",
-              }}
-            >
-              <Icons.Plus size={12} aria-hidden="true" />
-              <span>Add text</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!onUploadFiles}
-              className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
-              style={{
-                color: "var(--fg-tertiary)",
-                borderColor: "var(--border)",
-                background: "transparent",
-              }}
-            >
-              <Icons.FileText size={12} aria-hidden="true" />
-              <span>Upload files</span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,application/pdf,audio/*"
-              className="hidden"
-              onChange={handleFilePick}
-            />
-          </div>
-        )}
+        </div>
       </div>
+
+      {pasteOpen && (
+        <AddTextDialog
+          onSubmit={onSubmitText}
+          onClose={() => setPasteOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -519,9 +429,8 @@ export function RightPane({
 }: RightPaneProps) {
   return (
     <aside
-      className="flex flex-col h-full overflow-hidden border-l"
+      className="flex flex-col h-full w-full overflow-hidden border-l"
       style={{
-        width: 268,
         background: "var(--surface-2)",
         borderColor: "var(--border)",
       }}

@@ -5,11 +5,13 @@ import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 
 import { useMounted } from "@/lib/hooks/use-mounted";
+import { usePersistentState } from "@/lib/hooks/use-persistent-state";
 import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
 import { type AppState, DocView } from "./doc-view";
 import { type ProjectListItem,ProjectSidebar } from "./project-sidebar";
+import { ResizeHandle } from "./resize-handle";
 import { RightPane, type SourceItem, type SourceType } from "./right-pane";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
@@ -17,6 +19,15 @@ import { TitleBar } from "./titlebar";
 type RightTab = "sources" | "chat" | "revisions";
 
 type SessionRef = { id: string; title: string } | null;
+const SIDEBAR_DEFAULT = 220;
+const SIDEBAR_MIN = SIDEBAR_DEFAULT;
+const SIDEBAR_MAX = 480;
+const RIGHT_DEFAULT = 268;
+const RIGHT_MIN = RIGHT_DEFAULT;
+const RIGHT_MAX = 560;
+
+const clamp = (n: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, n));
 
 interface EditorShellProps {
   projects?: ProjectListItem[];
@@ -73,6 +84,15 @@ export function EditorShell({
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightOpen,   setRightOpen]   = useState(true);
+  const [sidebarWidth, setSidebarWidth] = usePersistentState(
+    "rx-sidebar-width",
+    SIDEBAR_DEFAULT,
+  );
+  const [rightWidth, setRightWidth] = usePersistentState(
+    "rx-right-width",
+    RIGHT_DEFAULT,
+  );
+  const [resizing, setResizing] = useState<null | "left" | "right">(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [rightTab,    setRightTab]    = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
@@ -304,6 +324,48 @@ export function EditorShell({
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
+  /* Drag-to-resize: while a handle is being dragged, listen on window so the
+     pointer can leave the 6px handle without dropping the drag. */
+  useEffect(() => {
+    if (!resizing) return;
+    const prevCursor = document.body.style.cursor;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    function handleMove(e: MouseEvent) {
+      if (resizing === "left") {
+        setSidebarWidth(clamp(e.clientX, SIDEBAR_MIN, SIDEBAR_MAX));
+      } else {
+        setRightWidth(
+          clamp(window.innerWidth - e.clientX, RIGHT_MIN, RIGHT_MAX),
+        );
+      }
+    }
+    function handleUp() {
+      setResizing(null);
+    }
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevUserSelect;
+    };
+  }, [resizing, setSidebarWidth, setRightWidth]);
+
+  const adjustSidebar = useCallback(
+    (delta: number) =>
+      setSidebarWidth(clamp(sidebarWidth + delta, SIDEBAR_MIN, SIDEBAR_MAX)),
+    [sidebarWidth, setSidebarWidth],
+  );
+  const adjustRight = useCallback(
+    (delta: number) =>
+      setRightWidth(clamp(rightWidth + delta, RIGHT_MIN, RIGHT_MAX)),
+    [rightWidth, setRightWidth],
+  );
+
   function handleSelectReq(id: string) {
     setSelectedReq((cur) => (cur === id ? null : id));
   }
@@ -315,9 +377,9 @@ export function EditorShell({
 
   /* Body grid columns based on panel state */
   const colTemplate = [
-    sidebarOpen ? "220px" : "0px",
+    sidebarOpen ? `${sidebarWidth}px` : "0px",
     "1fr",
-    rightOpen ? "268px" : "0px",
+    rightOpen ? `${rightWidth}px` : "0px",
   ].join(" ");
 
   return (
@@ -342,17 +404,31 @@ export function EditorShell({
         style={{
           display: "grid",
           gridTemplateColumns: colTemplate,
-          transition: "grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1)",
+          transition: resizing
+            ? "none"
+            : "grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1)",
         }}
       >
         {/* Sidebar */}
-        <div className="overflow-hidden" style={{ minWidth: 0 }}>
+        <div className="relative overflow-hidden" style={{ minWidth: 0 }}>
           {sidebarOpen && (
             <ProjectSidebar
               projects={projects}
               activeProjectId={activeProjectId}
               onOpenPalette={() => setPaletteOpen(true)}
               onSwitchProject={handleSwitchProject}
+            />
+          )}
+          {sidebarOpen && (
+            <ResizeHandle
+              side="right"
+              ariaLabel="Resize sidebar"
+              value={sidebarWidth}
+              min={SIDEBAR_MIN}
+              max={SIDEBAR_MAX}
+              onResizeStart={() => setResizing("left")}
+              onReset={() => setSidebarWidth(SIDEBAR_DEFAULT)}
+              onKeyAdjust={adjustSidebar}
             />
           )}
         </div>
@@ -367,7 +443,19 @@ export function EditorShell({
         />
 
         {/* Right pane */}
-        <div className="overflow-hidden" style={{ minWidth: 0 }}>
+        <div className="relative overflow-hidden" style={{ minWidth: 0 }}>
+          {rightOpen && (
+            <ResizeHandle
+              side="left"
+              ariaLabel="Resize right pane"
+              value={rightWidth}
+              min={RIGHT_MIN}
+              max={RIGHT_MAX}
+              onResizeStart={() => setResizing("right")}
+              onReset={() => setRightWidth(RIGHT_DEFAULT)}
+              onKeyAdjust={adjustRight}
+            />
+          )}
           {rightOpen && (
             <RightPane
               activeTab={rightTab}
