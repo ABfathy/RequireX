@@ -399,6 +399,7 @@ function ChatBar({ onAttachFiles }: ChatBarProps) {
 /* ── DocView ────────────────────────────────────────────── */
 export interface DocViewProps {
   appState?: AppState;
+  projectName?: string | null;
   sessionName?: string | null;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
@@ -409,6 +410,7 @@ export interface DocViewProps {
 
 export function DocView({
   appState = "no-session",
+  projectName,
   sessionName,
   selectedReq,
   onSelectReq,
@@ -431,10 +433,18 @@ export function DocView({
       >
         {/* Breadcrumbs */}
         <div
-          className="flex items-center gap-1.5 text-[12px] flex-1 min-w-0"
+          className="flex items-center gap-1 text-[12px] flex-1 min-w-0"
           style={{ color: "var(--fg-tertiary)" }}
         >
-          <span className="truncate" style={{ color: "var(--fg-secondary)" }}>
+          {projectName && (
+            <>
+              <span className="truncate shrink-0 max-w-[180px] font-medium" style={{ color: "var(--fg-secondary)" }}>
+                {projectName}
+              </span>
+              <Icons.ChevronRight size={11} aria-hidden="true" className="shrink-0 opacity-40" />
+            </>
+          )}
+          <span className="truncate" style={{ color: projectName ? "var(--fg-tertiary)" : "var(--fg-secondary)" }}>
             {sessionName ?? "—"}
           </span>
         </div>

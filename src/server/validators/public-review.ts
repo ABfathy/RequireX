@@ -1,7 +1,7 @@
 import {
   BriefCommentAnchorType,
   BriefCommentSection,
-} from "@prisma/client";
+} from "../../../generated/prisma/client";
 import { z } from "zod";
 
 const optionalTrimmedString = (max: number) =>

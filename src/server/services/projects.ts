@@ -1,4 +1,4 @@
-import type { SourceAssetStatus } from "@prisma/client";
+import type { SourceAssetStatus } from "../../../generated/prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -19,6 +19,8 @@ export type ProjectAssetBundle = {
   status: SourceAssetStatus;
   displayLabel: string | null;
   originalFileName: string | null;
+  mimeType: string | null;
+  ufsUrl: string | null;
   createdAt: string;
 };
 
@@ -120,6 +122,8 @@ async function bundleProjects(projects: ProjectListItem[]) {
             status: true,
             displayLabel: true,
             originalFileName: true,
+            mimeType: true,
+            ufsUrl: true,
             createdAt: true,
           },
         });
@@ -133,6 +137,8 @@ async function bundleProjects(projects: ProjectListItem[]) {
       status: asset.status,
       displayLabel: asset.displayLabel,
       originalFileName: asset.originalFileName,
+      mimeType: asset.mimeType,
+      ufsUrl: asset.ufsUrl,
       createdAt: asset.createdAt.toISOString(),
     });
     assetsBySession.set(asset.sessionId, bucket);

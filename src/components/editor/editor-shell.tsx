@@ -56,6 +56,8 @@ type ApiAsset = {
   status: SourceItem["status"];
   displayLabel: string | null;
   originalFileName: string | null;
+  mimeType: string | null;
+  ufsUrl: string | null;
   createdAt: string;
 };
 
@@ -75,6 +77,8 @@ function assetToSource(a: ApiAsset): SourceItem {
     sourceType: mapSourceType(a.sourceType),
     status: a.status,
     createdAt: a.createdAt,
+    fileUrl: a.ufsUrl ?? undefined,
+    mimeType: a.mimeType ?? undefined,
   };
 }
 
@@ -305,6 +309,9 @@ export function EditorShell({
       : "no-sources"
     : "no-session";
 
+  const activeProjectName =
+    projects.find((p) => p.id === activeProjectId)?.name ?? null;
+
   /* ⌘K shortcut */
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -431,6 +438,7 @@ export function EditorShell({
 
         <DocView
           appState={appState}
+          projectName={activeProjectName}
           sessionName={session?.title ?? null}
           selectedReq={selectedReq}
           onSelectReq={handleSelectReq}
