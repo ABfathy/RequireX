@@ -1,19 +1,9 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useSyncExternalStore } from "react";
 
 import { Icons } from "@/components/icons";
-
-const subscribe = () => () => {};
-
-function useMounted() {
-  return useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
-}
+import { useMounted } from "@/lib/hooks/use-mounted";
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();

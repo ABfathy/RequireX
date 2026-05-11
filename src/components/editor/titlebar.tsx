@@ -8,7 +8,7 @@ import { useIsMac } from "@/lib/hooks/use-is-mac";
 interface TitleBarProps {
   sidebarOpen: boolean;
   rightOpen: boolean;
-  theme: "dark" | "light";
+  theme: "dark" | "light" | null;
   onToggleSidebar: () => void;
   onToggleRight: () => void;
   onToggleTheme: () => void;
@@ -74,11 +74,18 @@ export function TitleBar({
         </IconButton>
         <IconButton
           label={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            theme === null
+              ? "Toggle theme"
+              : theme === "dark"
+                ? "Switch to light mode"
+                : "Switch to dark mode"
           }
           onClick={onToggleTheme}
+          suppressHydrationWarning
         >
-          {theme === "dark" ? (
+          {theme === null ? (
+            <span aria-hidden="true" style={{ width: 14, height: 14 }} />
+          ) : theme === "dark" ? (
             <Icons.Sun size={14} />
           ) : (
             <Icons.Moon size={14} />

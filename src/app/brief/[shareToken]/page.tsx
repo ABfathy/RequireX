@@ -7,6 +7,7 @@ import { ClientDoc } from "@/components/brief/client-doc";
 import { ClientHeader } from "@/components/brief/client-header";
 import type { Requirement } from "@/components/brief/requirement-card";
 import { type Revision,RevisionPanel } from "@/components/brief/revision-panel";
+import { useMounted } from "@/lib/hooks/use-mounted";
 import { cn } from "@/lib/utils";
 
 /* ── Mock data (matches design/client.html) ─────────── */
@@ -93,8 +94,14 @@ const MOCK_REVISIONS: Revision[] = [
 export default function BriefClientShell() {
   const [revOpen, setRevOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
-  const theme = (resolvedTheme ?? "dark") as "dark" | "light";
-  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+  const mounted = useMounted();
+  const theme: "dark" | "light" | null = mounted
+    ? resolvedTheme === "light"
+      ? "light"
+      : "dark"
+    : null;
+  const toggleTheme = () =>
+    setTheme((theme ?? "dark") === "dark" ? "light" : "dark");
 
   const needsInputCount = MOCK_REQUIREMENTS.filter((r) => r.question).length;
 
