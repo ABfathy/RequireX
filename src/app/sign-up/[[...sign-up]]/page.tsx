@@ -1,14 +1,31 @@
-import { SignUp } from "@clerk/nextjs";
+"use client";
+
+import { SignUp, useSignUp } from "@clerk/nextjs";
 import Link from "next/link";
 
 import { RxLogo } from "@/components/icons";
 
 export default function SignUpPage() {
+  const { signUp } = useSignUp();
+  const isCompleting = signUp?.status === "complete";
+
   return (
     <main
       className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10"
       style={{ background: "var(--background)" }}
     >
+      {isCompleting && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4" style={{ background: "var(--background)" }}>
+          <div
+            className="size-8 rounded-full border-2 animate-spin"
+            style={{ borderColor: "var(--border-strong)", borderTopColor: "var(--accent)" }}
+            aria-hidden="true"
+          />
+          <p className="text-[13px]" style={{ color: "var(--fg-muted)" }}>
+            Setting up your account…
+          </p>
+        </div>
+      )}
       <Link
         href="/"
         className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity"
@@ -21,7 +38,7 @@ export default function SignUpPage() {
           RequireX
         </span>
       </Link>
-      <SignUp routing="path" path="/sign-up" />
+      <SignUp routing="path" path="/sign-up" afterSignUpUrl="/app" />
     </main>
   );
 }

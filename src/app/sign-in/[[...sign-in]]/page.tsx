@@ -21,7 +21,7 @@ export default function SignInPage() {
           RequireX
         </span>
       </Link>
-      <SignIn routing="path" path="/sign-in" />
+      <SignIn routing="path" path="/sign-in" afterSignInUrl="/app" />
     </main>
   );
 }

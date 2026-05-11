@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 
 import { ClerkModalGuard } from "@/components/clerk-modal-guard";
 import { ThemedClerkProvider } from "@/components/clerk-provider";
+import { ThemeSync } from "@/components/theme-sync";
 
 export const metadata: Metadata = {
   title: "RequireX",
@@ -36,6 +37,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen text-foreground">
         <ThemedClerkProvider>
+          <ThemeSync />
           <ClerkModalGuard />
           {children}
         </ThemedClerkProvider>
