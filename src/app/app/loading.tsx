@@ -18,11 +18,19 @@ export default function AppLoading() {
         className="flex items-center h-8 px-3 gap-3 border-b shrink-0"
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
-        <Bone w="180px" h={8} />
-        <span className="flex-1" />
-        <Bone w="24px" h={16} />
-        <Bone w="24px" h={16} />
-        <Bone w="24px" h={16} />
+        {/* Brand */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Bone w="13px" h={13} />
+          <Bone w="64px" h={10} />
+        </div>
+        {/* Center search */}
+        <div className="flex-1 flex justify-center px-4">
+          <Bone w="280px" h={22} />
+        </div>
+        {/* Right icons */}
+        <Bone w="24px" h={22} />
+        <Bone w="24px" h={22} />
+        <Bone w="24px" h={22} />
       </div>
 
       {/* Body */}
@@ -35,12 +43,9 @@ export default function AppLoading() {
           className="flex flex-col h-full border-r overflow-hidden"
           style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
-          <div className="flex items-center h-8 px-3 border-b gap-2" style={{ borderColor: "var(--border)" }}>
-            <Bone w="14px" h={14} />
-            <Bone w="80px" />
-          </div>
-          <div className="flex-1 p-3 flex flex-col gap-2">
+          <div className="flex flex-col px-2 pt-3 gap-2 flex-1">
             <Bone w="100%" h={26} />
+            <div className="h-1" />
             <Bone w="70%" />
             <Bone w="85%" />
             <Bone w="60%" />

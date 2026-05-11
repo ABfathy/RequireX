@@ -1,11 +1,10 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { SettingsPanel } from "@/components/editor/settings-panel";
-import { Icons, RxLogo } from "@/components/icons";
+import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
 import { useIsMac } from "@/lib/hooks/use-is-mac";
@@ -35,32 +34,11 @@ export function ProjectSidebar({ onOpenPalette }: ProjectSidebarProps) {
           borderColor: "var(--border)",
         }}
       >
-        {/* Head — logo links to landing page */}
-        <div
-          className="flex items-center h-8 px-1 shrink-0 border-b"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <Link
-            href="/"
-            className="flex items-center gap-2 flex-1 px-2 h-full rounded-[4px] transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]"
-            aria-label="RequireX — go to home"
-          >
-            <RxLogo size={14} className="text-[var(--accent)] shrink-0" />
-            <span
-              className="flex-1 text-[13px] font-semibold tracking-[-0.01em] truncate"
-              style={{ color: "var(--fg-primary)" }}
-              translate="no"
-            >
-              RequireX
-            </span>
-          </Link>
-        </div>
-
         {/* Search row */}
         <button
           type="button"
           onClick={onOpenPalette}
-          className="flex items-center gap-2 mx-2 mt-2 mb-1 h-[26px] px-2 rounded-[5px] border transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
+          className="flex items-center gap-2 mx-2 mt-3 mb-1 h-[26px] px-2 rounded-[5px] border transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
           style={{
             background: "var(--surface-2)",
             borderColor: "var(--border)",

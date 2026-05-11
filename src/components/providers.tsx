@@ -4,6 +4,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { ThemeProvider } from "next-themes";
 
+import { clientEnv } from "@/lib/env/client";
+
 const SHARED = {
   borderRadius: "8px",
   fontFamily: "Geist, system-ui, sans-serif",
@@ -46,7 +48,17 @@ function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== "light";
   return (
-    <ClerkProvider appearance={isDark ? DARK_APPEARANCE : LIGHT_APPEARANCE}>
+    <ClerkProvider
+      appearance={isDark ? DARK_APPEARANCE : LIGHT_APPEARANCE}
+      signInUrl={clientEnv.NEXT_PUBLIC_CLERK_SIGN_IN_URL}
+      signUpUrl={clientEnv.NEXT_PUBLIC_CLERK_SIGN_UP_URL}
+      signInFallbackRedirectUrl={
+        clientEnv.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL
+      }
+      signUpFallbackRedirectUrl={
+        clientEnv.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL
+      }
+    >
       {children}
     </ClerkProvider>
   );

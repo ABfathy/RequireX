@@ -14,7 +14,7 @@ interface ClientHeaderProps {
   reqCount: number;
   needsInputCount: number;
   revOpen: boolean;
-  theme: string;
+  theme: "dark" | "light" | null;
   onToggleRev: () => void;
   onToggleTheme: () => void;
 }
@@ -76,10 +76,23 @@ function ClientHeader({
       </IconBtn>
 
       <IconBtn
-        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        aria-label={
+          theme === null
+            ? "Toggle theme"
+            : theme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+        }
         onClick={onToggleTheme}
+        suppressHydrationWarning
       >
-        {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+        {theme === null ? (
+          <span aria-hidden="true" style={{ width: 14, height: 14 }} />
+        ) : theme === "dark" ? (
+          <Sun size={14} />
+        ) : (
+          <Moon size={14} />
+        )}
       </IconBtn>
 
       {/* Submit */}

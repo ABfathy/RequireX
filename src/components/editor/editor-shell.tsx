@@ -3,6 +3,8 @@
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
+import { useMounted } from "@/lib/hooks/use-mounted";
+
 import { CommandPalette } from "./command-palette";
 import { type AppState, DocView } from "./doc-view";
 import { ProjectSidebar } from "./project-sidebar";
@@ -23,8 +25,14 @@ export function EditorShell({ session }: EditorShellProps) {
   const [rightTab,    setRightTab]    = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
-  const theme = (resolvedTheme ?? "dark") as "dark" | "light";
-  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+  const mounted = useMounted();
+  const theme: "dark" | "light" | null = mounted
+    ? resolvedTheme === "light"
+      ? "light"
+      : "dark"
+    : null;
+  const toggleTheme = () =>
+    setTheme((theme ?? "dark") === "dark" ? "light" : "dark");
   const appState: AppState = session ? "no-sources" : "no-session";
 
   /* ⌘K shortcut */

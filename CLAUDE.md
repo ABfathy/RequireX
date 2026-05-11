@@ -64,9 +64,15 @@ Clerk handles auth. Middleware in `src/proxy.ts` protects `/app/**` via `auth.pr
 
 Always use these helpers in server actions/API routes — never trust client-passed user IDs.
 
-**Clerk appearance:** `ClerkProvider` in `layout.tsx` uses `variables` only — `elements` with inline style objects are silently dropped in Clerk v7. Custom sign-in/sign-up pages use `routing="path"` + `path` prop or multi-step flows break.
+**Clerk appearance:** `ClerkProvider` lives in `src/components/providers.tsx` (themed via `next-themes`), not `layout.tsx`. Uses `variables` only — `elements` with inline style objects are silently dropped in Clerk v7. Custom sign-in/sign-up pages use the `[[...sign-in]]` catch-all route with the `<SignIn>` / `<SignUp>` components.
 
-**OAuth SSO callbacks:** Dedicated pages at `src/app/sign-in/sso-callback/page.tsx` and `src/app/sign-up/sso-callback/page.tsx` render `<AuthenticateWithRedirectCallback />` with `<div id="clerk-captcha" />`. Do NOT rely on the `[[...sign-in]]` catch-all for SSO callbacks — it gets stuck.
+**Clerk routing centralization:** `<ClerkProvider>` receives `signInUrl`, `signUpUrl`, `signInFallbackRedirectUrl`, `signUpFallbackRedirectUrl` from `clientEnv`. Do not re-add per-button `forceRedirectUrl="/app"` on `<SignInButton>` / `<SignUpButton>` — they're redundant. Without provider-level URLs, `<SignUp>`'s internal "Already have an account?" link falls back to Clerk's hosted `accounts.*.clerk.accounts.dev` domain.
+
+**Sign-in / sign-up pages:** `src/app/sign-in/[[...sign-in]]/page.tsx` and `src/app/sign-up/[[...sign-up]]/page.tsx` are client components. They watch `useAuth().isSignedIn` and call `router.replace("/app")` on success — this removes the auth route from browser history, so Back from `/app` does not land on a stale form. Rendering a `<Spinner />` placeholder during the transition prevents a blank frame before `/app/loading.tsx`.
+
+**OAuth SSO callbacks:** Dedicated pages at `src/app/sign-in/sso-callback/page.tsx` and `src/app/sign-up/sso-callback/page.tsx` are client components that render a visible spinner alongside `<AuthenticateWithRedirectCallback signInForceRedirectUrl="/app" signUpForceRedirectUrl="/app" />` and also call `router.replace("/app")` on `isSignedIn`. The `<div id="clerk-captcha" />` mount point lives in `src/app/layout.tsx`, not the callback pages. Do NOT rely on the `[[...sign-in]]` catch-all for SSO callbacks — it gets stuck.
+
+**Middleware (`src/proxy.ts`):** Signed-in users hitting `/sign-in` or `/sign-up` are redirected to `/` (landing), not `/app`. This is the safety net for manual URL entry; the back-button case is handled by `router.replace` on the auth pages themselves.
 
 **ClerkModalGuard** (`src/components/clerk-modal-guard.tsx`) — closes all Clerk modals on route change. Mounted inside `ClerkProvider` in `layout.tsx`.
 
@@ -84,7 +90,14 @@ Never access `process.env` directly. Import from:
 - `src/lib/env/server.ts` — server-side secrets (DATABASE_URL, CLERK_SECRET_KEY, UPLOADTHING_TOKEN, GCP, Inngest)
 - `src/lib/env/client.ts` — public vars (NEXT_PUBLIC_*)
 
-Copy `env.example` → `.env.local` to set up. Minimum needed locally: `DATABASE_URL`, Clerk keys.
+Copy `env.example` → `.env.local` to set up. Minimum needed locally: `DATABASE_URL`, Clerk publishable + secret keys, and the four **required** Clerk routing vars enforced by the client env schema:
+
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+- `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/app`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/app`
+
+These are validated at import-time in `src/lib/env/client.ts` — missing any one will crash app startup with a zod error. They're consumed by `<ClerkProvider>` in `src/components/providers.tsx`.
 
 `SEED_USER_ID` — set to your Clerk user ID (`user_2...`) before running `pnpm prisma:seed` so seed data is owned by your account and the editor loads a real session. Find it in the Clerk dashboard or via `window.Clerk.user.id` in the browser console.
 
@@ -121,6 +134,12 @@ Unit tests in `tests/unit/` — not yet wired to Vitest runner (Workstream 10).
 `AppState` (defined in `src/components/editor/doc-view.tsx`): `no-session → no-sources → generating → failed → ready`.
 
 `src/app/app/page.tsx` is an async server component — it queries `prisma.intakeSession.findFirst` by `clerkUserId` and passes `{ id, title } | null` to `EditorShell`. `EditorShell` derives `appState` from the presence of the session prop and threads `sessionName` (title) to `DocView`/`StatusBar` and `sessionId` (id) to `RightPane`.
+
+### Theme
+
+`next-themes` provides theming via `ThemeProvider` in `src/components/providers.tsx` (`attribute="data-theme"`, `storageKey="rx-theme"`, `defaultTheme="system"`).
+
+**Hydration footgun:** `useTheme().resolvedTheme` is `undefined` on the server. The pattern `resolvedTheme ?? "dark"` SSRs as `"dark"` but the client may resolve to `"light"` → React throws a hydration mismatch and regenerates the subtree. In any component that SSRs and renders theme-dependent UI (icons, aria-labels, etc.), gate the output on `useMounted()` from `src/lib/hooks/use-mounted.ts` (a `useSyncExternalStore`-based hook — the standard `useEffect + setMounted` pattern fails the repo's `react-hooks/set-state-in-effect` rule). Render a stable placeholder until mounted. Post-interaction components (e.g. `SettingsPanel` opened via a click) don't need this since they never SSR.
 
 ### Images
 

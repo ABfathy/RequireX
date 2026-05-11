@@ -67,6 +67,37 @@
 
 ---
 
+### Session 3 — `claude/agitated-goldwasser-8ab7f5` (PR pending)
+
+#### Sign-in flow rewrite ✅ (commit `4a21cfd`)
+
+- `src/lib/env/client.ts` — 4 new **required** Clerk routing fields (no defaults; zod fails startup if missing):
+  - `NEXT_PUBLIC_CLERK_SIGN_IN_URL`
+  - `NEXT_PUBLIC_CLERK_SIGN_UP_URL`
+  - `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`
+  - `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`
+- `src/components/providers.tsx` — `<ClerkProvider>` now receives `signInUrl`, `signUpUrl`, `signInFallbackRedirectUrl`, `signUpFallbackRedirectUrl` from `clientEnv`. This is the **actual fix for the "two sign-in pages" symptom**: when these props were absent, `<SignUp>`'s "Already have an account?" link fell back to Clerk's hosted `accounts.*.clerk.accounts.dev/sign-in` instead of the local route.
+- `src/app/sign-in/[[...sign-in]]/page.tsx` and `src/app/sign-up/[[...sign-up]]/page.tsx` — rewritten as client components. Use `useAuth()` + `router.replace("/app")` so the auth route is **removed from history** the moment `isSignedIn` flips true. Renders a `<Spinner />` placeholder during the cookie-set → navigation gap, eliminating the blank frame before `/app/loading.tsx`.
+- `src/app/sign-in/sso-callback/page.tsx` and `src/app/sign-up/sso-callback/page.tsx` — same client-component pattern. Now render a visible spinner alongside `<AuthenticateWithRedirectCallback signInForceRedirectUrl="/app" signUpForceRedirectUrl="/app" />` and call `router.replace("/app")` on `isSignedIn`. Previously they rendered nothing visible → blank screen during OAuth processing; and the default Clerk redirect pushed `/sso-callback` onto history, creating a Back-button loop.
+- `src/proxy.ts` — middleware now redirects signed-in users hitting `/sign-in` or `/sign-up` to `/` (landing), not `/app`. Safety net for manual URL entry; works in concert with `router.replace` for the standard Back-button case.
+- `src/app/page.tsx` — removed redundant per-button `forceRedirectUrl="/app"` on `<SignInButton>` and `<SignUpButton>`; provider env defaults govern.
+
+**Browser-default behaviour the user should know:** OAuth flows put Google's account-chooser pages in the browser's main history. We cannot remove those entries — only popup-mode OAuth (different SDK mode, large refactor) does. After the fixes, Back from `/app` skips our `/sign-in` and `/sso-callback` entries but will still show Google's pages briefly before reaching `/`.
+
+#### Hydration mismatch fix ✅ (commits `f401951`, `951b789`)
+
+- `src/lib/hooks/use-mounted.ts` — **new** shared hook backed by `useSyncExternalStore` (server snapshot returns `false`, client snapshot returns `true`). Used in place of `useEffect + setState` because the repo enforces `react-hooks/set-state-in-effect`.
+- `src/components/theme-toggle.tsx` — was the bug source: `resolvedTheme ?? "dark"` evaluated to `"dark"` on the server but the client's stored theme is often `"light"`, so SSR rendered Sun + "Switch to light mode" and hydration disagreed. Now gates icon and `aria-label` on `useMounted()` and renders a same-size invisible placeholder during SSR.
+- `src/app/brief/[shareToken]/page.tsx`, `src/components/editor/editor-shell.tsx` — same `resolvedTheme ?? "dark"` bug. Both now expose `theme: "dark" | "light" | null` to their respective header children.
+- `src/components/brief/client-header.tsx`, `src/components/editor/titlebar.tsx` — accept nullable `theme` and render a 14×14 placeholder + neutral "Toggle theme" label when `theme === null`. Both pass `suppressHydrationWarning` on the affected button (defence in depth).
+- `src/components/editor/settings-panel.tsx` — intentionally **not** patched. It's behind `settingsOpen && <SettingsPanel />` so it never SSRs, and `resolvedTheme` is already populated by the time the user opens it.
+
+#### Brief client loading skeleton ✅ (commit `9720b5a`)
+
+- `src/app/brief/[shareToken]/loading.tsx` — **new**. Mirrors `/app/loading.tsx` aesthetic (static `Bone` skeleton with a single subtle `animate-pulse`) for the public review path. Captures the real `ClientHeader` (brand, doc meta, two icon buttons, submit) and `ClientDoc` (large title, mono meta row, section dividers, requirement cards with status pill + tags + body lines). Deliberately avoids the root `src/app/loading.tsx` style — no logo splash, pulse ring, shimmer bar, or blinking cursor; the user called that "slop".
+
+---
+
 ## Actionable Next Steps (Priority Order)
 
 ### Hour 2 — Sources tab live (file upload + text paste)
@@ -86,7 +117,10 @@ Implement the "Share" button: server action creates a `ShareLink` with a random 
 ---
 
 ## Key Technical Notes
-- Theme: always initialise `useState("dark")`, correct in useEffect from localStorage. The `eslint-disable-next-line react-hooks/set-state-in-effect` comment is intentional.
+- Theme: app uses `next-themes` (`ThemeProvider` in `src/components/providers.tsx`, `attribute="data-theme"`, `storageKey="rx-theme"`, `defaultTheme="system"`). When reading `useTheme().resolvedTheme` in a component that SSRs, always gate theme-dependent UI on `useMounted()` from `src/lib/hooks/use-mounted.ts` — `resolvedTheme` is `undefined` on the server and the unguarded `?? "dark"` fallback causes hydration mismatches. The old `src/lib/hooks/use-theme.ts` was removed in an earlier session.
+- The repo enforces `react-hooks/set-state-in-effect`. The classic `useState + useEffect(() => setMounted(true), [])` mount-detection pattern won't pass lint — use `useSyncExternalStore` (see `use-mounted.ts`) or restructure.
+- Clerk routing URLs are now centralized in `<ClerkProvider>` props (`signInUrl`, `signUpUrl`, `signInFallbackRedirectUrl`, `signUpFallbackRedirectUrl`) wired from `clientEnv`. Do not re-add per-button `forceRedirectUrl` props — they're redundant and drift from the env source of truth.
+- Sign-in / sign-up page success uses `router.replace("/app")`, not `push`. This removes the auth route from browser history so Back from `/app` skips the form. The middleware redirect target for signed-in users on auth pages is `/` (landing), not `/app`.
 - UploadThing v7 has no `audio` category — audioUploader uses `blob` type with MIME guard in `onUploadComplete`.
 - Never access `process.env` directly — import from `src/lib/env/server.ts` or `src/lib/env/client.ts`.
 - Auth guards: `requireInternalAuth()` for clerkUserId, `requireInternalActor()` for full user object. Never trust client-passed user IDs.

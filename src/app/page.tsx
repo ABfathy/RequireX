@@ -48,7 +48,7 @@ export default function HomePage() {
         {/* Auth CTAs */}
         <div className="flex items-center gap-2 mb-10">
           <Show when="signed-out">
-            <SignUpButton mode="redirect" forceRedirectUrl="/app">
+            <SignUpButton mode="redirect">
               <Button
                 className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--background)] cursor-pointer"
                 style={{
@@ -60,7 +60,7 @@ export default function HomePage() {
                 Get Started
               </Button>
             </SignUpButton>
-            <SignInButton mode="redirect" forceRedirectUrl="/app">
+            <SignInButton mode="redirect">
               <Button
                 className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] border hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--background)] cursor-pointer"
                 style={{

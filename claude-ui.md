@@ -1,6 +1,6 @@
 # Claude UI Handoff
 
-Last reviewed on 2026-05-11.
+Last reviewed on 2026-05-11 (Session 3).
 
 This document is for Claude to work on the missing UI surface area only.
 
@@ -23,12 +23,32 @@ A UI area is only complete when it:
 
 This section tracks what has been built. Do not redo this work.
 
+### Session 3 — auth + hydration + brief loading (current branch)
+
+**Sign-in / sign-up flow** (`src/app/sign-in/**`, `src/app/sign-up/**`, `src/components/providers.tsx`, `src/lib/env/client.ts`, `src/proxy.ts`, `src/app/page.tsx`)
+
+- `<ClerkProvider>` in `providers.tsx` now receives `signInUrl` / `signUpUrl` / `signInFallbackRedirectUrl` / `signUpFallbackRedirectUrl` from `clientEnv`. The four env vars are **required** in the zod schema. This is the canonical place for sign-in routing — do not re-add `forceRedirectUrl` on individual buttons.
+- All four auth pages (`/sign-in`, `/sign-up`, and both `sso-callback` routes) are client components that watch `useAuth().isSignedIn` and call `router.replace("/app")` on success. The replace (not push) drops the auth route from history so Back from `/app` doesn't land on a stale form. Spinner placeholder during the cookie-set → navigation window prevents the previous blank-frame.
+- Middleware redirects signed-in users hitting `/sign-in` or `/sign-up` to `/`, not `/app`. Safety net for manual URL entry.
+- OAuth screens on `accounts.google.com` remain in browser history — that's owned by the browser; only popup-mode OAuth could remove them.
+
+**Hydration fix across all theme consumers** (`src/components/theme-toggle.tsx`, `src/app/brief/[shareToken]/page.tsx`, `src/components/editor/editor-shell.tsx`, `src/components/brief/client-header.tsx`, `src/components/editor/titlebar.tsx`)
+
+- Created `src/lib/hooks/use-mounted.ts` (useSyncExternalStore-based).
+- Removed the `resolvedTheme ?? "dark"` pattern everywhere it appeared in SSR'd components. Each parent now exposes `theme: "dark" | "light" | null` — null until mounted. Children render a 14×14 / 15×15 invisible placeholder and a neutral "Toggle theme" aria-label until theme resolves on the client. `suppressHydrationWarning` is set on the affected buttons as a defence-in-depth.
+- `SettingsPanel` is intentionally NOT patched: it never SSRs because it's gated on `settingsOpen && <SettingsPanel />`.
+
+**Brief client loading skeleton** (`src/app/brief/[shareToken]/loading.tsx`, new)
+
+- Layout-isomorphic skeleton matching the real `ClientHeader` + `ClientDoc` geometry: 48px header strip with brand / doc meta / two icon buttons / submit button, then a centered `max-w-[920px]` column with title, mono meta row, section dividers, and requirement-card bones (status pill + tags + body lines). Static bones with a single subtle `animate-pulse` — same `Bone` helper signature as `/app/loading.tsx`. Deliberately avoids the root `loading.tsx` style (pulse ring, shimmer bar, blinking cursor, logo splash).
+
 ### Design system
 
-- `src/lib/hooks/use-theme.ts` — shared `useTheme()` hook; persists to localStorage key `"rx-theme"`; initialises as `"dark"` on the server to avoid hydration mismatch, then corrects from localStorage on mount
-- `src/components/theme-toggle.tsx` — reusable `<ThemeToggle />` client component (Sun/Moon button); used on the landing page
+- Theme is provided by `next-themes` via `ThemeProvider` in `src/components/providers.tsx` (`attribute="data-theme"`, `storageKey="rx-theme"`, `defaultTheme="system"`). The legacy `src/lib/hooks/use-theme.ts` was removed — use `useTheme()` from `next-themes` directly.
+- `src/lib/hooks/use-mounted.ts` — `useSyncExternalStore`-based mount detector. Required when rendering theme-dependent UI in any SSR'd component, because `useTheme().resolvedTheme` is `undefined` on the server. Pattern: derive `theme: "dark" | "light" | null` (null until mounted) and render a stable placeholder for the null case.
+- `src/components/theme-toggle.tsx` — reusable `<ThemeToggle />` client component (Sun/Moon button); used on the landing page. Already uses the `useMounted` pattern.
 - `src/app/globals.css` — `touch-action: manipulation` on all buttons; `prefers-reduced-motion` media query
-- `src/app/layout.tsx` — `colorScheme: "dark"` on `<html>`; `<meta name="theme-color" content="#141517">`
+- `src/app/layout.tsx` — `colorScheme: "dark"` on `<html>`; `<meta name="theme-color" content="#141517">`; mounts the `<div id="clerk-captcha" />` placeholder for Clerk Smart CAPTCHA.
 - `src/components/icons.tsx` — added `ArrowRight` icon
 
 ### Landing page (`src/app/page.tsx`)
