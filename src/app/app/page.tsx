@@ -1,12 +1,14 @@
 import { EditorShell } from "@/components/editor/editor-shell";
 import type { SourceItem, SourceType } from "@/components/editor/right-pane";
 import { prisma } from "@/lib/prisma";
+import { snapshotToDocLines } from "@/lib/snapshot-to-doclines";
 import { requireInternalAuth } from "@/server/auth";
 import { getSessionAssets } from "@/server/services/assets";
 import {
   ensureWorkspaceForUser,
   listBundledProjectsForUser,
 } from "@/server/services/projects";
+import { getLatestSnapshot } from "@/server/services/snapshot";
 
 type PageProps = {
   searchParams: Promise<{ projectId?: string }>;
@@ -15,7 +17,8 @@ type PageProps = {
 function mapSourceType(dbType: string): SourceType {
   if (dbType === "AUDIO") return "AUDIO";
   if (dbType === "TEXT") return "TEXT";
-  return "FILE";
+  if (dbType === "IMAGE") return "IMAGE";
+  return "PDF";
 }
 
 export default async function InternalWorkspacePage({
@@ -48,6 +51,8 @@ export default async function InternalWorkspacePage({
       : null);
 
   let initialSources: SourceItem[] = [];
+  const latestSnapshot = session ? await getLatestSnapshot(session.id) : null;
+
   if (activeBundledProject) {
     initialSources = activeBundledProject.assets.map((asset) => ({
       id: asset.id,
@@ -66,6 +71,8 @@ export default async function InternalWorkspacePage({
       createdAt: asset.createdAt.toISOString(),
     }));
   }
+
+  const lines = snapshotToDocLines(latestSnapshot, session?.title ?? null);
 
   const initialProjectCache = Object.fromEntries(
     bundledProjects.map((project) => [
@@ -99,6 +106,8 @@ export default async function InternalWorkspacePage({
       session={session}
       initialSources={initialSources}
       initialProjectCache={initialProjectCache}
+      lines={lines}
+      hasSnapshot={Boolean(latestSnapshot)}
     />
   );
 }

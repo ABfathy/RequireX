@@ -10,6 +10,7 @@ const serverEnvSchema = z.object({
   GOOGLE_CLOUD_PROJECT: z.string().optional(),
   GOOGLE_CLOUD_LOCATION: z.string().optional(),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+  BRIEF_GENERATION_ASYNC: z.enum(["0", "1"]).default("0"),
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
 });
@@ -25,6 +26,7 @@ export const serverEnv = serverEnvSchema.parse({
   GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
   GOOGLE_CLOUD_LOCATION: process.env.GOOGLE_CLOUD_LOCATION,
   GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  BRIEF_GENERATION_ASYNC: process.env.BRIEF_GENERATION_ASYNC,
   INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
   INNGEST_SIGNING_KEY: process.env.INNGEST_SIGNING_KEY,
 });

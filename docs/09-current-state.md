@@ -4,7 +4,7 @@ Last refreshed: 2026-05-11
 
 ## Summary
 
-The app has crossed from scaffold into usable internal shell. Auth, project bootstrap, project creation, source ingestion, and public review mutation infrastructure are implemented. The repo's main unfinished layer is the actual AI processing and snapshot rendering path.
+The app has crossed from scaffold into usable internal shell. Auth, project bootstrap, project creation, source ingestion, internal brief generation, and public review mutation infrastructure are implemented. The main unfinished layer is the public share/review rendering path.
 
 ## Internal App
 
@@ -19,9 +19,10 @@ Implemented:
 - the sidebar supports project switching and creating a new project
 - the right pane supports pasted text, uploads, rename, delete, refresh, and loading/error states
 
-Current limitation:
+Generation/rendering:
 
-- the central document view is still a shell and does not render real brief snapshots
+- the central document view renders the latest `BriefSnapshot` for the active session
+- the Generate Brief button runs the text-first sync Vertex AI flow and refreshes the editor
 
 ## Uploads And Sources
 
@@ -34,21 +35,24 @@ Implemented:
 
 Current limitation:
 
-- assets stop at `SourceAsset`; there is no chunking or processing pipeline yet
+- file assets stop at `SourceAsset`; the live generation path is text-first
 
 ## Generation
 
 Implemented:
 
-- `/api/generate` creates generation jobs
+- `/api/generate` creates generation jobs and runs sync brief generation by default
 - `/api/regenerate` creates regeneration jobs
-- Inngest receives both event types
+- text sources are normalized into `SourceChunk` rows when generation runs
+- `@google/genai` calls Vertex AI Gemini 2.5 Flash in Vertex mode
+- successful runs persist `BriefSnapshot`, claims, questions, evidence refs, and a `GENERATED` revision event
+- Inngest generation dispatch remains available behind `BRIEF_GENERATION_ASYNC=1`
 - job-dispatch failures are written back onto the `ProcessingJob`
 
 Current limitation:
 
-- both Inngest functions deliberately fail with `PIPELINE_NOT_IMPLEMENTED`
-- no `BriefSnapshot` rows are created by generation today
+- generation only includes text sources in the prompt
+- regeneration UI is not wired yet
 
 ## Public Review
 

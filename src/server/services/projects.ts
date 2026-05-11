@@ -1,6 +1,6 @@
-import type { SourceAssetStatus } from "../../../generated/prisma/client";
-
 import { prisma } from "@/lib/prisma";
+
+import type { SourceAssetStatus } from "../../../generated/prisma/client";
 
 const DEFAULT_WORKSPACE_NAME = "My Workspace";
 
@@ -28,6 +28,13 @@ export type BundledProject = ProjectListItem & {
   session: ProjectSessionRef;
   assets: ProjectAssetBundle[];
 };
+
+export class ProjectNotFoundError extends Error {
+  constructor(projectId: string) {
+    super(`Project not found: ${projectId}`);
+    this.name = "ProjectNotFoundError";
+  }
+}
 
 function workspaceSlugForUser(clerkUserId: string) {
   return `ws-${clerkUserId.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
@@ -183,5 +190,28 @@ export async function createProject(params: CreateProjectParams) {
     });
 
     return { project, session };
+  });
+}
+
+export async function deleteProject(projectId: string, clerkUserId: string) {
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      createdBy: clerkUserId,
+      status: "ACTIVE",
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!project) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  await prisma.project.delete({
+    where: {
+      id: projectId,
+    },
   });
 }

@@ -14,44 +14,47 @@
 - [x] UploadThing integration for mixed source uploads
 - [x] Source rename and delete APIs
 - [x] Client-side source upload, refresh, retry, and optimistic updates
+- [x] Internal "Generate Brief" action wired to `POST /api/generate`
+- [x] Sync text-first brief generation via `@google/genai` in Vertex mode
+- [x] `SourceChunk` creation for text assets during generation
+- [x] `BriefSnapshot`, `BriefClaim`, `BriefQuestion`, and `EvidenceRef` persistence
+- [x] `RevisionEvent` creation for generated snapshots
+- [x] Latest-snapshot loading in `/app`
+- [x] Internal document view rendering from real snapshot data
 - [x] Public review comment route and service
 - [x] Public review answer route and service
 - [x] Public review confirmation route and service
 - [x] Public review rate limiting and read-only snapshot guards
-- [x] Unit tests for asset services, validators, public auth, and public review flows
+- [x] Unit tests for asset services, validators, public auth, public review flows
 
 ## In Progress / Partially Done
 
-- [ ] Internal document view has the correct shell and state machine, but still renders placeholder lines instead of real snapshot data
 - [ ] Public brief page has the real responsive shell and loading state, but still renders `MOCK_REQUIREMENTS` and `MOCK_REVISIONS`
-- [ ] Generation and regeneration request APIs create `ProcessingJob` rows and dispatch Inngest events, but the actual processing pipeline is still unimplemented
-- [ ] Status UI primitives exist (`AppState`, `StatusBar`, loading/error states), but generation status is not yet driven by real job progression
+- [ ] Generation supports both sync and async modes, but the sync path is the only ready demo path
+- [ ] Regeneration job creation exists in the service layer, but `/api/regenerate` and the UI are still disabled
+- [ ] Status UI primitives exist (`AppState`, `StatusBar`, loading/error states), but there is no durable async job tracking/history UI
 - [ ] Public review backend mutations are real, but the public page UI still uses local-only submit behavior
 
 ## Next Engineering Work
 
 ### Backend Work
 
-- [ ] Implement the source-processing pipeline after asset upload or pasted-text creation
-- [ ] Move assets beyond `UPLOADED` into real processing states with durable status updates
-- [ ] Create `SourceChunk` rows from uploaded and pasted content
-- [ ] Define and implement the text normalization/extraction layer that feeds generation
-- [ ] Generate `BriefSnapshot`, `BriefClaim`, `BriefQuestion`, and `EvidenceRef`
-- [ ] Mark generation and regeneration jobs `SUCCEEDED` or `FAILED` with meaningful error codes and messages
-- [ ] Add a read-side query surface for the latest snapshot on an intake session
+- [ ] Move file assets beyond `UPLOADED` into real processing states with durable status updates
+- [ ] Create `SourceChunk` rows from PDF, audio, and image inputs
+- [ ] Add extraction/transcription/observation layers for non-text sources
+- [ ] Implement true regeneration from a prior snapshot
 - [ ] Add a read-side query surface for revision events and public feedback in the internal workspace
 - [ ] Implement share-link creation from the internal workspace
 - [ ] Implement share-link/snapshot loading for `/brief/[shareToken]`
+- [ ] Decide whether async generation should become the default and harden the Inngest path if so
 - [ ] Replace placeholder `test:e2e` and `test:a11y` scripts with real commands and coverage
 
 ### Frontend / UI Work
 
-- [ ] Wire the "Generate Brief" action in the internal workspace to `POST /api/generate`
-- [ ] Surface queued/running/failed generation state honestly in `DocView` and `StatusBar`
-- [ ] Wire `DocView` to live snapshot data instead of placeholder requirement lines
-- [ ] Render claims, questions, and evidence in the internal editor using snapshot-backed data
+- [ ] Surface async queued/running/failed generation state honestly in `DocView` and `StatusBar`
+- [ ] Add retry/regenerate controls to the internal workspace
+- [ ] Add job history / failure inspection UI for generation runs
 - [ ] Replace public mock brief data with real share-link/snapshot-backed data
------
 - [ ] Wire public comment submission to `/api/public/briefs/[shareToken]/comments`
 - [ ] Wire public answer submission to `/api/public/briefs/[shareToken]/answers`
 - [ ] Wire public confirmation submission to `/api/public/briefs/[shareToken]/confirm`

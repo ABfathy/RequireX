@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { prisma } from "@/lib/prisma";
 import {
   isInternalAuthorizationError,
   requireInternalAuth,
@@ -10,7 +11,6 @@ import {
   deleteAsset,
   updateAssetLabel,
 } from "@/server/services/assets";
-import { prisma } from "@/lib/prisma";
 import { UpdateLabelInputSchema } from "@/server/validators/assets";
 
 type RouteContext = { params: Promise<{ assetId: string }> };

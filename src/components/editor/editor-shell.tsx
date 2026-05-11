@@ -9,7 +9,7 @@ import { usePersistentState } from "@/lib/hooks/use-persistent-state";
 import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
-import { type AppState, DocView } from "./doc-view";
+import { type AppState, type DocLineData, DocView } from "./doc-view";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
 import { RightPane, type SourceItem, type SourceType } from "./right-pane";
@@ -19,9 +19,10 @@ import { TitleBar } from "./titlebar";
 type RightTab = "sources" | "chat" | "revisions";
 
 type SessionRef = { id: string; title: string } | null;
-const SIDEBAR_DEFAULT = 220;
-const SIDEBAR_MIN = SIDEBAR_DEFAULT;
-const SIDEBAR_MAX = 480;
+const SIDEBAR_STORAGE_KEY = "rx-sidebar-width-v2";
+const SIDEBAR_DEFAULT = 196;
+const SIDEBAR_MIN = 196;
+const SIDEBAR_MAX = 320;
 const RIGHT_DEFAULT = 268;
 const RIGHT_MIN = RIGHT_DEFAULT;
 const RIGHT_MAX = 560;
@@ -35,6 +36,8 @@ interface EditorShellProps {
   session?: SessionRef;
   initialSources?: SourceItem[];
   initialProjectCache?: SerializableProjectCache;
+  lines?: DocLineData[];
+  hasSnapshot?: boolean;
 }
 
 interface CacheEntry {
@@ -47,7 +50,8 @@ type SerializableProjectCache = Record<string, CacheEntry>;
 function mapSourceType(dbType: string): SourceType {
   if (dbType === "AUDIO") return "AUDIO";
   if (dbType === "TEXT") return "TEXT";
-  return "FILE";
+  if (dbType === "IMAGE") return "IMAGE";
+  return "PDF";
 }
 
 type ApiAsset = {
@@ -83,17 +87,20 @@ function assetToSource(a: ApiAsset): SourceItem {
 }
 
 export function EditorShell({
-  projects = [],
+  projects: initialProjects = [],
   activeProjectId: initialActiveProjectId = null,
   session: initialSession,
   initialSources = [],
   initialProjectCache = {},
+  lines = [],
+  hasSnapshot = false,
 }: EditorShellProps) {
   const router = useRouter();
+  const [projects, setProjects] = useState<ProjectListItem[]>(initialProjects);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [rightOpen,   setRightOpen]   = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = usePersistentState(
-    "rx-sidebar-width",
+    SIDEBAR_STORAGE_KEY,
     SIDEBAR_DEFAULT,
   );
   const [rightWidth, setRightWidth] = usePersistentState(
@@ -104,6 +111,8 @@ export function EditorShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     initialActiveProjectId,
@@ -111,7 +120,9 @@ export function EditorShell({
   const [session, setSession] = useState<SessionRef>(initialSession ?? null);
   const [sources, setSources] = useState<SourceItem[]>(initialSources);
   const [sourcesLoading, setSourcesLoading] = useState(false);
-  const [sourcesError, setSourcesError] = useState<string | undefined>(undefined);
+  const [sourcesError, setSourcesError] = useState<string | undefined>(
+    undefined,
+  );
 
   const [projectCache, setProjectCache] = useState<Map<string, CacheEntry>>(
     () => new Map(Object.entries(initialProjectCache)),
@@ -128,6 +139,12 @@ export function EditorShell({
     setTheme((theme ?? "dark") === "dark" ? "light" : "dark");
 
   const sessionId = session?.id;
+
+  useEffect(() => {
+    if (sidebarWidth < SIDEBAR_MIN || sidebarWidth > SIDEBAR_MAX) {
+      setSidebarWidth(clamp(sidebarWidth, SIDEBAR_MIN, SIDEBAR_MAX));
+    }
+  }, [sidebarWidth, setSidebarWidth]);
 
   /* Warm the remaining client cache with every project's session + sources in
      one shot. Server-provided top projects and locally mutated active project
@@ -279,11 +296,40 @@ export function EditorShell({
     [sessionId, startUpload],
   );
 
-  /* Soft client-side project switch. Cache hit → swap state + replace URL
-     silently (no Next.js routing → no server roundtrip). Cache miss →
-     full navigation; the page server component will re-render with fresh
-     props and the parent's `key` (in app/page.tsx) remounts EditorShell
-     so its local state re-seeds from the new props. */
+  const handleGenerateBrief = useCallback(async () => {
+    if (!sessionId || generating) return;
+
+    setGenerating(true);
+    setGenerationError(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as
+          | { error?: string; message?: string }
+          | null;
+        throw new Error(
+          payload?.message ?? payload?.error ?? "Failed to generate brief.",
+        );
+      }
+
+      router.refresh();
+    } catch (error) {
+      setGenerationError(
+        error instanceof Error ? error.message : "Failed to generate brief.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }, [sessionId, generating, router]);
+
+  /* Soft client-side project switch. Cache hit -> swap state + replace URL
+     silently (no Next.js routing -> no server roundtrip). Cached switches clear
+     snapshot lines rather than showing stale lines from the previous project. */
   const handleSwitchProject = useCallback(
     (id: string) => {
       if (id === activeProjectId) return;
@@ -292,6 +338,7 @@ export function EditorShell({
         setActiveProjectId(id);
         setSession(cached.session);
         setSources(cached.sources);
+        setGenerationError(null);
         setSourcesError(undefined);
         if (typeof window !== "undefined") {
           window.history.replaceState({}, "", `/app?projectId=${id}`);
@@ -303,51 +350,95 @@ export function EditorShell({
     [activeProjectId, projectCache, router],
   );
 
-  const appState: AppState = session
-    ? sources.length > 0
+  const handleDeleteProject = useCallback(
+    async (projectId: string) => {
+      const previousActiveProjectId = activeProjectId;
+      const previousSession = session;
+      const previousSources = sources;
+      const previousGenerationError = generationError;
+      const previousSourcesError = sourcesError;
+      const previousProjects = projects;
+      const previousProjectCache = new Map(projectCache);
+      const remainingProjects = previousProjects.filter((p) => p.id !== projectId);
+
+      setProjects(remainingProjects);
+      setProjectCache((prev) => {
+        const next = new Map(prev);
+        next.delete(projectId);
+        return next;
+      });
+
+      const deletingActive = activeProjectId === projectId;
+      if (deletingActive) {
+        const nextProject = remainingProjects[0] ?? null;
+        setActiveProjectId(nextProject?.id ?? null);
+        setSession(null);
+        setSources([]);
+        setGenerationError(null);
+        setSourcesError(undefined);
+      }
+
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        setProjects(previousProjects);
+        setProjectCache(previousProjectCache);
+        setActiveProjectId(previousActiveProjectId);
+        setSession(previousSession);
+        setSources(previousSources);
+        setGenerationError(previousGenerationError);
+        setSourcesError(previousSourcesError);
+        throw new Error("Failed to delete project.");
+      }
+
+      if (deletingActive) {
+        const nextProject = remainingProjects[0] ?? null;
+        if (nextProject) {
+          router.push(`/app?projectId=${nextProject.id}`);
+        } else {
+          router.push("/app");
+        }
+      } else {
+        router.refresh();
+      }
+    },
+    [
+      projects,
+      projectCache,
+      activeProjectId,
+      session,
+      sources,
+      generationError,
+      sourcesError,
+      router,
+    ],
+  );
+
+  const usesServerSnapshot = activeProjectId === initialActiveProjectId;
+  const displayLines = usesServerSnapshot
+    ? lines
+    : session?.title
+      ? [{ lineNum: 1, type: "h1" as const, text: session.title }]
+      : [];
+  const displayHasSnapshot = usesServerSnapshot && hasSnapshot;
+
+  const baseAppState: AppState = session
+    ? sources.length > 0 || displayHasSnapshot
       ? "ready"
       : "no-sources"
     : "no-session";
+  const appState: AppState = generating
+    ? "generating"
+    : generationError
+      ? "failed"
+      : baseAppState;
 
   const activeProjectName =
     projects.find((p) => p.id === activeProjectId)?.name ?? null;
 
-  const appState: AppState = !session
-    ? "no-session"
-    : generationState === "requesting"
-      ? "generating"
-      : generationState === "failed"
-        ? "failed"
-        : sources.length > 0
-          ? "ready"
-          : "no-sources";
-
-  const loadSources = useCallback(async () => {
-    if (!session) {
-      setSources([]);
-      setSourcesError(undefined);
-      return;
-    }
-
-    setSourcesLoading(true);
-    setSourcesError(undefined);
-    try {
-      const response = await fetch(`/api/sessions/${session.id}/assets`);
-      if (!response.ok) {
-        throw new Error("Failed to load sources.");
-      }
-
-      const payload = (await response.json()) as { assets: ApiSourceAsset[] };
-      setSources(payload.assets.map(mapAsset));
-    } catch (error) {
-      setSourcesError(
-        error instanceof Error ? error.message : "Failed to load sources.",
-      );
-    } finally {
-      setSourcesLoading(false);
-    }
-  }, [session]);
-
+  /* ⌘K shortcut */
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -413,117 +504,6 @@ export function EditorShell({
     setRightTab("sources");
   }
 
-  async function handleSubmitText(text: string) {
-    if (!session) {
-      const response = await fetch("/api/preview-messy-text", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ textContent: text }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          await readApiError(response, "Failed to send prompt preview event."),
-        );
-      }
-
-      return;
-    }
-
-    const response = await fetch(`/api/sessions/${session.id}/assets`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ textContent: text }),
-    });
-
-    if (!response.ok) {
-      throw new Error(await readApiError(response, "Failed to save source."));
-    }
-
-    await loadSources();
-  }
-
-  async function handleDeleteSource(id: string) {
-    const response = await fetch(`/api/assets/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      throw new Error(await readApiError(response, "Failed to delete source."));
-    }
-
-    await loadSources();
-  }
-
-  async function handleRenameSource(id: string, label: string) {
-    const response = await fetch(`/api/assets/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ displayLabel: label }),
-    });
-
-    if (!response.ok) {
-      throw new Error(await readApiError(response, "Failed to rename source."));
-    }
-
-    await loadSources();
-  }
-
-  async function handleUploadSources(
-    files: File[],
-    onProgress: (progress: number) => void,
-  ) {
-    if (!session) {
-      throw new Error("No active session.");
-    }
-
-    await uploadFiles("mixedUploader", {
-      files,
-      input: {
-        sessionId: session.id,
-      },
-      onUploadProgress: ({ totalProgress }) => {
-        onProgress(
-          Math.round(totalProgress <= 1 ? totalProgress * 100 : totalProgress),
-        );
-      },
-    });
-
-    onProgress(100);
-    await loadSources();
-  }
-
-  async function handleGenerateBrief() {
-    if (!session) {
-      return;
-    }
-
-    setGenerationState("requesting");
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ sessionId: session.id }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to request brief generation.");
-      }
-
-      setGenerationState("idle");
-    } catch {
-      setGenerationState("failed");
-    }
-  }
-
   const colTemplate = [
     sidebarOpen ? `${sidebarWidth}px` : "0px",
     "1fr",
@@ -532,7 +512,7 @@ export function EditorShell({
 
   return (
     <div
-      className="flex h-screen flex-col overflow-hidden"
+      className="flex flex-col h-screen overflow-hidden"
       style={{ background: "var(--background)" }}
     >
       <TitleBar
@@ -555,7 +535,6 @@ export function EditorShell({
             : "grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1)",
         }}
       >
-        {/* Sidebar */}
         <div className="relative overflow-hidden" style={{ minWidth: 0 }}>
           {sidebarOpen && (
             <ProjectSidebar
@@ -563,6 +542,7 @@ export function EditorShell({
               activeProjectId={activeProjectId}
               onOpenPalette={() => setPaletteOpen(true)}
               onSwitchProject={handleSwitchProject}
+              onDeleteProject={handleDeleteProject}
             />
           )}
           {sidebarOpen && (
@@ -586,14 +566,12 @@ export function EditorShell({
           selectedReq={selectedReq}
           onSelectReq={handleSelectReq}
           onAddSources={handleOpenSources}
-          onGenerateBrief={handleGenerateBrief}
-        />
-
-        <div className="overflow-hidden" style={{ minWidth: 0 }}>
           onAttachFiles={sessionId ? handleUploadFiles : undefined}
+          onGenerateBrief={sessionId ? handleGenerateBrief : undefined}
+          generating={generating}
+          lines={displayLines}
         />
 
-        {/* Right pane */}
         <div className="relative overflow-hidden" style={{ minWidth: 0 }}>
           {rightOpen && (
             <ResizeHandle

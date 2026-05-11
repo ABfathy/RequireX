@@ -1,19 +1,28 @@
+import { ZodError } from "zod";
+
 import { prisma } from "@/lib/prisma";
-import type { SourceBundleChunk } from "@/server/services/google-genai";
-import { generateBriefFromBundle } from "@/server/services/google-genai";
+import {
+  generateBriefFromBundle,
+  GoogleGenAIConfigError,
+  type SourceBundle,
+} from "@/server/services/google-genai";
 import { normalizeTextToChunks } from "@/server/services/source-normalization";
 import type {
-  GeneratedBrief,
-  GeneratedBriefEvidence,
-} from "@/server/validators/brief-generation";
+  BriefClaimOutput,
+  BriefEvidenceOutput,
+  BriefOutput,
+  BriefQuestionOutput,
+} from "@/server/validators/brief-output";
 
 import type {
   BriefClaimSection,
   BriefQuestionSection,
   Prisma,
+  SourceAsset,
   SourceChunk,
-  SourceType,
 } from "../../../generated/prisma/client";
+
+const PROMPT_BUNDLE_MAX_CHARS = 30_000;
 
 export class BriefPipelineError extends Error {
   constructor(
@@ -25,177 +34,84 @@ export class BriefPipelineError extends Error {
   }
 }
 
-type RunTextBriefGenerationInput = {
+type RunBriefGenerationInput = {
   jobId: string;
   sessionId: string;
   requestedBy: string;
-  sourceSnapshotId?: string;
 };
 
-type ChunkWithAsset = SourceChunk & {
-  sourceAsset: {
-    id: string;
-    sourceType: SourceType;
-    displayLabel: string | null;
-    originalFileName: string | null;
-  };
+type TextAssetWithChunks = SourceAsset & {
+  chunks: SourceChunk[];
 };
 
-type GeneratedItem = {
-  text: string;
-  evidence: GeneratedBriefEvidence[];
-};
-
-function truncateExcerpt(text: string) {
-  return text.trim().slice(0, 500);
-}
-
-function sourceLabel(chunk: ChunkWithAsset) {
-  return (
-    chunk.sourceAsset.displayLabel ??
-    chunk.sourceAsset.originalFileName ??
-    chunk.chunkLabel ??
-    "Source"
+function pipelineErrorFromUnknown(error: unknown) {
+  if (error instanceof BriefPipelineError) return error;
+  if (error instanceof GoogleGenAIConfigError) {
+    return new BriefPipelineError(error.code, error.message);
+  }
+  if (error instanceof ZodError) {
+    const issues = error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+      .join("; ");
+    return new BriefPipelineError(
+      "INVALID_MODEL_OUTPUT",
+      `Model output did not match schema: ${issues}`,
+    );
+  }
+  if (error instanceof SyntaxError) {
+    return new BriefPipelineError("INVALID_MODEL_OUTPUT", error.message);
+  }
+  if (error instanceof Error) {
+    return new BriefPipelineError("VERTEX_CALL_FAILED", error.message);
+  }
+  return new BriefPipelineError(
+    "PIPELINE_FAILED",
+    "Brief generation failed.",
   );
 }
 
-function buildSourceBundle(chunks: ChunkWithAsset[]) {
-  return {
-    chunks: chunks.map<SourceBundleChunk>((chunk) => ({
-      id: chunk.id,
-      label: chunk.chunkLabel ?? `Chunk ${chunk.orderIndex + 1}`,
-      sourceLabel: sourceLabel(chunk),
-      text: chunk.text,
-    })),
-  };
-}
-
-function resolveEvidence(
-  item: GeneratedItem,
-  chunksById: Map<string, ChunkWithAsset>,
-  fallbackChunk: ChunkWithAsset,
-) {
-  const validEvidence = item.evidence
-    .map((evidence) => {
-      const chunk = chunksById.get(evidence.sourceChunkId);
-      if (!chunk) {
-        return null;
-      }
-
-      return {
-        chunk,
-        label:
-          evidence.label ??
-          chunk.chunkLabel ??
-          `${sourceLabel(chunk)} #${chunk.orderIndex + 1}`,
-        excerpt: truncateExcerpt(evidence.excerpt ?? chunk.text),
-      };
-    })
-    .filter(
-      (
-        evidence,
-      ): evidence is {
-        chunk: ChunkWithAsset;
-        label: string;
-        excerpt: string;
-      } => Boolean(evidence),
-    );
-
-  if (validEvidence.length > 0) {
-    return validEvidence;
-  }
-
-  return [
-    {
-      chunk: fallbackChunk,
-      label: fallbackChunk.chunkLabel ?? sourceLabel(fallbackChunk),
-      excerpt: truncateExcerpt(fallbackChunk.text),
+async function markJobFailed(jobId: string, error: unknown) {
+  const pipelineError = pipelineErrorFromUnknown(error);
+  await prisma.processingJob.update({
+    where: { id: jobId },
+    data: {
+      status: "FAILED",
+      completedAt: new Date(),
+      errorCode: pipelineError.code,
+      errorMessage: pipelineError.message,
     },
-  ];
+  });
+  return pipelineError;
 }
 
-async function ensureTextChunks(sessionId: string) {
-  const textAssets = await prisma.sourceAsset.findMany({
+async function loadTextAssets(sessionId: string) {
+  return prisma.sourceAsset.findMany({
     where: {
       sessionId,
       sourceType: "TEXT",
+      status: { in: ["UPLOADED", "PROCESSED"] },
     },
-    orderBy: {
-      createdAt: "asc",
+    include: {
+      chunks: {
+        orderBy: { orderIndex: "asc" },
+      },
     },
-    select: {
-      id: true,
-      status: true,
-      textContent: true,
-    },
+    orderBy: { createdAt: "asc" },
   });
+}
 
-  if (textAssets.length === 0) {
-    throw new BriefPipelineError(
-      "NO_TEXT_SOURCES",
-      "At least one pasted text source is required for text-first generation.",
-    );
-  }
-
-  for (const asset of textAssets) {
-    const existingChunks = await prisma.sourceChunk.findMany({
-      where: {
-        sourceAssetId: asset.id,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existingChunks.length > 0) {
-      await prisma.sourceAsset.update({
-        where: {
-          id: asset.id,
-        },
-        data: {
-          status: "PROCESSED",
-          processedAt: new Date(),
-          errorMessage: null,
-        },
-      });
-      continue;
-    }
+async function ensureTextChunks(assets: TextAssetWithChunks[]) {
+  for (const asset of assets) {
+    if (asset.chunks.length > 0) continue;
 
     const normalizedChunks = normalizeTextToChunks(asset.textContent ?? "");
     if (normalizedChunks.length === 0) {
-      await prisma.sourceAsset.update({
-        where: {
-          id: asset.id,
-        },
-        data: {
-          status: "FAILED",
-          errorMessage: "Text source had no usable content to process.",
-        },
-      });
       throw new BriefPipelineError(
         "EMPTY_TEXT_SOURCE",
         "A text source had no usable content to process.",
       );
     }
-
-    await prisma.sourceAsset.update({
-      where: {
-        id: asset.id,
-      },
-      data: {
-        status: "QUEUED",
-        errorMessage: null,
-      },
-    });
-
-    await prisma.sourceAsset.update({
-      where: {
-        id: asset.id,
-      },
-      data: {
-        status: "PROCESSING",
-      },
-    });
 
     await prisma.sourceChunk.createMany({
       data: normalizedChunks.map((chunk) => ({
@@ -209,218 +125,136 @@ async function ensureTextChunks(sessionId: string) {
     });
 
     await prisma.sourceAsset.update({
-      where: {
-        id: asset.id,
-      },
+      where: { id: asset.id },
       data: {
         status: "PROCESSED",
         processedAt: new Date(),
+        errorMessage: null,
       },
     });
   }
 
-  return prisma.sourceChunk.findMany({
-    where: {
-      sourceAsset: {
-        sessionId,
-        sourceType: "TEXT",
-      },
-    },
-    include: {
-      sourceAsset: {
-        select: {
-          id: true,
-          sourceType: true,
-          displayLabel: true,
-          originalFileName: true,
-        },
-      },
-    },
-    orderBy: [
-      {
-        sourceAsset: {
-          createdAt: "asc",
-        },
-      },
-      {
-        orderIndex: "asc",
-      },
-    ],
-  });
+  return loadTextAssets(assets[0]?.sessionId ?? "");
 }
 
-async function createEvidenceRefs(
-  tx: Prisma.TransactionClient,
-  input: {
-    snapshotId: string;
-    item: GeneratedItem;
-    chunksById: Map<string, ChunkWithAsset>;
-    fallbackChunk: ChunkWithAsset;
-    claimId?: string;
-    questionId?: string;
-  },
-) {
-  const evidenceRefs = resolveEvidence(
-    input.item,
-    input.chunksById,
-    input.fallbackChunk,
-  );
-
-  for (const evidence of evidenceRefs) {
-    await tx.evidenceRef.create({
-      data: {
-        snapshotId: input.snapshotId,
-        sourceAssetId: evidence.chunk.sourceAssetId,
-        sourceChunkId: evidence.chunk.id,
-        claimId: input.claimId,
-        questionId: input.questionId,
-        sourceType: evidence.chunk.sourceAsset.sourceType,
-        label: evidence.label,
-        locator: (evidence.chunk.locator ?? {}) as Prisma.InputJsonValue,
-        excerpt: evidence.excerpt,
-      },
-    });
-  }
+function assetLabel(asset: TextAssetWithChunks) {
+  return asset.displayLabel ?? asset.originalFileName ?? "Untitled source";
 }
 
-async function createClaims(
-  tx: Prisma.TransactionClient,
-  input: {
-    snapshotId: string;
-    section: BriefClaimSection;
-    items: GeneratedBrief["summary"];
-    chunksById: Map<string, ChunkWithAsset>;
-    fallbackChunk: ChunkWithAsset;
-  },
-) {
-  for (const [orderIndex, item] of input.items.entries()) {
-    const claim = await tx.briefClaim.create({
-      data: {
-        snapshotId: input.snapshotId,
-        section: input.section,
-        orderIndex,
-        text: item.text,
-        confidence: item.confidence,
-      },
-    });
-
-    await createEvidenceRefs(tx, {
-      snapshotId: input.snapshotId,
-      item,
-      chunksById: input.chunksById,
-      fallbackChunk: input.fallbackChunk,
-      claimId: claim.id,
-    });
-  }
+function textForPrompt(asset: TextAssetWithChunks) {
+  if (asset.textContent?.trim()) return asset.textContent.trim();
+  return asset.chunks.map((chunk) => chunk.text).join("\n\n").trim();
 }
 
-async function createQuestions(
-  tx: Prisma.TransactionClient,
-  input: {
-    snapshotId: string;
-    section: BriefQuestionSection;
-    items: GeneratedBrief["ambiguities"];
-    chunksById: Map<string, ChunkWithAsset>;
-    fallbackChunk: ChunkWithAsset;
-  },
-) {
-  for (const [orderIndex, item] of input.items.entries()) {
-    const question = await tx.briefQuestion.create({
-      data: {
-        snapshotId: input.snapshotId,
-        section: input.section,
-        orderIndex,
-        text: item.text,
-        reason: item.reason,
-      },
-    });
+function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
+  const bundleAssets: SourceBundle["assets"] = [];
+  let used = 0;
 
-    await createEvidenceRefs(tx, {
-      snapshotId: input.snapshotId,
-      item,
-      chunksById: input.chunksById,
-      fallbackChunk: input.fallbackChunk,
-      questionId: question.id,
+  for (const asset of assets) {
+    const body = textForPrompt(asset);
+    if (!body) continue;
+
+    const label = assetLabel(asset);
+    const blockOverhead = `[SOURCE id="${asset.id}" label="${label}"]\n\n[/SOURCE]\n\n`
+      .length;
+    const remaining = PROMPT_BUNDLE_MAX_CHARS - used - blockOverhead;
+    if (remaining <= 0) break;
+
+    const text = body.slice(0, remaining);
+    bundleAssets.push({
+      id: asset.id,
+      label,
+      text,
     });
+    used += blockOverhead + text.length;
   }
+
+  return { assets: bundleAssets };
 }
 
-export async function runTextBriefGeneration({
-  jobId,
-  sessionId,
-  requestedBy,
-  sourceSnapshotId,
-}: RunTextBriefGenerationInput) {
-  const session = await prisma.intakeSession.findUnique({
-    where: {
-      id: sessionId,
-    },
-    select: {
-      id: true,
-      projectId: true,
-    },
-  });
+async function callModelWithRetry(bundle: SourceBundle) {
+  try {
+    return await generateBriefFromBundle(bundle);
+  } catch (error) {
+    const firstError = pipelineErrorFromUnknown(error);
+    if (firstError.code !== "INVALID_MODEL_OUTPUT") {
+      throw firstError;
+    }
 
-  if (!session) {
-    throw new BriefPipelineError(
-      "SESSION_NOT_FOUND",
-      "Intake session was not found.",
-    );
-  }
-
-  if (sourceSnapshotId) {
-    const sourceSnapshot = await prisma.briefSnapshot.findFirst({
-      where: {
-        id: sourceSnapshotId,
-        sessionId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!sourceSnapshot) {
-      throw new BriefPipelineError(
-        "SOURCE_SNAPSHOT_NOT_FOUND",
-        "Source brief snapshot was not found for this intake session.",
-      );
+    try {
+      return await generateBriefFromBundle(bundle, firstError.message);
+    } catch (retryError) {
+      throw pipelineErrorFromUnknown(retryError);
     }
   }
+}
 
-  const chunks = await ensureTextChunks(sessionId);
-  if (chunks.length === 0) {
-    throw new BriefPipelineError(
-      "NO_SOURCE_CHUNKS",
-      "Text sources did not produce any source chunks.",
-    );
+type PersistSnapshotInput = {
+  projectId: string;
+  sessionId: string;
+  requestedBy: string;
+  output: BriefOutput;
+  assets: TextAssetWithChunks[];
+};
+
+function firstChunkByAssetId(assets: TextAssetWithChunks[]) {
+  const map = new Map<string, SourceChunk>();
+  for (const asset of assets) {
+    const firstChunk = asset.chunks[0];
+    if (firstChunk) map.set(asset.id, firstChunk);
   }
+  return map;
+}
 
-  const bundle = buildSourceBundle(chunks);
-  const generatedBrief = await generateBriefFromBundle(bundle);
-  const chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
-  const fallbackChunk = chunks[0];
+function buildEvidenceRows(input: {
+  snapshotId: string;
+  claimId?: string;
+  questionId?: string;
+  evidence: BriefEvidenceOutput[];
+  assetById: Map<string, TextAssetWithChunks>;
+  chunkByAssetId: Map<string, SourceChunk>;
+}) {
+  return input.evidence
+    .map((evidence) => {
+      const asset = input.assetById.get(evidence.sourceAssetId);
+      const chunk = input.chunkByAssetId.get(evidence.sourceAssetId);
+      if (!asset || !chunk) return null;
 
-  if (!fallbackChunk) {
-    throw new BriefPipelineError(
-      "NO_SOURCE_CHUNKS",
-      "Text sources did not produce any source chunks.",
-    );
-  }
+      return {
+        snapshotId: input.snapshotId,
+        sourceAssetId: asset.id,
+        sourceChunkId: chunk.id,
+        claimId: input.claimId,
+        questionId: input.questionId,
+        sourceType: asset.sourceType,
+        label: assetLabel(asset),
+        locator: chunk.locator as Prisma.InputJsonValue,
+        excerpt: evidence.excerpt.trim().slice(0, 500),
+      };
+    })
+    .filter(<T>(row: T | null): row is T => row !== null);
+}
+
+async function persistSnapshot({
+  projectId,
+  sessionId,
+  requestedBy,
+  output,
+  assets,
+}: PersistSnapshotInput) {
+  const assetById = new Map(assets.map((asset) => [asset.id, asset]));
+  const chunkByAssetId = firstChunkByAssetId(assets);
 
   return prisma.$transaction(async (tx) => {
     const latest = await tx.briefSnapshot.aggregate({
-      where: {
-        sessionId,
-      },
-      _max: {
-        version: true,
-      },
+      where: { sessionId },
+      _max: { version: true },
     });
     const version = (latest._max.version ?? 0) + 1;
 
     const snapshot = await tx.briefSnapshot.create({
       data: {
-        projectId: session.projectId,
+        projectId,
         sessionId,
         version,
         status: "DRAFT",
@@ -429,70 +263,82 @@ export async function runTextBriefGeneration({
       },
     });
 
-    await createClaims(tx, {
-      snapshotId: snapshot.id,
-      section: "SUMMARY",
-      items: generatedBrief.summary,
-      chunksById,
-      fallbackChunk,
-    });
-    await createClaims(tx, {
-      snapshotId: snapshot.id,
-      section: "GOALS",
-      items: generatedBrief.goals,
-      chunksById,
-      fallbackChunk,
-    });
-    await createQuestions(tx, {
-      snapshotId: snapshot.id,
-      section: "AMBIGUITIES",
-      items: generatedBrief.ambiguities,
-      chunksById,
-      fallbackChunk,
-    });
-    await createQuestions(tx, {
-      snapshotId: snapshot.id,
-      section: "FOLLOW_UP_QUESTIONS",
-      items: generatedBrief.followUpQuestions,
-      chunksById,
-      fallbackChunk,
-    });
+    async function insertClaims(
+      section: BriefClaimSection,
+      claims: BriefClaimOutput[],
+    ) {
+      for (const [orderIndex, item] of claims.entries()) {
+        const claim = await tx.briefClaim.create({
+          data: {
+            snapshotId: snapshot.id,
+            section,
+            orderIndex,
+            text: item.text,
+            confidence: item.confidence,
+          },
+        });
+        const rows = buildEvidenceRows({
+          snapshotId: snapshot.id,
+          claimId: claim.id,
+          evidence: item.evidence,
+          assetById,
+          chunkByAssetId,
+        });
+        if (rows.length > 0) {
+          await tx.evidenceRef.createMany({ data: rows });
+        }
+      }
+    }
+
+    async function insertQuestions(
+      section: BriefQuestionSection,
+      questions: BriefQuestionOutput[],
+    ) {
+      for (const [orderIndex, item] of questions.entries()) {
+        const question = await tx.briefQuestion.create({
+          data: {
+            snapshotId: snapshot.id,
+            section,
+            orderIndex,
+            text: item.text,
+            reason: item.reason,
+          },
+        });
+        const rows = buildEvidenceRows({
+          snapshotId: snapshot.id,
+          questionId: question.id,
+          evidence: item.evidence,
+          assetById,
+          chunkByAssetId,
+        });
+        if (rows.length > 0) {
+          await tx.evidenceRef.createMany({ data: rows });
+        }
+      }
+    }
+
+    await insertClaims("SUMMARY", output.summary);
+    await insertClaims("GOALS", output.goals);
+    await insertQuestions("AMBIGUITIES", output.ambiguities);
+    await insertQuestions("FOLLOW_UP_QUESTIONS", output.followUpQuestions);
 
     await tx.revisionEvent.create({
       data: {
-        projectId: session.projectId,
+        projectId,
         sessionId,
         snapshotId: snapshot.id,
-        type: sourceSnapshotId ? "REGENERATED" : "GENERATED",
-        actorType: "INTERNAL_USER",
+        type: "GENERATED",
+        actorType: "SYSTEM",
         actorId: requestedBy,
-        summary: sourceSnapshotId
-          ? `Regenerated brief snapshot v${version}.`
-          : `Generated brief snapshot v${version}.`,
+        summary: `Generated brief snapshot v${version}.`,
         metadata: {
-          sourceSnapshotId: sourceSnapshotId ?? null,
-          sourceChunkCount: chunks.length,
+          sourceAssetCount: assets.length,
         },
       },
     });
 
-    await tx.processingJob.update({
-      where: {
-        id: jobId,
-      },
-      data: {
-        status: "SUCCEEDED",
-        resultSnapshotId: snapshot.id,
-        completedAt: new Date(),
-        errorCode: null,
-        errorMessage: null,
-      },
-    });
-
     await tx.intakeSession.update({
-      where: {
-        id: sessionId,
-      },
+      where: { id: sessionId },
       data: {
         status: "REVIEW_READY",
         lastActivityAt: new Date(),
@@ -501,4 +347,81 @@ export async function runTextBriefGeneration({
 
     return snapshot;
   });
+}
+
+export async function runBriefGeneration({
+  jobId,
+  sessionId,
+  requestedBy,
+}: RunBriefGenerationInput) {
+  await prisma.processingJob.update({
+    where: { id: jobId },
+    data: {
+      status: "RUNNING",
+      startedAt: new Date(),
+      attemptCount: { increment: 1 },
+      errorCode: null,
+      errorMessage: null,
+    },
+  });
+
+  try {
+    const session = await prisma.intakeSession.findUnique({
+      where: { id: sessionId },
+      select: { id: true, projectId: true },
+    });
+
+    if (!session) {
+      throw new BriefPipelineError(
+        "SESSION_NOT_FOUND",
+        "Intake session was not found.",
+      );
+    }
+
+    const initialAssets = await loadTextAssets(sessionId);
+    const assetsWithText = initialAssets.filter((asset) =>
+      textForPrompt(asset).trim(),
+    );
+
+    if (assetsWithText.length === 0) {
+      throw new BriefPipelineError(
+        "NO_SOURCES",
+        "No text sources are available for this session.",
+      );
+    }
+
+    const assets = await ensureTextChunks(assetsWithText);
+    const bundle = buildSourceBundle(assets);
+    if (bundle.assets.length === 0) {
+      throw new BriefPipelineError(
+        "EMPTY_BUNDLE",
+        "Source bundle was empty after assembly.",
+      );
+    }
+
+    const output = await callModelWithRetry(bundle);
+    const snapshot = await persistSnapshot({
+      projectId: session.projectId,
+      sessionId,
+      requestedBy,
+      output,
+      assets,
+    });
+
+    await prisma.processingJob.update({
+      where: { id: jobId },
+      data: {
+        status: "SUCCEEDED",
+        completedAt: new Date(),
+        resultSnapshotId: snapshot.id,
+        errorCode: null,
+        errorMessage: null,
+      },
+    });
+
+    return { snapshotId: snapshot.id, version: snapshot.version };
+  } catch (error) {
+    const pipelineError = await markJobFailed(jobId, error);
+    throw pipelineError;
+  }
 }

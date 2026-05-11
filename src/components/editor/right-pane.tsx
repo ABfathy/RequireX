@@ -40,10 +40,6 @@ export interface RightPaneProps {
   onDeleteSource?: (id: string) => void;
   onRenameSource?: (id: string, label: string) => void;
   onSubmitText?: (text: string) => Promise<void>;
-  onUploadSources?: (
-    files: File[],
-    onProgress: (progress: number) => void,
-  ) => Promise<void>;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRetrySourceLoad?: () => void;
 }
@@ -306,158 +302,26 @@ function SkeletonRow() {
 
 /* ── SourcesTab ─────────────────────────────────────────── */
 interface SourcesTabProps {
-  sessionId?: string;
   sources?: SourceItem[];
   loading?: boolean;
   error?: string;
   onDelete?: (id: string) => void;
   onRename?: (id: string, label: string) => void;
   onSubmitText?: (text: string) => Promise<void>;
-  onUpload?: (
-    files: File[],
-    onProgress: (progress: number) => void,
-  ) => Promise<void>;
+  onUploadFiles?: (files: File[]) => Promise<void>;
   onRetry?: () => void;
 }
 
-function isAcceptedUpload(file: File) {
-  return file.type === "application/pdf" || file.type.startsWith("audio/");
-}
-
-interface SourceDropzoneProps {
-  sessionId?: string;
-  onUpload?: (
-    files: File[],
-    onProgress: (progress: number) => void,
-  ) => Promise<void>;
-}
-
-function SourceDropzone({ sessionId, onUpload }: SourceDropzoneProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  async function uploadSelected(files: FileList | File[]) {
-    const selected = Array.from(files);
-    if (selected.length === 0 || !onUpload) {
-      return;
-    }
-
-    const unsupported = selected.find((file) => !isAcceptedUpload(file));
-    if (unsupported) {
-      setError(`${unsupported.name} is not a supported PDF or audio file.`);
-      return;
-    }
-
-    setUploading(true);
-    setProgress(0);
-    setError(null);
-    try {
-      await onUpload(selected, setProgress);
-      setProgress(100);
-    } catch {
-      setError("Upload failed. Try again.");
-    } finally {
-      setUploading(false);
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
-    }
-  }
-
-  return (
-    <div className="px-3 pb-3">
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept="application/pdf,audio/*"
-        className="sr-only"
-        onChange={(event) => {
-          if (event.target.files) {
-            void uploadSelected(event.target.files);
-          }
-        }}
-      />
-      <button
-        type="button"
-        disabled={!sessionId || uploading || !onUpload}
-        onClick={() => inputRef.current?.click()}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-          void uploadSelected(event.dataTransfer.files);
-        }}
-        className="flex min-h-[78px] w-full flex-col items-center justify-center gap-2 rounded-[6px] border border-dashed px-3 py-3 text-center transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-45 cursor-pointer"
-        style={{
-          background: dragging ? "var(--surface-3)" : "var(--surface-1)",
-          borderColor: dragging ? "var(--accent)" : "var(--border-strong)",
-          color: "var(--fg-tertiary)",
-        }}
-      >
-        <Icons.Upload size={16} aria-hidden="true" />
-        <span className="text-[11px] font-medium">
-          {uploading ? `Uploading ${progress}%` : "Drop PDF or voice notes"}
-        </span>
-        <span className="text-[10px]" style={{ color: "var(--fg-disabled)" }}>
-          PDF and audio files are stored for this session.
-        </span>
-        {uploading && (
-          <span
-            className="h-[3px] w-full overflow-hidden rounded-full"
-            style={{ background: "var(--surface-3)" }}
-            aria-hidden="true"
-          >
-            <span
-              className="block h-full transition-[width] duration-[120ms]"
-              style={{
-                width: `${progress}%`,
-                background: "var(--accent)",
-              }}
-            />
-          </span>
-        )}
-      </button>
-      {error && (
-        <p
-          className="mt-2 text-[10px]"
-          style={{ color: "var(--danger)" }}
-          role="alert"
-        >
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function SourcesTab({
-  sessionId,
   sources,
   loading,
   error,
   onDelete,
   onRename,
   onSubmitText,
-  onUpload,
+  onUploadFiles,
   onRetry,
 }: SourcesTabProps) {
-  onUploadFiles?: (files: File[]) => Promise<void>;
-  onRetry?: () => void;
-}
-
-function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText, onUploadFiles, onRetry }: SourcesTabProps) {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -473,7 +337,6 @@ function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText,
   return (
     <>
       <SectionLabel>Ingested sources</SectionLabel>
-      <SourceDropzone sessionId={sessionId} onUpload={onUpload} />
 
       {/* Error state */}
       {error && (
@@ -624,14 +487,12 @@ function RevisionsTab() {
 export function RightPane({
   activeTab,
   onTabChange,
-  sessionId,
   sources,
   sourcesLoading,
   sourcesError,
   onDeleteSource,
   onRenameSource,
   onSubmitText,
-  onUploadSources,
   onUploadFiles,
   onRetrySourceLoad,
 }: RightPaneProps) {
@@ -688,14 +549,12 @@ export function RightPane({
       >
         {activeTab === "sources" && (
           <SourcesTab
-            sessionId={sessionId}
             sources={sources}
             loading={sourcesLoading}
             error={sourcesError}
             onDelete={onDeleteSource}
             onRename={onRenameSource}
             onSubmitText={onSubmitText}
-            onUpload={onUploadSources}
             onUploadFiles={onUploadFiles}
             onRetry={onRetrySourceLoad}
           />

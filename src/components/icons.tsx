@@ -22,6 +22,7 @@ import {
   Share2,
   Sun,
   Ticket,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -57,6 +58,7 @@ export const Icons = {
   Ticket:       icon(Ticket),
   Code:         icon(Code),
   Refresh:      icon(RefreshCw),
+  Trash:        icon(Trash2),
   Check:        icon(Check),
   X:            icon(X),
   ArrowRight:   icon(ArrowRight),

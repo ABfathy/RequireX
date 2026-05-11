@@ -23,6 +23,7 @@ interface ProjectSidebarProps {
   activeProjectId: string | null;
   onOpenPalette: () => void;
   onSwitchProject: (id: string) => void;
+  onDeleteProject: (id: string) => Promise<void>;
 }
 
 function relativeTime(dateStr: string): string {
@@ -58,6 +59,7 @@ export function ProjectSidebar({
   activeProjectId,
   onOpenPalette,
   onSwitchProject,
+  onDeleteProject,
 }: ProjectSidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -109,39 +111,12 @@ export function ProjectSidebar({
                 const active = p.id === activeProjectId;
                 return (
                   <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSwitchProject(p.id)}
-                      className="flex flex-col gap-0.5 w-full text-left px-3 py-2 transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-                      style={{
-                        background: active ? "var(--surface-2)" : "transparent",
-                        borderLeft: "2px solid",
-                        borderLeftColor: active ? "var(--accent)" : "transparent",
-                      }}
-                      aria-current={active ? "page" : undefined}
-                    >
-                      <span
-                        className="text-[12px] truncate"
-                        style={{
-                          color: active
-                            ? "var(--fg-primary)"
-                            : "var(--fg-secondary)",
-                          fontWeight: active ? 500 : 400,
-                        }}
-                        title={p.name}
-                      >
-                        {p.name}
-                      </span>
-                      <span
-                        className="text-[10px] truncate"
-                        style={{
-                          color: "var(--fg-disabled)",
-                          fontFamily: "var(--font-mono)",
-                        }}
-                      >
-                        {relativeTime(p.updatedAt)}
-                      </span>
-                    </button>
+                    <ProjectRow
+                      project={p}
+                      active={active}
+                      onSwitchProject={onSwitchProject}
+                      onDeleteProject={onDeleteProject}
+                    />
                   </li>
                 );
               })}
@@ -187,6 +162,129 @@ export function ProjectSidebar({
         <SettingsPanel onClose={() => setSettingsOpen(false)} />
       )}
     </>
+  );
+}
+
+function ProjectRow({
+  project,
+  active,
+  onSwitchProject,
+  onDeleteProject,
+}: {
+  project: ProjectListItem;
+  active: boolean;
+  onSwitchProject: (id: string) => void;
+  onDeleteProject: (id: string) => Promise<void>;
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDeleteProject(project.id);
+    } catch {
+      setDeleteError("Delete failed.");
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
+
+  return (
+    <div>
+      <div
+        className="group flex items-center gap-1 pr-2 transition-colors duration-[120ms] hover:bg-[var(--surface-2)]"
+        style={{
+          background: active ? "var(--surface-2)" : "transparent",
+          borderLeft: "2px solid",
+          borderLeftColor: active ? "var(--accent)" : "transparent",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => onSwitchProject(project.id)}
+          className="flex flex-col gap-0.5 flex-1 min-w-0 text-left px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+          aria-current={active ? "page" : undefined}
+        >
+          <span
+            className="text-[12px] truncate"
+            style={{
+              color: active ? "var(--fg-primary)" : "var(--fg-secondary)",
+              fontWeight: active ? 500 : 400,
+            }}
+            title={project.name}
+          >
+            {project.name}
+          </span>
+          <span
+            className="text-[10px] truncate"
+            style={{
+              color: "var(--fg-disabled)",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            {relativeTime(project.updatedAt)}
+          </span>
+        </button>
+
+        <div className="flex shrink-0 items-center justify-end w-[44px] h-6">
+          {confirmingDelete ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Cancel delete"
+                onClick={() => setConfirmingDelete(false)}
+                className="inline-flex items-center justify-center size-[20px] rounded-[4px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+                style={{ color: "var(--fg-muted)" }}
+                disabled={deleting}
+              >
+                <Icons.X size={10} />
+              </button>
+              <button
+                type="button"
+                aria-label={`Delete ${project.name}`}
+                onClick={() => void handleDelete()}
+                className="inline-flex items-center justify-center size-[20px] rounded-[4px] transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer disabled:cursor-not-allowed"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--danger) 15%, transparent)",
+                  color: "var(--danger)",
+                }}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <Icons.Refresh size={10} className="animate-spin" />
+                ) : (
+                  <Icons.Check size={10} />
+                )}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              aria-label={`Delete ${project.name}`}
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex items-center justify-center size-6 rounded-[4px] opacity-0 group-hover:opacity-100 transition-[opacity,background-color,color] duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ color: "var(--fg-muted)" }}
+            >
+              <Icons.Trash size={11} />
+            </button>
+          )}
+        </div>
+      </div>
+      {deleteError && (
+        <div
+          className="px-3 pb-1 text-[10px]"
+          style={{ color: "var(--danger)" }}
+          role="alert"
+        >
+          {deleteError}
+        </div>
+      )}
+    </div>
   );
 }
 

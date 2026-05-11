@@ -458,6 +458,7 @@ export interface DocViewProps {
   onSelectReq: (id: string) => void;
   onAddSources?: () => void;
   onGenerateBrief?: () => void;
+  generating?: boolean;
   onAttachFiles?: (files: File[]) => Promise<void>;
   lines?: DocLineData[];
 }
@@ -470,12 +471,17 @@ export function DocView({
   onSelectReq,
   onAddSources,
   onGenerateBrief,
+  generating = false,
   onAttachFiles,
   lines = [],
 }: DocViewProps) {
   const canGenerate = appState === "ready" || appState === "no-sources";
   const generateDisabled =
-    appState === "no-sources" || appState === "no-session";
+    appState === "no-sources" ||
+    appState === "no-session" ||
+    appState === "generating" ||
+    generating ||
+    !onGenerateBrief;
 
   return (
     <div
@@ -518,7 +524,13 @@ export function DocView({
           <button
             type="button"
             disabled={generateDisabled}
-            title={generateDisabled ? "Add sources first" : undefined}
+            title={
+              generating
+                ? "Generation in progress"
+                : generateDisabled
+                  ? "Add sources first"
+                  : undefined
+            }
             onClick={onGenerateBrief}
             className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             style={
@@ -527,8 +539,12 @@ export function DocView({
                 : { background: "var(--surface-3)", color: "var(--fg-muted)" }
             }
           >
-            <Icons.Download size={11} aria-hidden="true" />
-            <span>Generate Brief</span>
+            <Icons.Download
+              size={11}
+              aria-hidden="true"
+              className={generating ? "animate-spin" : undefined}
+            />
+            <span>{generating ? "Generating..." : "Generate Brief"}</span>
           </button>
         </div>
       </div>

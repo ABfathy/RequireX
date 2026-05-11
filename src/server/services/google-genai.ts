@@ -1,117 +1,215 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 import { serverEnv } from "@/lib/env/server";
-import { GeneratedBriefSchema } from "@/server/validators/brief-generation";
+import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 const MODEL = "gemini-2.5-flash";
 
-export type SourceBundleChunk = {
+let cachedClient: GoogleGenAI | null = null;
+
+export type SourceBundleAsset = {
   id: string;
   label: string;
-  sourceLabel: string;
   text: string;
 };
 
 export type SourceBundle = {
-  chunks: SourceBundleChunk[];
+  assets: SourceBundleAsset[];
 };
 
 const responseJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["summary", "goals", "ambiguities", "followUpQuestions"],
+  type: Type.OBJECT,
   properties: {
-    summary: { type: "array", items: { $ref: "#/$defs/claim" }, minItems: 1 },
-    goals: { type: "array", items: { $ref: "#/$defs/claim" }, minItems: 1 },
+    summary: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING },
+          confidence: {
+            type: Type.STRING,
+            enum: ["LOW", "MEDIUM", "HIGH"],
+          },
+          evidence: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                sourceAssetId: { type: Type.STRING },
+                excerpt: { type: Type.STRING },
+              },
+              required: ["sourceAssetId", "excerpt"],
+            },
+          },
+        },
+        required: ["text", "confidence", "evidence"],
+      },
+    },
+    goals: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING },
+          confidence: {
+            type: Type.STRING,
+            enum: ["LOW", "MEDIUM", "HIGH"],
+          },
+          evidence: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                sourceAssetId: { type: Type.STRING },
+                excerpt: { type: Type.STRING },
+              },
+              required: ["sourceAssetId", "excerpt"],
+            },
+          },
+        },
+        required: ["text", "confidence", "evidence"],
+      },
+    },
     ambiguities: {
-      type: "array",
-      items: { $ref: "#/$defs/question" },
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING },
+          reason: { type: Type.STRING },
+          evidence: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                sourceAssetId: { type: Type.STRING },
+                excerpt: { type: Type.STRING },
+              },
+              required: ["sourceAssetId", "excerpt"],
+            },
+          },
+        },
+        required: ["text", "reason", "evidence"],
+      },
     },
     followUpQuestions: {
-      type: "array",
-      items: { $ref: "#/$defs/question" },
-    },
-  },
-  $defs: {
-    evidence: {
-      type: "object",
-      additionalProperties: false,
-      required: ["sourceChunkId"],
-      properties: {
-        sourceChunkId: { type: "string" },
-        label: { type: "string" },
-        excerpt: { type: "string" },
-      },
-    },
-    claim: {
-      type: "object",
-      additionalProperties: false,
-      required: ["text", "confidence", "evidence"],
-      properties: {
-        text: { type: "string" },
-        confidence: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
-        evidence: { type: "array", items: { $ref: "#/$defs/evidence" } },
-      },
-    },
-    question: {
-      type: "object",
-      additionalProperties: false,
-      required: ["text", "reason", "evidence"],
-      properties: {
-        text: { type: "string" },
-        reason: { type: "string" },
-        evidence: { type: "array", items: { $ref: "#/$defs/evidence" } },
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING },
+          reason: { type: Type.STRING },
+          evidence: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                sourceAssetId: { type: Type.STRING },
+                excerpt: { type: Type.STRING },
+              },
+              required: ["sourceAssetId", "excerpt"],
+            },
+          },
+        },
+        required: ["text", "reason", "evidence"],
       },
     },
   },
-};
+  required: ["summary", "goals", "ambiguities", "followUpQuestions"],
+} as const;
 
-function assertVertexConfig() {
-  if (!serverEnv.GOOGLE_CLOUD_PROJECT || !serverEnv.GOOGLE_CLOUD_LOCATION) {
-    throw new Error(
-      "GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are required for brief generation.",
-    );
+const SYSTEM_PROMPT = `You are a senior product analyst building a structured brief from raw client intake material.
+
+You will receive one or more SOURCE blocks delimited like:
+[SOURCE id="<sourceAssetId>" label="<label>"]
+<source text>
+[/SOURCE]
+
+Produce a JSON object with exactly these top-level keys:
+- "summary": array of claim objects
+- "goals": array of claim objects
+- "ambiguities": array of question objects
+- "followUpQuestions": array of question objects
+
+Each claim object has "text", "confidence", and non-empty "evidence".
+Each question object has "text", "reason", and "evidence" which may be empty.
+Evidence items use { "sourceAssetId": <one of the provided source ids>, "excerpt": <short verbatim quote> }.
+
+Rules:
+- Use only sourceAssetId values from the SOURCE blocks.
+- Cap each section at 5 items.
+- Prefer HIGH confidence only when the source material clearly supports it.
+- Excerpts must be short and copied from the cited source.
+- Output JSON only.`;
+
+export class GoogleGenAIConfigError extends Error {
+  readonly code = "VERTEX_CONFIG_MISSING";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "GoogleGenAIConfigError";
   }
 }
 
-function buildPrompt(bundle: SourceBundle) {
-  const sourceText = bundle.chunks
-    .map(
-      (chunk) =>
-        `<chunk id="${chunk.id}" label="${chunk.label}" source="${chunk.sourceLabel}">\n${chunk.text}\n</chunk>`,
-    )
-    .join("\n\n");
+function getClient() {
+  if (cachedClient) return cachedClient;
+  if (!serverEnv.GOOGLE_CLOUD_PROJECT || !serverEnv.GOOGLE_CLOUD_LOCATION) {
+    throw new GoogleGenAIConfigError(
+      "GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are required for brief generation.",
+    );
+  }
 
-  return `Create a concise project brief from the source chunks below.
-
-Return JSON only. Use only these sourceChunkId values in evidence:
-${bundle.chunks.map((chunk) => `- ${chunk.id}`).join("\n")}
-
-Each summary and goal item must be a clear claim with LOW, MEDIUM, or HIGH confidence.
-Ambiguities and follow-up questions should be questions the internal team should resolve before delivery.
-
-Sources:
-${sourceText}`;
-}
-
-export async function generateBriefFromBundle(bundle: SourceBundle) {
-  assertVertexConfig();
-
-  const ai = new GoogleGenAI({
+  cachedClient = new GoogleGenAI({
     vertexai: true,
     project: serverEnv.GOOGLE_CLOUD_PROJECT,
     location: serverEnv.GOOGLE_CLOUD_LOCATION,
   });
+  return cachedClient;
+}
 
-  const response = await ai.models.generateContent({
+function buildPrompt(bundle: SourceBundle, retryHint?: string) {
+  const sourceText = bundle.assets
+    .map(
+      (asset) =>
+        `[SOURCE id="${asset.id}" label="${asset.label.replace(/"/g, '\\"')}"]\n${asset.text}\n[/SOURCE]`,
+    )
+    .join("\n\n");
+
+  const validIds = bundle.assets.map((asset) => `- ${asset.id}`).join("\n");
+  const retryText = retryHint
+    ? `\n\nYour previous response was invalid: ${retryHint}\nReturn only corrected JSON.`
+    : "";
+
+  return `Use only these sourceAssetId values in evidence:\n${validIds}\n\n${sourceText}${retryText}`;
+}
+
+function extractJson(raw: string) {
+  const trimmed = raw.trim();
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(trimmed.slice(start, end + 1)) as unknown;
+    }
+    throw new Error("Model output was not valid JSON.");
+  }
+}
+
+export async function generateBriefFromBundle(
+  bundle: SourceBundle,
+  retryHint?: string,
+) {
+  const response = await getClient().models.generateContent({
     model: MODEL,
-    contents: buildPrompt(bundle),
+    contents: buildPrompt(bundle, retryHint),
     config: {
+      systemInstruction: SYSTEM_PROMPT,
       temperature: 0.2,
+      maxOutputTokens: 4096,
       responseMimeType: "application/json",
       responseJsonSchema,
-      systemInstruction:
-        "You transform messy client intake notes into structured, evidence-backed software project briefs.",
     },
   });
 
@@ -120,5 +218,5 @@ export async function generateBriefFromBundle(bundle: SourceBundle) {
     throw new Error("Model returned an empty response.");
   }
 
-  return GeneratedBriefSchema.parse(JSON.parse(rawText));
+  return BriefOutputSchema.parse(extractJson(rawText));
 }

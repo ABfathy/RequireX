@@ -16,16 +16,22 @@ vi.mock("@/lib/prisma", () => ({
       findMany: vi.fn(),
       createMany: vi.fn(),
     },
+    processingJob: {
+      update: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }));
 
 vi.mock("@/server/services/google-genai", () => ({
   generateBriefFromBundle: vi.fn(),
+  GoogleGenAIConfigError: class GoogleGenAIConfigError extends Error {
+    readonly code = "VERTEX_CONFIG_MISSING";
+  },
 }));
 
 import { prisma } from "@/lib/prisma";
-import { runTextBriefGeneration } from "@/server/services/brief-pipeline";
+import { runBriefGeneration } from "@/server/services/brief-pipeline";
 import { generateBriefFromBundle } from "@/server/services/google-genai";
 
 const mockPrisma = prisma as unknown as {
@@ -42,6 +48,9 @@ const mockPrisma = prisma as unknown as {
   sourceChunk: {
     findMany: ReturnType<typeof vi.fn>;
     createMany: ReturnType<typeof vi.fn>;
+  };
+  processingJob: {
+    update: ReturnType<typeof vi.fn>;
   };
   $transaction: ReturnType<typeof vi.fn>;
 };
@@ -65,7 +74,7 @@ function createTx() {
       create: vi.fn().mockResolvedValue({ id: "question_1" }),
     },
     evidenceRef: {
-      create: vi.fn().mockResolvedValue({ id: "evidence_1" }),
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     revisionEvent: {
       create: vi.fn().mockResolvedValue({ id: "revision_1" }),
@@ -79,7 +88,7 @@ function createTx() {
   };
 }
 
-describe("runTextBriefGeneration", () => {
+describe("runBriefGeneration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.intakeSession.findUnique.mockResolvedValue({
@@ -87,35 +96,45 @@ describe("runTextBriefGeneration", () => {
       projectId: "project_1",
     });
     mockPrisma.briefSnapshot.findFirst.mockResolvedValue({ id: "snapshot_0" });
-    mockPrisma.sourceAsset.findMany.mockResolvedValue([
-      {
-        id: "asset_1",
-        status: "UPLOADED",
-        textContent: "Client needs a portal.\n\nThey also need approvals.",
-      },
-    ]);
-    mockPrisma.sourceChunk.findMany
-      .mockResolvedValueOnce([])
+    mockPrisma.processingJob.update.mockResolvedValue({ id: "job_1" });
+    mockPrisma.sourceAsset.findMany
       .mockResolvedValueOnce([
         {
-          id: "chunk_1",
-          sourceAssetId: "asset_1",
-          kind: "TEXT_BLOCK",
-          orderIndex: 0,
-          text: "Client needs a portal.",
-          locator: { kind: "text-range", paragraphStart: 0, paragraphEnd: 0 },
-          chunkLabel: "Text 1",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          pageNumber: null,
-          startMs: null,
-          endMs: null,
-          sourceAsset: {
-            id: "asset_1",
-            sourceType: "TEXT",
-            displayLabel: "Pasted text",
-            originalFileName: null,
-          },
+          id: "asset_1",
+          sessionId: "session_1",
+          sourceType: "TEXT",
+          status: "UPLOADED",
+          displayLabel: "Pasted text",
+          originalFileName: null,
+          textContent: "Client needs a portal.\n\nThey also need approvals.",
+          chunks: [],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "asset_1",
+          sessionId: "session_1",
+          sourceType: "TEXT",
+          status: "PROCESSED",
+          displayLabel: "Pasted text",
+          originalFileName: null,
+          textContent: "Client needs a portal.\n\nThey also need approvals.",
+          chunks: [
+            {
+              id: "chunk_1",
+              sourceAssetId: "asset_1",
+              kind: "TEXT_BLOCK",
+              orderIndex: 0,
+              text: "Client needs a portal.",
+              locator: { kind: "text-range", paragraphStart: 0, paragraphEnd: 0 },
+              chunkLabel: "Text 1",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              pageNumber: null,
+              startMs: null,
+              endMs: null,
+            },
+          ],
         },
       ]);
     mockPrisma.sourceChunk.createMany.mockResolvedValue({ count: 1 });
@@ -125,14 +144,14 @@ describe("runTextBriefGeneration", () => {
         {
           text: "The client needs a portal.",
           confidence: "HIGH",
-          evidence: [{ sourceChunkId: "chunk_1" }],
+          evidence: [{ sourceAssetId: "asset_1", excerpt: "Client needs a portal." }],
         },
       ],
       goals: [
         {
           text: "Support approvals.",
           confidence: "MEDIUM",
-          evidence: [{ sourceChunkId: "chunk_1" }],
+          evidence: [{ sourceAssetId: "asset_1", excerpt: "They also need approvals." }],
         },
       ],
       ambiguities: [],
@@ -146,7 +165,7 @@ describe("runTextBriefGeneration", () => {
       callback(tx),
     );
 
-    await runTextBriefGeneration({
+    await runBriefGeneration({
       jobId: "job_1",
       sessionId: "session_1",
       requestedBy: "user_1",
@@ -154,10 +173,10 @@ describe("runTextBriefGeneration", () => {
 
     expect(mockPrisma.sourceChunk.createMany).toHaveBeenCalled();
     expect(mockGenerateBriefFromBundle).toHaveBeenCalledWith({
-      chunks: [
+      assets: [
         expect.objectContaining({
-          id: "chunk_1",
-          sourceLabel: "Pasted text",
+          id: "asset_1",
+          label: "Pasted text",
         }),
       ],
     });
@@ -168,13 +187,15 @@ describe("runTextBriefGeneration", () => {
         version: 1,
       }),
     });
-    expect(tx.evidenceRef.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        snapshotId: "snapshot_1",
-        sourceChunkId: "chunk_1",
-      }),
+    expect(tx.evidenceRef.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          snapshotId: "snapshot_1",
+          sourceChunkId: "chunk_1",
+        }),
+      ],
     });
-    expect(tx.processingJob.update).toHaveBeenCalledWith({
+    expect(mockPrisma.processingJob.update).toHaveBeenCalledWith({
       where: { id: "job_1" },
       data: expect.objectContaining({
         status: "SUCCEEDED",
@@ -184,15 +205,16 @@ describe("runTextBriefGeneration", () => {
   });
 
   it("fails before model generation when no text sources exist", async () => {
+    mockPrisma.sourceAsset.findMany.mockReset();
     mockPrisma.sourceAsset.findMany.mockResolvedValueOnce([]);
 
     await expect(
-      runTextBriefGeneration({
+      runBriefGeneration({
         jobId: "job_1",
         sessionId: "session_1",
         requestedBy: "user_1",
       }),
-    ).rejects.toThrow("At least one pasted text source");
+    ).rejects.toThrow("No text sources");
 
     expect(mockGenerateBriefFromBundle).not.toHaveBeenCalled();
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
