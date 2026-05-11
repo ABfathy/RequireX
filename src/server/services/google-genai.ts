@@ -1,11 +1,41 @@
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 import { serverEnv } from "@/lib/env/server";
 import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 const MODEL = "gemini-2.5-flash";
+const TEMP_CREDENTIALS_PATH = join(tmpdir(), "requirex-google-service-account.json");
 
 let cachedClient: GoogleGenAI | null = null;
+let cachedCredentialsPath: string | null = null;
+
+function logGoogleGenAI(
+  level: "info" | "warn" | "error",
+  message: string,
+  details: Record<string, unknown>,
+) {
+  const payload = {
+    scope: "google-genai",
+    message,
+    ...details,
+  };
+
+  if (level === "error") {
+    console.error(payload);
+    return;
+  }
+
+  if (level === "warn") {
+    console.warn(payload);
+    return;
+  }
+
+  console.info(payload);
+}
 
 export type SourceBundleAsset = {
   id: string;
@@ -151,13 +181,93 @@ export class GoogleGenAIConfigError extends Error {
   }
 }
 
+function ensureGoogleCredentials() {
+  if (
+    serverEnv.NODE_ENV !== "production" &&
+    serverEnv.GOOGLE_APPLICATION_CREDENTIALS
+  ) {
+    cachedCredentialsPath = serverEnv.GOOGLE_APPLICATION_CREDENTIALS;
+    process.env.GOOGLE_APPLICATION_CREDENTIALS =
+      serverEnv.GOOGLE_APPLICATION_CREDENTIALS;
+    return serverEnv.GOOGLE_APPLICATION_CREDENTIALS;
+  }
+
+  if (cachedCredentialsPath) {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = cachedCredentialsPath;
+    return cachedCredentialsPath;
+  }
+
+  if (serverEnv.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const parsed = JSON.parse(serverEnv.GOOGLE_SERVICE_ACCOUNT_JSON) as Record<
+        string,
+        unknown
+      >;
+      writeFileSync(TEMP_CREDENTIALS_PATH, JSON.stringify(parsed), {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+      cachedCredentialsPath = TEMP_CREDENTIALS_PATH;
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = TEMP_CREDENTIALS_PATH;
+
+      logGoogleGenAI("info", "Materialized Google service account JSON.", {
+        path: TEMP_CREDENTIALS_PATH,
+        source: serverEnv.NODE_ENV === "production" ? "env-json" : "env-json-local",
+      });
+
+      return TEMP_CREDENTIALS_PATH;
+    } catch (error) {
+      logGoogleGenAI("error", "Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON.", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Unknown service account JSON error.",
+      });
+      throw new GoogleGenAIConfigError(
+        "GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.",
+      );
+    }
+  }
+
+  if (serverEnv.GOOGLE_APPLICATION_CREDENTIALS) {
+    cachedCredentialsPath = serverEnv.GOOGLE_APPLICATION_CREDENTIALS;
+    process.env.GOOGLE_APPLICATION_CREDENTIALS =
+      serverEnv.GOOGLE_APPLICATION_CREDENTIALS;
+    return serverEnv.GOOGLE_APPLICATION_CREDENTIALS;
+  }
+
+  return null;
+}
+
 function getClient() {
   if (cachedClient) return cachedClient;
+  const credentialsPath = ensureGoogleCredentials();
   if (!serverEnv.GOOGLE_CLOUD_PROJECT || !serverEnv.GOOGLE_CLOUD_LOCATION) {
+    logGoogleGenAI("error", "Missing Vertex AI configuration.", {
+      hasProject: Boolean(serverEnv.GOOGLE_CLOUD_PROJECT),
+      hasLocation: Boolean(serverEnv.GOOGLE_CLOUD_LOCATION),
+      hasCredentialsPath: Boolean(credentialsPath),
+      hasServiceAccountJson: Boolean(serverEnv.GOOGLE_SERVICE_ACCOUNT_JSON),
+    });
     throw new GoogleGenAIConfigError(
       "GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are required for brief generation.",
     );
   }
+
+  logGoogleGenAI("info", "Initializing GoogleGenAI Vertex client.", {
+    project: serverEnv.GOOGLE_CLOUD_PROJECT,
+    location: serverEnv.GOOGLE_CLOUD_LOCATION,
+    hasCredentialsPath: Boolean(credentialsPath),
+    hasServiceAccountJson: Boolean(serverEnv.GOOGLE_SERVICE_ACCOUNT_JSON),
+    credentialsSource:
+      credentialsPath === serverEnv.GOOGLE_APPLICATION_CREDENTIALS
+        ? "path"
+        : credentialsPath
+          ? "env-json"
+          : "adc",
+    model: MODEL,
+  });
 
   cachedClient = new GoogleGenAI({
     vertexai: true,
@@ -201,22 +311,50 @@ export async function generateBriefFromBundle(
   bundle: SourceBundle,
   retryHint?: string,
 ) {
-  const response = await getClient().models.generateContent({
-    model: MODEL,
-    contents: buildPrompt(bundle, retryHint),
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      temperature: 0.2,
-      maxOutputTokens: 4096,
-      responseMimeType: "application/json",
-      responseJsonSchema,
-    },
-  });
+  let response;
+  try {
+    response = await getClient().models.generateContent({
+      model: MODEL,
+      contents: buildPrompt(bundle, retryHint),
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        responseJsonSchema,
+      },
+    });
+  } catch (error) {
+    logGoogleGenAI("error", "Gemini call failed.", {
+      project: serverEnv.GOOGLE_CLOUD_PROJECT ?? null,
+      location: serverEnv.GOOGLE_CLOUD_LOCATION ?? null,
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+    });
+    throw error;
+  }
 
   const rawText = response.text;
   if (!rawText) {
+    logGoogleGenAI("error", "Gemini returned an empty response.", {
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+    });
     throw new Error("Model returned an empty response.");
   }
 
-  return BriefOutputSchema.parse(extractJson(rawText));
+  try {
+    return BriefOutputSchema.parse(extractJson(rawText));
+  } catch (error) {
+    logGoogleGenAI("warn", "Gemini returned invalid structured output.", {
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+      rawPreview: rawText.slice(0, 500),
+      errorMessage:
+        error instanceof Error ? error.message : "Failed to parse Gemini output.",
+    });
+    throw error;
+  }
 }

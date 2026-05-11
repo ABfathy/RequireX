@@ -24,6 +24,30 @@ import type {
 
 const PROMPT_BUNDLE_MAX_CHARS = 30_000;
 
+function logBriefPipeline(
+  level: "info" | "warn" | "error",
+  message: string,
+  details: Record<string, unknown>,
+) {
+  const payload = {
+    scope: "brief-pipeline",
+    message,
+    ...details,
+  };
+
+  if (level === "error") {
+    console.error(payload);
+    return;
+  }
+
+  if (level === "warn") {
+    console.warn(payload);
+    return;
+  }
+
+  console.info(payload);
+}
+
 export class BriefPipelineError extends Error {
   constructor(
     readonly code: string,
@@ -73,6 +97,11 @@ function pipelineErrorFromUnknown(error: unknown) {
 
 async function markJobFailed(jobId: string, error: unknown) {
   const pipelineError = pipelineErrorFromUnknown(error);
+  logBriefPipeline("error", "Marking job as failed.", {
+    jobId,
+    errorCode: pipelineError.code,
+    errorMessage: pipelineError.message,
+  });
   await prisma.processingJob.update({
     where: { id: jobId },
     data: {
@@ -102,6 +131,11 @@ async function loadTextAssets(sessionId: string) {
 }
 
 async function ensureTextChunks(assets: TextAssetWithChunks[]) {
+  logBriefPipeline("info", "Ensuring text chunks exist.", {
+    sessionId: assets[0]?.sessionId ?? null,
+    assetCount: assets.length,
+  });
+
   for (const asset of assets) {
     if (asset.chunks.length > 0) continue;
 
@@ -174,14 +208,27 @@ function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
 
 async function callModelWithRetry(bundle: SourceBundle) {
   try {
+    logBriefPipeline("info", "Calling Gemini for brief generation.", {
+      sourceAssetCount: bundle.assets.length,
+      promptChars: bundle.assets.reduce((sum, asset) => sum + asset.text.length, 0),
+      retry: false,
+    });
     return await generateBriefFromBundle(bundle);
   } catch (error) {
     const firstError = pipelineErrorFromUnknown(error);
+    logBriefPipeline("warn", "Initial Gemini call failed.", {
+      errorCode: firstError.code,
+      errorMessage: firstError.message,
+    });
     if (firstError.code !== "INVALID_MODEL_OUTPUT") {
       throw firstError;
     }
 
     try {
+      logBriefPipeline("info", "Retrying Gemini after invalid output.", {
+        sourceAssetCount: bundle.assets.length,
+        retry: true,
+      });
       return await generateBriefFromBundle(bundle, firstError.message);
     } catch (retryError) {
       throw pipelineErrorFromUnknown(retryError);
@@ -345,6 +392,15 @@ async function persistSnapshot({
       },
     });
 
+    logBriefPipeline("info", "Persisted generated snapshot.", {
+      projectId,
+      sessionId,
+      snapshotId: snapshot.id,
+      version: snapshot.version,
+      claimCount: output.summary.length + output.goals.length,
+      questionCount: output.ambiguities.length + output.followUpQuestions.length,
+    });
+
     return snapshot;
   });
 }
@@ -354,6 +410,12 @@ export async function runBriefGeneration({
   sessionId,
   requestedBy,
 }: RunBriefGenerationInput) {
+  logBriefPipeline("info", "Starting brief generation run.", {
+    jobId,
+    sessionId,
+    requestedBy,
+  });
+
   await prisma.processingJob.update({
     where: { id: jobId },
     data: {
@@ -382,6 +444,13 @@ export async function runBriefGeneration({
     const assetsWithText = initialAssets.filter((asset) =>
       textForPrompt(asset).trim(),
     );
+
+    logBriefPipeline("info", "Loaded text assets for generation.", {
+      jobId,
+      sessionId,
+      totalAssets: initialAssets.length,
+      usableTextAssets: assetsWithText.length,
+    });
 
     if (assetsWithText.length === 0) {
       throw new BriefPipelineError(
@@ -417,6 +486,14 @@ export async function runBriefGeneration({
         errorCode: null,
         errorMessage: null,
       },
+    });
+
+    logBriefPipeline("info", "Completed brief generation run.", {
+      jobId,
+      sessionId,
+      snapshotId: snapshot.id,
+      version: snapshot.version,
+      status: "SUCCEEDED",
     });
 
     return { snapshotId: snapshot.id, version: snapshot.version };
