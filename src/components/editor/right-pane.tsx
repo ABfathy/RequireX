@@ -139,7 +139,7 @@ function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
 
   return (
     <div
-      className="group flex items-center gap-2 px-3 py-2 transition-colors duration-[120ms] hover:bg-[var(--surface-3)]"
+      className="group flex items-center gap-2 px-3 py-2 transition-[background-color] duration-[120ms] hover:bg-[var(--surface-3)]"
       role="listitem"
     >
       {/* Type icon */}
@@ -179,63 +179,77 @@ function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
           </button>
         )}
         <span
-          className="text-[10px] truncate"
+          className="text-[10px] truncate tabular-nums"
           style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
         >
           {relTime}
         </span>
       </div>
 
-      {/* Status dot + label */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* Right action area — fixed width so nothing shifts on hover or confirm */}
+      <div className="relative flex items-center justify-end shrink-0 w-[50px] h-6">
         {confirming ? (
+          /* Delete confirmation: two icon buttons, no text, no layout jump */
           <div className="flex items-center gap-1">
-            <span className="text-[10px]" style={{ color: "var(--danger)" }}>
-              Delete?
-            </span>
             <button
               type="button"
-              onClick={() => { onDelete?.(item.id); setConfirming(false); }}
-              className="text-[10px] font-medium focus-visible:outline-none focus-visible:underline cursor-pointer"
-              style={{ color: "var(--danger)" }}
+              aria-label="Cancel delete"
+              onClick={() => setConfirming(false)}
+              className="inline-flex items-center justify-center size-[22px] rounded-[4px] transition-[transform,background-color,color] duration-[120ms] hover:bg-[var(--surface-2)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ color: "var(--fg-muted)" }}
             >
-              Yes
+              <Icons.X size={11} />
             </button>
             <button
               type="button"
-              onClick={() => setConfirming(false)}
-              className="text-[10px] focus-visible:outline-none focus-visible:underline cursor-pointer"
-              style={{ color: "var(--fg-muted)" }}
+              aria-label="Confirm delete"
+              onClick={() => { onDelete?.(item.id); setConfirming(false); }}
+              className="inline-flex items-center justify-center size-[22px] rounded-[4px] transition-[transform,background-color] duration-[120ms] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{
+                background: "color-mix(in srgb, var(--danger) 15%, transparent)",
+                color: "var(--danger)",
+              }}
             >
-              No
+              <Icons.Check size={11} />
             </button>
           </div>
         ) : (
           <>
+            {/* Status dot — sits in place, cross-fades with action buttons */}
             <span
-              className="size-[6px] rounded-full shrink-0 opacity-70 group-hover:opacity-0 transition-opacity duration-[120ms]"
+              className={`absolute inset-0 m-auto size-[6px] rounded-full transition-opacity duration-[150ms] pointer-events-none ${
+                onPreview ?? onDelete
+                  ? "opacity-60 group-hover:opacity-0"
+                  : "opacity-60"
+              }`}
               style={{ background: STATUS_DOT[item.status] }}
-              title={STATUS_LABEL[item.status]}
               aria-label={STATUS_LABEL[item.status]}
+              role="img"
             />
-            <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms] flex items-center gap-0.5">
-              {onPreview && (
-                <IconButton
-                  label={`Preview ${item.label}`}
-                  onClick={() => onPreview(item)}
-                >
-                  <Icons.Eye size={11} />
-                </IconButton>
-              )}
-              {onDelete && (
-                <IconButton
-                  label={`Delete ${item.label}`}
-                  onClick={() => setConfirming(true)}
-                >
-                  <Icons.X size={11} />
-                </IconButton>
-              )}
-            </span>
+
+            {/* Action buttons — overlay the dot, fade in on hover */}
+            {(onPreview ?? onDelete) && (
+              <div className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-[150ms]">
+                {onPreview && (
+                  <IconButton
+                    label={`Preview ${item.label}`}
+                    onClick={() => onPreview(item)}
+                    className="active:scale-[0.96] transition-[transform,background-color,color]"
+                  >
+                    <Icons.Eye size={11} />
+                  </IconButton>
+                )}
+                {onDelete && (
+                  <IconButton
+                    label={`Delete ${item.label}`}
+                    onClick={() => setConfirming(true)}
+                    className="active:scale-[0.96] transition-[transform,background-color,color]"
+                  >
+                    <Icons.X size={11} />
+                  </IconButton>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
