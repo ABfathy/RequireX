@@ -3,6 +3,11 @@ import { SourceAssetStatus, SourceType } from "../../../generated/prisma/client"
 import { prisma } from "@/lib/prisma";
 import { TEXT_MAX_CHARS } from "@/server/validators/assets";
 
+import {
+  SourceAssetStatus,
+  SourceType,
+} from "../../../generated/prisma/client";
+
 export class AssetNotFoundError extends Error {
   constructor(assetId: string) {
     super(`SourceAsset not found: ${assetId}`);

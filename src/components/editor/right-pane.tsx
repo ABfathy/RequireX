@@ -11,8 +11,13 @@ import { SourcePreviewModal } from "./source-preview-modal";
 /* ── Types ─────────────────────────────────────────────── */
 type RightTab = "sources" | "chat" | "revisions";
 
-export type SourceType = "FILE" | "AUDIO" | "TEXT";
-export type SourceStatus = "UPLOADED" | "QUEUED" | "PROCESSING" | "PROCESSED" | "FAILED";
+export type SourceType = "TEXT" | "AUDIO" | "IMAGE" | "PDF";
+export type SourceStatus =
+  | "UPLOADED"
+  | "QUEUED"
+  | "PROCESSING"
+  | "PROCESSED"
+  | "FAILED";
 
 export interface SourceItem {
   id: string;
@@ -35,13 +40,17 @@ export interface RightPaneProps {
   onDeleteSource?: (id: string) => void;
   onRenameSource?: (id: string, label: string) => void;
   onSubmitText?: (text: string) => Promise<void>;
+  onUploadSources?: (
+    files: File[],
+    onProgress: (progress: number) => void,
+  ) => Promise<void>;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRetrySourceLoad?: () => void;
 }
 
 const TABS: { id: RightTab; label: string }[] = [
-  { id: "sources",   label: "Sources"   },
-  { id: "chat",      label: "Chat"      },
+  { id: "sources", label: "Sources" },
+  { id: "chat", label: "Chat" },
   { id: "revisions", label: "Revisions" },
 ];
 
@@ -57,7 +66,13 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
+function EmptyState({
+  icon,
+  message,
+}: {
+  icon: React.ReactNode;
+  message: string;
+}) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center">
       <div style={{ color: "var(--fg-disabled)" }}>{icon}</div>
@@ -73,32 +88,37 @@ function EmptyState({ icon, message }: { icon: React.ReactNode; message: string 
 
 /* ── Source status helpers ──────────────────────────────── */
 const STATUS_DOT: Record<SourceStatus, string> = {
-  PROCESSED:  "var(--success)",
+  PROCESSED: "var(--success)",
   PROCESSING: "var(--warning)",
-  QUEUED:     "var(--info)",
-  UPLOADED:   "var(--fg-tertiary)",
-  FAILED:     "var(--danger)",
+  QUEUED: "var(--info)",
+  UPLOADED: "var(--fg-tertiary)",
+  FAILED: "var(--danger)",
 };
 
 const STATUS_LABEL: Record<SourceStatus, string> = {
-  PROCESSED:  "Ready",
+  PROCESSED: "Ready",
   PROCESSING: "Processing",
-  QUEUED:     "Queued",
-  UPLOADED:   "Uploaded",
-  FAILED:     "Failed",
+  QUEUED: "Queued",
+  UPLOADED: "Uploaded",
+  FAILED: "Failed",
 };
 
 function relativeTime(dateStr: string): string {
   try {
-    const diffMinutes = Math.round((new Date(dateStr).getTime() - Date.now()) / 60_000);
-    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(diffMinutes, "minute");
+    const diffMinutes = Math.round(
+      (new Date(dateStr).getTime() - Date.now()) / 60_000,
+    );
+    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
+      diffMinutes,
+      "minute",
+    );
   } catch {
     return "";
   }
 }
 
 function sourceIcon(type: SourceType) {
-  if (type === "AUDIO") return <Icons.MessageSquare size={13} aria-hidden="true" />;
+  if (type === "AUDIO") return <Icons.Mic size={13} aria-hidden="true" />;
   return <Icons.FileText size={13} aria-hidden="true" />;
 }
 
@@ -131,8 +151,13 @@ function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
   }
 
   function handleEditKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
-    if (e.key === "Escape") { setEditing(false); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitEdit();
+    }
+    if (e.key === "Escape") {
+      setEditing(false);
+    }
   }
 
   const relTime = relativeTime(item.createdAt);
@@ -281,12 +306,153 @@ function SkeletonRow() {
 
 /* ── SourcesTab ─────────────────────────────────────────── */
 interface SourcesTabProps {
+  sessionId?: string;
   sources?: SourceItem[];
   loading?: boolean;
   error?: string;
   onDelete?: (id: string) => void;
   onRename?: (id: string, label: string) => void;
   onSubmitText?: (text: string) => Promise<void>;
+  onUpload?: (
+    files: File[],
+    onProgress: (progress: number) => void,
+  ) => Promise<void>;
+  onRetry?: () => void;
+}
+
+function isAcceptedUpload(file: File) {
+  return file.type === "application/pdf" || file.type.startsWith("audio/");
+}
+
+interface SourceDropzoneProps {
+  sessionId?: string;
+  onUpload?: (
+    files: File[],
+    onProgress: (progress: number) => void,
+  ) => Promise<void>;
+}
+
+function SourceDropzone({ sessionId, onUpload }: SourceDropzoneProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  async function uploadSelected(files: FileList | File[]) {
+    const selected = Array.from(files);
+    if (selected.length === 0 || !onUpload) {
+      return;
+    }
+
+    const unsupported = selected.find((file) => !isAcceptedUpload(file));
+    if (unsupported) {
+      setError(`${unsupported.name} is not a supported PDF or audio file.`);
+      return;
+    }
+
+    setUploading(true);
+    setProgress(0);
+    setError(null);
+    try {
+      await onUpload(selected, setProgress);
+      setProgress(100);
+    } catch {
+      setError("Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
+    }
+  }
+
+  return (
+    <div className="px-3 pb-3">
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept="application/pdf,audio/*"
+        className="sr-only"
+        onChange={(event) => {
+          if (event.target.files) {
+            void uploadSelected(event.target.files);
+          }
+        }}
+      />
+      <button
+        type="button"
+        disabled={!sessionId || uploading || !onUpload}
+        onClick={() => inputRef.current?.click()}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          void uploadSelected(event.dataTransfer.files);
+        }}
+        className="flex min-h-[78px] w-full flex-col items-center justify-center gap-2 rounded-[6px] border border-dashed px-3 py-3 text-center transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-45 cursor-pointer"
+        style={{
+          background: dragging ? "var(--surface-3)" : "var(--surface-1)",
+          borderColor: dragging ? "var(--accent)" : "var(--border-strong)",
+          color: "var(--fg-tertiary)",
+        }}
+      >
+        <Icons.Upload size={16} aria-hidden="true" />
+        <span className="text-[11px] font-medium">
+          {uploading ? `Uploading ${progress}%` : "Drop PDF or voice notes"}
+        </span>
+        <span className="text-[10px]" style={{ color: "var(--fg-disabled)" }}>
+          PDF and audio files are stored for this session.
+        </span>
+        {uploading && (
+          <span
+            className="h-[3px] w-full overflow-hidden rounded-full"
+            style={{ background: "var(--surface-3)" }}
+            aria-hidden="true"
+          >
+            <span
+              className="block h-full transition-[width] duration-[120ms]"
+              style={{
+                width: `${progress}%`,
+                background: "var(--accent)",
+              }}
+            />
+          </span>
+        )}
+      </button>
+      {error && (
+        <p
+          className="mt-2 text-[10px]"
+          style={{ color: "var(--danger)" }}
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SourcesTab({
+  sessionId,
+  sources,
+  loading,
+  error,
+  onDelete,
+  onRename,
+  onSubmitText,
+  onUpload,
+  onRetry,
+}: SourcesTabProps) {
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRetry?: () => void;
 }
@@ -307,6 +473,7 @@ function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText,
   return (
     <>
       <SectionLabel>Ingested sources</SectionLabel>
+      <SourceDropzone sessionId={sessionId} onUpload={onUpload} />
 
       {/* Error state */}
       {error && (
@@ -360,7 +527,9 @@ function SourcesTab({ sources, loading, error, onDelete, onRename, onSubmitText,
       {!loading && (!sources || sources.length === 0) && (
         <EmptyState
           icon={<Icons.FileText size={20} />}
-          message={"No sources added yet.\nPaste text below to get started."}
+          message={
+            "No sources added yet.\nPaste text or drop a file to get started."
+          }
         />
       )}
 
@@ -443,7 +612,9 @@ function RevisionsTab() {
       <SectionLabel>Revision history</SectionLabel>
       <EmptyState
         icon={<Icons.History size={20} />}
-        message={"No revisions yet.\nRevisions appear after the first generation."}
+        message={
+          "No revisions yet.\nRevisions appear after the first generation."
+        }
       />
     </>
   );
@@ -453,12 +624,14 @@ function RevisionsTab() {
 export function RightPane({
   activeTab,
   onTabChange,
+  sessionId,
   sources,
   sourcesLoading,
   sourcesError,
   onDeleteSource,
   onRenameSource,
   onSubmitText,
+  onUploadSources,
   onUploadFiles,
   onRetrySourceLoad,
 }: RightPaneProps) {
@@ -488,7 +661,10 @@ export function RightPane({
             onClick={() => onTabChange(tab.id)}
             className="relative h-full px-3 text-[12px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)] cursor-pointer"
             style={{
-              color: activeTab === tab.id ? "var(--fg-primary)" : "var(--fg-tertiary)",
+              color:
+                activeTab === tab.id
+                  ? "var(--fg-primary)"
+                  : "var(--fg-tertiary)",
             }}
           >
             {tab.label}
@@ -512,12 +688,14 @@ export function RightPane({
       >
         {activeTab === "sources" && (
           <SourcesTab
+            sessionId={sessionId}
             sources={sources}
             loading={sourcesLoading}
             error={sourcesError}
             onDelete={onDeleteSource}
             onRename={onRenameSource}
             onSubmitText={onSubmitText}
+            onUpload={onUploadSources}
             onUploadFiles={onUploadFiles}
             onRetry={onRetrySourceLoad}
           />

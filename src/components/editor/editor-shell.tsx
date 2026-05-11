@@ -102,7 +102,7 @@ export function EditorShell({
   );
   const [resizing, setResizing] = useState<null | "left" | "right">(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [rightTab,    setRightTab]    = useState<RightTab>("sources");
+  const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
@@ -312,7 +312,42 @@ export function EditorShell({
   const activeProjectName =
     projects.find((p) => p.id === activeProjectId)?.name ?? null;
 
-  /* ⌘K shortcut */
+  const appState: AppState = !session
+    ? "no-session"
+    : generationState === "requesting"
+      ? "generating"
+      : generationState === "failed"
+        ? "failed"
+        : sources.length > 0
+          ? "ready"
+          : "no-sources";
+
+  const loadSources = useCallback(async () => {
+    if (!session) {
+      setSources([]);
+      setSourcesError(undefined);
+      return;
+    }
+
+    setSourcesLoading(true);
+    setSourcesError(undefined);
+    try {
+      const response = await fetch(`/api/sessions/${session.id}/assets`);
+      if (!response.ok) {
+        throw new Error("Failed to load sources.");
+      }
+
+      const payload = (await response.json()) as { assets: ApiSourceAsset[] };
+      setSources(payload.assets.map(mapAsset));
+    } catch (error) {
+      setSourcesError(
+        error instanceof Error ? error.message : "Failed to load sources.",
+      );
+    } finally {
+      setSourcesLoading(false);
+    }
+  }, [session]);
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -378,7 +413,117 @@ export function EditorShell({
     setRightTab("sources");
   }
 
-  /* Body grid columns based on panel state */
+  async function handleSubmitText(text: string) {
+    if (!session) {
+      const response = await fetch("/api/preview-messy-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ textContent: text }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(response, "Failed to send prompt preview event."),
+        );
+      }
+
+      return;
+    }
+
+    const response = await fetch(`/api/sessions/${session.id}/assets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ textContent: text }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Failed to save source."));
+    }
+
+    await loadSources();
+  }
+
+  async function handleDeleteSource(id: string) {
+    const response = await fetch(`/api/assets/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Failed to delete source."));
+    }
+
+    await loadSources();
+  }
+
+  async function handleRenameSource(id: string, label: string) {
+    const response = await fetch(`/api/assets/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ displayLabel: label }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Failed to rename source."));
+    }
+
+    await loadSources();
+  }
+
+  async function handleUploadSources(
+    files: File[],
+    onProgress: (progress: number) => void,
+  ) {
+    if (!session) {
+      throw new Error("No active session.");
+    }
+
+    await uploadFiles("mixedUploader", {
+      files,
+      input: {
+        sessionId: session.id,
+      },
+      onUploadProgress: ({ totalProgress }) => {
+        onProgress(
+          Math.round(totalProgress <= 1 ? totalProgress * 100 : totalProgress),
+        );
+      },
+    });
+
+    onProgress(100);
+    await loadSources();
+  }
+
+  async function handleGenerateBrief() {
+    if (!session) {
+      return;
+    }
+
+    setGenerationState("requesting");
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sessionId: session.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to request brief generation.");
+      }
+
+      setGenerationState("idle");
+    } catch {
+      setGenerationState("failed");
+    }
+  }
+
   const colTemplate = [
     sidebarOpen ? `${sidebarWidth}px` : "0px",
     "1fr",
@@ -387,10 +532,9 @@ export function EditorShell({
 
   return (
     <div
-      className="flex flex-col h-screen overflow-hidden"
+      className="flex h-screen flex-col overflow-hidden"
       style={{ background: "var(--background)" }}
     >
-      {/* TitleBar */}
       <TitleBar
         sidebarOpen={sidebarOpen}
         rightOpen={rightOpen}
@@ -401,7 +545,6 @@ export function EditorShell({
         onOpenPalette={() => setPaletteOpen(true)}
       />
 
-      {/* Body */}
       <div
         className="flex-1 overflow-hidden"
         style={{
@@ -443,6 +586,10 @@ export function EditorShell({
           selectedReq={selectedReq}
           onSelectReq={handleSelectReq}
           onAddSources={handleOpenSources}
+          onGenerateBrief={handleGenerateBrief}
+        />
+
+        <div className="overflow-hidden" style={{ minWidth: 0 }}>
           onAttachFiles={sessionId ? handleUploadFiles : undefined}
         />
 
@@ -478,13 +625,12 @@ export function EditorShell({
         </div>
       </div>
 
-      {/* StatusBar */}
-      <StatusBar selectedReq={selectedReq} sessionName={session?.title ?? null} />
+      <StatusBar
+        selectedReq={selectedReq}
+        sessionName={session?.title ?? null}
+      />
 
-      {/* Command palette (portal-like fixed overlay) */}
-      {paletteOpen && (
-        <CommandPalette onClose={() => setPaletteOpen(false)} />
-      )}
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
   );
 }
