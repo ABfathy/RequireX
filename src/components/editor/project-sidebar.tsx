@@ -1,7 +1,8 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFormStatus } from "react-dom";
 
 import { SettingsPanel } from "@/components/editor/settings-panel";
 import { Icons } from "@/components/icons";
@@ -60,7 +61,6 @@ export function ProjectSidebar({
 }: ProjectSidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const isMac = useIsMac();
 
@@ -72,7 +72,6 @@ export function ProjectSidebar({
 
   function startCreate() {
     setCreating(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   return (
@@ -158,37 +157,9 @@ export function ProjectSidebar({
           {creating ? (
             <form
               action={createProjectAction}
-              className="flex items-center gap-1 flex-1"
-              onSubmit={() => setCreating(false)}
+              className="flex items-center gap-1 flex-1 min-w-0"
             >
-              <input
-                ref={inputRef}
-                name="name"
-                placeholder="Project name…"
-                required
-                minLength={1}
-                maxLength={120}
-                className="flex-1 h-[24px] px-1.5 rounded-[4px] border bg-transparent text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)]"
-                style={{
-                  color: "var(--fg-primary)",
-                  borderColor: "var(--border)",
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setCreating(false);
-                }}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button
-                type="submit"
-                className="h-[24px] px-1.5 rounded-[4px] text-[10px] font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-                style={{
-                  background: "var(--accent)",
-                  color: "var(--accent-fg)",
-                }}
-              >
-                Add
-              </button>
+              <CreateFormFields onCancel={() => setCreating(false)} />
             </form>
           ) : (
             <button
@@ -214,6 +185,64 @@ export function ProjectSidebar({
       {settingsOpen && (
         <SettingsPanel onClose={() => setSettingsOpen(false)} />
       )}
+    </>
+  );
+}
+
+/* ── CreateFormFields ── rendered inside <form> so useFormStatus works ── */
+function CreateFormFields({ onCancel }: { onCancel: () => void }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <>
+      <input
+        name="name"
+        placeholder="Project name…"
+        required
+        minLength={1}
+        maxLength={120}
+        disabled={pending}
+        autoFocus
+        className="flex-1 min-w-0 h-[24px] px-1.5 rounded-[4px] border bg-transparent text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-50"
+        style={{ color: "var(--fg-primary)", borderColor: "var(--border)" }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && !pending) onCancel();
+        }}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <button
+        type="submit"
+        disabled={pending}
+        className="inline-flex items-center justify-center h-[24px] px-1.5 rounded-[4px] text-[10px] font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer disabled:cursor-not-allowed shrink-0"
+        style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+      >
+        {pending ? (
+          <svg
+            className="animate-spin"
+            width={10}
+            height={10}
+            viewBox="0 0 10 10"
+            fill="none"
+            aria-label="Creating…"
+          >
+            <circle
+              cx="5" cy="5" r="4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeOpacity="0.3"
+            />
+            <path
+              d="M9 5A4 4 0 0 0 5 1"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        ) : (
+          "Add"
+        )}
+      </button>
     </>
   );
 }
