@@ -1,13 +1,23 @@
 "use client";
 
-import { SignUp, useSignUp } from "@clerk/nextjs";
+import { SignUp, useAuth, useSignUp } from "@clerk/nextjs";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { RxLogo } from "@/components/icons";
 
 export default function SignUpPage() {
+  const { isLoaded, isSignedIn } = useAuth();
   const { signUp } = useSignUp();
+  const router = useRouter();
   const isCompleting = signUp?.status === "complete";
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) router.replace("/app");
+  }, [isLoaded, isSignedIn, router]);
+
+  if (!isLoaded || isSignedIn) return null;
 
   return (
     <main
@@ -15,7 +25,10 @@ export default function SignUpPage() {
       style={{ background: "var(--background)" }}
     >
       {isCompleting && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4" style={{ background: "var(--background)" }}>
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4"
+          style={{ background: "var(--background)" }}
+        >
           <div
             className="size-8 rounded-full border-2 animate-spin"
             style={{ borderColor: "var(--border-strong)", borderTopColor: "var(--accent)" }}

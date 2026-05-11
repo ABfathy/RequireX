@@ -1,9 +1,22 @@
-import { SignIn } from "@clerk/nextjs";
+"use client";
+
+import { SignIn, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { RxLogo } from "@/components/icons";
 
 export default function SignInPage() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) router.replace("/app");
+  }, [isLoaded, isSignedIn, router]);
+
+  if (!isLoaded || isSignedIn) return null;
+
   return (
     <main
       className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10"
