@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { prisma } from "@/lib/prisma";
+import { snapshotToDocLines } from "@/lib/snapshot-to-doclines";
 import {
   isInternalAuthorizationError,
   requireInternalAuth,
 } from "@/server/auth";
-import { prisma } from "@/lib/prisma";
-import { snapshotToDocLines } from "@/lib/snapshot-to-doclines";
 import { getSnapshotById } from "@/server/services/snapshot";
 
 type RouteContext = { params: Promise<{ snapshotId: string }> };

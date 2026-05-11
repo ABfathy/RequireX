@@ -2,15 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { usePersistentState } from "@/lib/hooks/use-persistent-state";
 import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
-import { ProjectSearchPalette } from "./project-search-palette";
 import { type AppState, type DocLineData, DocView } from "./doc-view";
+import { ProjectSearchPalette } from "./project-search-palette";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
 import { RightPane, type SnapshotListItem, type SourceItem, type SourceType } from "./right-pane";
@@ -128,7 +128,7 @@ export function EditorShell({
 
   const [snapshots, setSnapshots] = useState<SnapshotListItem[] | undefined>(undefined);
   const [snapshotsLoading, setSnapshotsLoading] = useState(false);
-  const [snapshotsFetched, setSnapshotsFetched] = useState(false);
+  const snapshotsFetchedRef = useRef(false);
   const [viewingSnapshotId, setViewingSnapshotId] = useState<string | null>(null);
   const [viewingLines, setViewingLines] = useState<DocLineData[] | null>(null);
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
@@ -519,28 +519,38 @@ export function EditorShell({
     setRightTab("sources");
   }
 
-  /* Fetch snapshot list when revisions tab first opens */
+  /* Reset snapshot state when session changes */
   useEffect(() => {
-    if (rightTab !== "revisions" || snapshotsFetched || !sessionId) return;
-    setSnapshotsLoading(true);
-    setSnapshotsFetched(true);
-    fetch(`/api/sessions/${sessionId}/snapshots`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { snapshots: SnapshotListItem[] } | null) => {
-        setSnapshots(data?.snapshots ?? []);
-      })
-      .catch(() => setSnapshots([]))
-      .finally(() => setSnapshotsLoading(false));
-  }, [rightTab, snapshotsFetched, sessionId]);
-
-  /* Reset snapshot view when session changes */
-  useEffect(() => {
+    snapshotsFetchedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSnapshots(undefined);
-    setSnapshotsFetched(false);
     setViewingSnapshotId(null);
     setViewingLines(null);
     setViewingVersion(null);
   }, [sessionId]);
+
+  /* Fetch snapshot list when revisions tab first opens for this session */
+  useEffect(() => {
+    if (rightTab !== "revisions" || snapshotsFetchedRef.current || !sessionId) return;
+    snapshotsFetchedRef.current = true;
+    const ctrl = new AbortController();
+    fetch(`/api/sessions/${sessionId}/snapshots`, {
+      cache: "no-store",
+      signal: ctrl.signal,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { snapshots: SnapshotListItem[] } | null) => {
+        setSnapshots(data?.snapshots ?? []);
+        setSnapshotsLoading(false);
+      })
+      .catch(() => {
+        setSnapshots([]);
+        setSnapshotsLoading(false);
+      });
+     
+    setSnapshotsLoading(true);
+    return () => ctrl.abort();
+  }, [rightTab, sessionId]);
 
   function handleViewSnapshot(id: string | null) {
     if (!id) {

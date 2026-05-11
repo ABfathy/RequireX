@@ -54,10 +54,6 @@ export function ProjectSearchPalette({
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    setActiveIdx(0);
-  }, [query]);
-
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === "Escape") { onClose(); return; }
     if (e.key === "ArrowDown") {
