@@ -1,7 +1,6 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 
 import { SettingsPanel } from "@/components/editor/settings-panel";
@@ -22,6 +21,7 @@ interface ProjectSidebarProps {
   projects: ProjectListItem[];
   activeProjectId: string | null;
   onOpenPalette: () => void;
+  onSwitchProject: (id: string) => void;
 }
 
 function relativeTime(dateStr: string): string {
@@ -56,6 +56,7 @@ export function ProjectSidebar({
   projects,
   activeProjectId,
   onOpenPalette,
+  onSwitchProject,
 }: ProjectSidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -110,9 +111,10 @@ export function ProjectSidebar({
                 const active = p.id === activeProjectId;
                 return (
                   <li key={p.id}>
-                    <Link
-                      href={`/app?projectId=${p.id}`}
-                      className="flex flex-col gap-0.5 px-3 py-2 transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]"
+                    <button
+                      type="button"
+                      onClick={() => onSwitchProject(p.id)}
+                      className="flex flex-col gap-0.5 w-full text-left px-3 py-2 transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)] cursor-pointer"
                       style={{
                         background: active ? "var(--surface-2)" : "transparent",
                         borderLeft: "2px solid",
@@ -141,7 +143,7 @@ export function ProjectSidebar({
                       >
                         {relativeTime(p.updatedAt)}
                       </span>
-                    </Link>
+                    </button>
                   </li>
                 );
               })}

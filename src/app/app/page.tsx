@@ -56,6 +56,7 @@ export default async function InternalWorkspacePage({
 
   return (
     <EditorShell
+      key={activeProject?.id ?? "no-project"}
       projects={projectsForClient}
       activeProjectId={activeProject?.id ?? null}
       session={session}

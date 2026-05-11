@@ -2,6 +2,7 @@ import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 
 import { Icons, RxLogo } from "@/components/icons";
+import { PrefetchApp } from "@/components/prefetch-app";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 
@@ -75,6 +76,7 @@ export default function HomePage() {
             </SignInButton>
           </Show>
           <Show when="signed-in">
+            <PrefetchApp />
             <Link
               href="/app"
               className="inline-flex items-center justify-center h-[34px] px-4 rounded-[6px] text-[13px] font-medium transition-colors duration-[120ms] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--background)]"
@@ -98,7 +100,6 @@ export default function HomePage() {
             href="/app"
             label="Internal Workspace"
             description="Editor, chat, source ingestion, revision history."
-            prefetch={false}
           />
           <NavCard
             href="/brief/demo-share-token"

@@ -23,6 +23,10 @@ export default function SignInPage() {
   const router = useRouter();
 
   useEffect(() => {
+    router.prefetch("/app");
+  }, [router]);
+
+  useEffect(() => {
     if (isLoaded && isSignedIn) {
       router.replace("/app");
     }
