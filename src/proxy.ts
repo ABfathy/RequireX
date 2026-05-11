@@ -15,7 +15,7 @@ export default clerkMiddleware(async (auth, req) => {
     !path.includes("/sso-callback");
 
   if (isAuthPage && userId) {
-    return NextResponse.redirect(new URL("/app", req.url));
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
   if (isProtectedRoute(req)) {
