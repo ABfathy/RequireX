@@ -3,6 +3,7 @@
 import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
+import { useIsMac } from "@/lib/hooks/use-is-mac";
 
 interface TitleBarProps {
   sidebarOpen: boolean;
@@ -23,6 +24,7 @@ export function TitleBar({
   onToggleTheme,
   onOpenPalette,
 }: TitleBarProps) {
+  const isMac = useIsMac();
   return (
     <div
       className="flex items-center h-8 px-3 gap-3 border-b shrink-0 select-none"
@@ -50,7 +52,7 @@ export function TitleBar({
           <span className="flex-1 text-left text-[12px]">
             Search requirements…
           </span>
-          <Kbd>⌘K</Kbd>
+          <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>
         </button>
       </div>
 

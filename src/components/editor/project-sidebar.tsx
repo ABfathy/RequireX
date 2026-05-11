@@ -8,6 +8,7 @@ import { SettingsPanel } from "@/components/editor/settings-panel";
 import { Icons, RxLogo } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { Kbd } from "@/components/ui/kbd";
+import { useIsMac } from "@/lib/hooks/use-is-mac";
 
 interface ProjectSidebarProps {
   onOpenPalette: () => void;
@@ -16,6 +17,7 @@ interface ProjectSidebarProps {
 export function ProjectSidebar({ onOpenPalette }: ProjectSidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user } = useUser();
+  const isMac = useIsMac();
 
   const preloadAvatar = useCallback(() => {
     if (!user?.imageUrl) return;
@@ -67,7 +69,7 @@ export function ProjectSidebar({ onOpenPalette }: ProjectSidebarProps) {
         >
           <Icons.Search size={12} aria-hidden="true" />
           <span className="flex-1 text-left text-[11px]">Find Project…</span>
-          <Kbd>⌘K</Kbd>
+          <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>
         </button>
 
         {/* Scrollable tree */}

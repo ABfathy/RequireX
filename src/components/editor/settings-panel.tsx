@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { Icons } from "@/components/icons";
+import { useIsMac } from "@/lib/hooks/use-is-mac";
 import { useTheme } from "@/lib/hooks/use-theme";
 
 interface SettingsPanelProps {
@@ -133,6 +134,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const { user } = useUser();
   const { signOut, openUserProfile } = useClerk();
   const { theme, toggle: toggleTheme } = useTheme();
+  const isMac = useIsMac();
+  const mod = isMac ? "⌘" : "Ctrl";
   const router = useRouter();
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -281,9 +284,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
           {/* Keyboard shortcuts */}
           <Section label="Keyboard shortcuts">
-            <KbdRow keys={["⌘", "K"]} label="Open command palette" />
+            <KbdRow keys={[mod, "K"]} label="Open command palette" />
             <KbdRow keys={["Esc"]} label="Close overlay" />
-            <KbdRow keys={["⌘", "/"]} label="Focus search" />
+            <KbdRow keys={[mod, "/"]} label="Focus search" />
           </Section>
 
           {/* Coming soon */}
