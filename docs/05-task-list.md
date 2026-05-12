@@ -60,3 +60,16 @@
 - [ ] Wire public confirmation submission to `/api/public/briefs/[shareToken]/confirm`
 - [ ] Surface public mutation success, validation, rate-limit, and read-only errors in the UI
 - [ ] Show revision history and public feedback inside the internal workspace once the read models exist
+
+## Discovered Enhancements
+
+From review of `feat/AI-processing` — non-blocking quality improvements for follow-up:
+
+- [ ] Regex DoS risk in `pdf-text.ts` `STREAM_START_PATTERN` — replace `(?:.|\n|\r)*?` with `[\s\S]*?` to avoid catastrophic backtracking on malformed PDFs
+- [ ] Latin-1 encoding assumption in `pdf-text.ts` corrupts non-ASCII PDFs — document the known limitation or replace with a proper PDF parser library
+- [ ] No concurrent-processing guard in `source-processing.ts` — two Inngest workers can double-process the same asset; add an optimistic status pre-check in `updateMany` before starting work
+- [ ] Audio processor has no parser-version tracking (unlike PDF which uses `PDF_TEXT_PARSER_VERSION`) — stale transcripts won't re-process when the transcription model changes
+- [ ] `PROMPT_BUNDLE_MAX_CHARS = 30_000` is a hardcoded magic number in `brief-pipeline.ts` — make it an env-configurable value so it can be tuned without a code change
+- [ ] Generation streaming has no server-side timeout in `api/generate/route.ts` — a stalled Gemini call blocks the worker indefinitely; add an `AbortSignal` with a 10-minute cap
+- [ ] SSE stream controller not closed after an error event in `api/generate/route.ts` — client stays connected after failure; call `controller.close()` after writing the error event
+- [ ] Expand `source-processing.test.ts` coverage: download failure (4xx / 5xx / timeout), empty-text PDF or audio result, and partial chunk-creation failure
