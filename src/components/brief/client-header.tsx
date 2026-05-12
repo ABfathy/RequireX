@@ -2,7 +2,6 @@
 
 import { Check, History, Moon, Sun } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 import { RxLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,9 @@ interface ClientHeaderProps {
   theme: "dark" | "light" | null;
   onToggleRev: () => void;
   onToggleTheme: () => void;
+  isConfirming?: boolean;
+  isConfirmed?: boolean;
+  onSubmitConfirmation?: () => void;
 }
 
 function ClientHeader({
@@ -28,8 +30,10 @@ function ClientHeader({
   theme,
   onToggleRev,
   onToggleTheme,
+  isConfirming,
+  isConfirmed,
+  onSubmitConfirmation,
 }: ClientHeaderProps) {
-  const [submitted, setSubmitted] = useState(false);
 
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 border-b border-border bg-background shrink-0 h-12 min-w-0">
@@ -96,8 +100,8 @@ function ClientHeader({
       </IconBtn>
 
       {/* Submit */}
-      {submitted ? (
-        <Button variant="secondary" size="sm" className="shrink-0">
+      {isConfirmed ? (
+        <Button variant="secondary" size="sm" className="shrink-0" disabled>
           <Check size={12} aria-hidden="true" />
           <span className="hidden sm:inline">Submitted</span>
         </Button>
@@ -106,10 +110,20 @@ function ClientHeader({
           variant="default"
           size="sm"
           className="shrink-0"
-          onClick={() => setSubmitted(true)}
+          disabled={isConfirming}
+          onClick={onSubmitConfirmation}
         >
-          <span className="sm:hidden">Submit</span>
-          <span className="hidden sm:inline">Submit feedback</span>
+          {isConfirming ? (
+            <>
+              <span className="sm:hidden">...</span>
+              <span className="hidden sm:inline">Submitting...</span>
+            </>
+          ) : (
+            <>
+              <span className="sm:hidden">Submit</span>
+              <span className="hidden sm:inline">Submit feedback</span>
+            </>
+          )}
         </Button>
       )}
     </header>

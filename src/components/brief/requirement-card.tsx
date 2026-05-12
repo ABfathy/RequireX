@@ -8,6 +8,7 @@ import { QuestionBlock } from "@/components/brief/question-block";
 import { Pill, type PillTone } from "@/components/ui/pill";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/utils";
+import type { BriefCommentSection } from "../../../generated/prisma/client";
 
 const STATUS_TONE: Record<string, PillTone> = {
   approved: "success",
@@ -24,24 +25,71 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export interface Requirement {
+  /** Display identifier, e.g. "REQ-0140" */
   id: string;
+  /** Display section label, e.g. "Functional requirements" */
   section: string;
+  /**
+   * API enum section — maps to the backend BriefCommentSection.
+   * Must be one of: SUMMARY | GOALS | AMBIGUITIES | FOLLOW_UP_QUESTIONS
+   */
+  commentSection: BriefCommentSection;
   title: string;
   body: string;
   status: string;
   tags: string[];
   question?: string;
+  /** Real UUID when this card maps to a BriefClaim row; omit for mock/section-only comments */
+  claimId?: string;
+  /** Real UUID when this card maps to a BriefQuestion row; omit for mock/section-only comments */
+  questionId?: string;
 }
 
 interface RequirementCardProps {
   req: Requirement;
+  /** Page-level comment submit handler */
+  onSubmitComment?: (
+    target: {
+      section: BriefCommentSection;
+      claimId?: string;
+      questionId?: string;
+    },
+    body: string,
+  ) => Promise<void>;
+  /** Page-level answer submit handler — receives the question UUID and answer body */
+  onSubmitAnswer?: (questionId: string, body: string) => Promise<void>;
 }
 
-function RequirementCard({ req }: RequirementCardProps) {
+function RequirementCard({ req, onSubmitComment, onSubmitAnswer }: RequirementCardProps) {
   const [commentOpen, setCommentOpen] = useState(false);
   const [hasComment, setHasComment] = useState(false);
   const hasQuestion = !!req.question;
-  const [answerSubmitted, setAnswerSubmitted] = useState(false);
+
+  /** Binds this card's target metadata so CommentThread only sees (body: string) => Promise<void> */
+  const handleCommentSubmit = onSubmitComment
+    ? async (body: string) => {
+        await onSubmitComment(
+          {
+            section: req.commentSection,
+            claimId: req.claimId,
+            questionId: req.questionId,
+          },
+          body,
+        );
+        setHasComment(true);
+      }
+    : undefined;
+
+  /**
+   * Binds this card's questionId so QuestionBlock only sees (body: string) => Promise<void>.
+   * Only created when both the handler and a real UUID are available.
+   */
+  const handleAnswerSubmit =
+    onSubmitAnswer && req.questionId
+      ? async (body: string) => {
+          await onSubmitAnswer(req.questionId!, body);
+        }
+      : undefined;
 
   return (
     <div
@@ -99,22 +147,19 @@ function RequirementCard({ req }: RequirementCardProps) {
       {/* Body */}
       <div className="text-[14px] text-fg-2 leading-[1.65]">{req.body}</div>
 
-      {/* Question block */}
-      {hasQuestion && !answerSubmitted && (
+      {/* Question block — manages its own answered/submitted state internally */}
+      {hasQuestion && (
         <QuestionBlock
           question={req.question!}
-          onSubmitAnswer={() => setAnswerSubmitted(true)}
+          onSubmitAnswer={handleAnswerSubmit}
         />
-      )}
-      {hasQuestion && answerSubmitted && (
-        <QuestionBlock question={req.question!} />
       )}
 
       {/* Comment thread */}
       <CommentThread
         isOpen={commentOpen}
         onClose={() => setCommentOpen(false)}
-        onSubmitComment={() => setHasComment(true)}
+        onSubmitComment={handleCommentSubmit}
       />
     </div>
   );
