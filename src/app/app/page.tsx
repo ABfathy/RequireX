@@ -108,6 +108,7 @@ export default async function InternalWorkspacePage({
       initialProjectCache={initialProjectCache}
       lines={lines}
       hasSnapshot={Boolean(latestSnapshot)}
+      initialSnapshotId={latestSnapshot?.id ?? null}
     />
   );
 }

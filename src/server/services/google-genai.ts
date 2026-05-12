@@ -161,7 +161,7 @@ Produce a JSON object with exactly these top-level keys:
 - "ambiguities": array of question objects
 - "followUpQuestions": array of question objects
 
-Each claim object has "text", "confidence", and non-empty "evidence".
+Each claim object has "text", "confidence", and "evidence" (may be empty if no direct source quote applies).
 Each question object has "text", "reason", and "evidence" which may be empty.
 Evidence items use { "sourceAssetId": <one of the provided source ids>, "excerpt": <short verbatim quote> }.
 
@@ -304,6 +304,111 @@ function extractJson(raw: string) {
       return JSON.parse(trimmed.slice(start, end + 1)) as unknown;
     }
     throw new Error("Model output was not valid JSON.");
+  }
+}
+
+const REVISION_SYSTEM_PROMPT = `You are a senior product analyst updating an existing structured brief based on an internal user's instruction.
+
+You will receive:
+1. The current brief as a JSON object.
+2. One or more SOURCE blocks containing the original intake material.
+3. The user's instruction for how to update the brief.
+
+Produce an updated JSON object with exactly the same top-level keys as the original brief:
+- "summary": array of claim objects
+- "goals": array of claim objects
+- "ambiguities": array of question objects
+- "followUpQuestions": array of question objects
+
+Follow the user's instruction precisely. Only modify what the instruction requires; preserve content that is unaffected.
+Each claim object has "text", "confidence", and "evidence" (may be empty if no direct source quote applies).
+Each question object has "text", "reason", and "evidence" which may be empty.
+Evidence items use { "sourceAssetId": <one of the provided source ids>, "excerpt": <short verbatim quote> }.
+
+Rules:
+- Use only sourceAssetId values from the SOURCE blocks.
+- Cap each section at 5 items.
+- Prefer HIGH confidence only when the source material clearly supports it.
+- Excerpts must be short and copied from the cited source.
+- Output JSON only.`;
+
+function buildRevisionPrompt(
+  bundle: SourceBundle,
+  currentBriefSummary: string,
+  userMessage: string,
+  selectionText?: string,
+  retryHint?: string,
+) {
+  const sourceText = bundle.assets
+    .map(
+      (asset) =>
+        `[SOURCE id="${asset.id}" label="${asset.label.replace(/"/g, '\\"')}"]\n${asset.text}\n[/SOURCE]`,
+    )
+    .join("\n\n");
+
+  const validIds = bundle.assets.map((asset) => `- ${asset.id}`).join("\n");
+  const selectionNote = selectionText
+    ? `\nThe user is specifically referring to this text in the brief: "${selectionText.slice(0, 200)}"`
+    : "";
+  const retryText = retryHint
+    ? `\n\nYour previous response was invalid: ${retryHint}\nReturn only corrected JSON.`
+    : "";
+
+  return `Use only these sourceAssetId values in evidence:\n${validIds}\n\nCurrent brief:\n${currentBriefSummary}\n\nUser instruction: ${userMessage}${selectionNote}\n\n${sourceText}${retryText}`;
+}
+
+export async function reviseBriefFromBundle(
+  bundle: SourceBundle,
+  currentBriefSummary: string,
+  userMessage: string,
+  selectionText?: string,
+  retryHint?: string,
+) {
+  let response;
+  try {
+    response = await getClient().models.generateContent({
+      model: MODEL,
+      contents: buildRevisionPrompt(bundle, currentBriefSummary, userMessage, selectionText, retryHint),
+      config: {
+        systemInstruction: REVISION_SYSTEM_PROMPT,
+        temperature: 0.3,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        responseJsonSchema,
+      },
+    });
+  } catch (error) {
+    logGoogleGenAI("error", "Gemini revision call failed.", {
+      project: serverEnv.GOOGLE_CLOUD_PROJECT ?? null,
+      location: serverEnv.GOOGLE_CLOUD_LOCATION ?? null,
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+    });
+    throw error;
+  }
+
+  const rawText = response.text;
+  if (!rawText) {
+    logGoogleGenAI("error", "Gemini revision returned an empty response.", {
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+    });
+    throw new Error("Model returned an empty response.");
+  }
+
+  try {
+    return BriefOutputSchema.parse(extractJson(rawText));
+  } catch (error) {
+    logGoogleGenAI("warn", "Gemini revision returned invalid structured output.", {
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+      rawPreview: rawText.slice(0, 500),
+      errorMessage:
+        error instanceof Error ? error.message : "Failed to parse Gemini output.",
+    });
+    throw error;
   }
 }
 

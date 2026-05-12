@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
@@ -29,6 +29,27 @@ export interface SourceItem {
   mimeType?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  userMessage: string;
+  version: number | null;
+  snapshotId: string | null;
+  createdAt: string;
+  trigger: string | null;
+  selectionText: string | null;
+}
+
+export interface SnapshotSummary {
+  id: string | null;
+  version: number | null;
+  snapshotStatus: string | null;
+  type: string;
+  summary: string;
+  createdAt: string;
+  trigger: string | null;
+  userMessage: string | null;
+}
+
 export interface RightPaneProps {
   activeTab: RightTab;
   onTabChange: (tab: RightTab) => void;
@@ -42,6 +63,13 @@ export interface RightPaneProps {
   onSubmitText?: (text: string) => Promise<void>;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRetrySourceLoad?: () => void;
+  /* chat tab */
+  chatMessages?: ChatMessage[];
+  /* revisions tab */
+  snapshots?: SnapshotSummary[];
+  revisionsLoading?: boolean;
+  activeSnapshotId?: string | null;
+  onSelectRevision?: (snapshotId: string) => Promise<void>;
 }
 
 const TABS: { id: RightTab; label: string }[] = [
@@ -456,29 +484,224 @@ function SourcesTab({
 }
 
 /* ── ChatTab ────────────────────────────────────────────── */
-function ChatTab() {
+function ChatTab({ messages }: { messages?: ChatMessage[] }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages?.length]);
+
+  if (!messages || messages.length === 0) {
+    return (
+      <>
+        <SectionLabel>Chat history</SectionLabel>
+        <EmptyState
+          icon={<Icons.MessageSquare size={20} />}
+          message={"No messages yet.\nUse the chat bar below to get started."}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <SectionLabel>Chat history</SectionLabel>
-      <EmptyState
-        icon={<Icons.MessageSquare size={20} />}
-        message={"No messages yet.\nUse the chat bar below to get started."}
-      />
+      <div className="px-3 pt-1 pb-4 flex flex-col gap-4">
+        {messages.map((msg) => (
+          <div key={msg.id} className="flex flex-col gap-2.5">
+            {/* User bubble */}
+            <div className="flex justify-end">
+              <div
+                className="max-w-[88%] rounded-[10px] rounded-br-[3px] px-3 py-2 text-[12px] leading-[1.6]"
+                style={{
+                  background: "var(--accent)",
+                  color: "var(--accent-fg)",
+                }}
+              >
+                {msg.selectionText && (
+                  <div
+                    className="text-[10px] mb-1.5 pb-1.5 border-b opacity-75 italic truncate"
+                    style={{ borderColor: "color-mix(in srgb, var(--accent-fg) 30%, transparent)" }}
+                  >
+                    Re: {msg.selectionText.slice(0, 70)}{msg.selectionText.length > 70 ? "…" : ""}
+                  </div>
+                )}
+                {msg.userMessage}
+              </div>
+            </div>
+            {/* AI response */}
+            <div className="flex justify-start">
+              <div
+                className="flex items-center gap-1.5 rounded-[10px] rounded-bl-[3px] px-3 py-1.5 text-[11px] leading-[1.55]"
+                style={{
+                  background: "var(--surface-3)",
+                  color: "var(--fg-tertiary)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <Icons.Check size={10} aria-hidden="true" className="shrink-0" style={{ color: "var(--success)" }} />
+                <span>
+                  Brief updated →{" "}
+                  <span
+                    className="font-medium"
+                    style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}
+                  >
+                    v{msg.version}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
     </>
   );
 }
 
 /* ── RevisionsTab ───────────────────────────────────────── */
-function RevisionsTab() {
+function relRevTime(dateStr: string): string {
+  try {
+    const diffMinutes = Math.round(
+      (new Date(dateStr).getTime() - Date.now()) / 60_000,
+    );
+    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
+      diffMinutes,
+      "minute",
+    );
+  } catch {
+    return "";
+  }
+}
+
+function RevisionsTab({
+  snapshots,
+  loading,
+  activeSnapshotId,
+  onSelectRevision,
+}: {
+  snapshots?: SnapshotSummary[];
+  loading?: boolean;
+  activeSnapshotId?: string | null;
+  onSelectRevision?: (snapshotId: string) => Promise<void>;
+}) {
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  async function handleRevisionClick(snapshotId: string) {
+    if (!onSelectRevision || loadingId) return;
+    setLoadingId(snapshotId);
+    try {
+      await onSelectRevision(snapshotId);
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <SectionLabel>Revision history</SectionLabel>
+        <div className="px-3" aria-label="Loading revisions…">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-start gap-3 mb-4">
+              <div
+                className="mt-1 size-[8px] rounded-full shrink-0 animate-pulse"
+                style={{ background: "var(--surface-3)" }}
+              />
+              <div className="flex flex-col gap-1.5 flex-1">
+                <div className="h-[10px] w-2/3 rounded animate-pulse" style={{ background: "var(--surface-3)" }} />
+                <div className="h-[8px] w-1/2 rounded animate-pulse" style={{ background: "var(--surface-3)" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  if (!snapshots || snapshots.length === 0) {
+    return (
+      <>
+        <SectionLabel>Revision history</SectionLabel>
+        <EmptyState
+          icon={<Icons.History size={20} />}
+          message={"No revisions yet.\nRevisions appear after the first generation."}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <SectionLabel>Revision history</SectionLabel>
-      <EmptyState
-        icon={<Icons.History size={20} />}
-        message={
-          "No revisions yet.\nRevisions appear after the first generation."
-        }
-      />
+      <div className="px-3 pb-3">
+        {snapshots.map((snap, idx) => {
+          const isActive = snap.id != null && snap.id === activeSnapshotId;
+          const isLast = idx === snapshots.length - 1;
+          const isChatRevision = snap.trigger === "chat";
+
+          const isLoadingThis = loadingId === snap.id;
+          const isClickable = !!snap.id && !!onSelectRevision && !isActive && !loadingId;
+          return (
+            <div
+              key={snap.id ?? `rev-${idx}`}
+              className={`flex items-start gap-3 mb-2 rounded-[5px] px-1 -mx-1 transition-colors duration-[100ms] ${isClickable ? "cursor-pointer hover:bg-[var(--surface-3)]" : ""} ${isLoadingThis ? "opacity-70" : ""}`}
+              role={isClickable ? "button" : undefined}
+              tabIndex={isClickable ? 0 : undefined}
+              onClick={isClickable ? () => void handleRevisionClick(snap.id!) : undefined}
+              onKeyDown={isClickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void handleRevisionClick(snap.id!); } } : undefined}
+            >
+              {/* Timeline dot + line */}
+              <div className="flex flex-col items-center shrink-0 mt-[3px]">
+                <div
+                  className={`size-[8px] rounded-full shrink-0 ${isLoadingThis ? "animate-pulse" : ""}`}
+                  style={{
+                    background: isActive ? "var(--accent)" : isLoadingThis ? "var(--warning)" : isChatRevision ? "var(--info)" : "var(--fg-muted)",
+                    boxShadow: isActive ? "0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent)" : undefined,
+                  }}
+                />
+                {!isLast && (
+                  <div
+                    className="w-px flex-1 mt-1"
+                    style={{ background: "var(--border)", minHeight: 16 }}
+                  />
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="flex flex-col min-w-0 pb-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {snap.version != null && (
+                    <span
+                      className="text-[10px] font-medium shrink-0"
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        color: isActive ? "var(--accent)" : "var(--fg-tertiary)",
+                      }}
+                    >
+                      v{snap.version}
+                    </span>
+                  )}
+                  <span
+                    className="text-[11px] truncate"
+                    style={{ color: isActive ? "var(--fg-primary)" : "var(--fg-secondary)" }}
+                  >
+                    {isChatRevision && snap.userMessage
+                      ? snap.userMessage.slice(0, 60) + (snap.userMessage.length > 60 ? "…" : "")
+                      : snap.summary}
+                  </span>
+                </div>
+                <span
+                  className="text-[10px] tabular-nums mt-0.5"
+                  style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+                >
+                  {relRevTime(snap.createdAt)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }
@@ -495,6 +718,11 @@ export function RightPane({
   onSubmitText,
   onUploadFiles,
   onRetrySourceLoad,
+  chatMessages,
+  snapshots,
+  revisionsLoading,
+  activeSnapshotId,
+  onSelectRevision,
 }: RightPaneProps) {
   return (
     <aside
@@ -559,8 +787,15 @@ export function RightPane({
             onRetry={onRetrySourceLoad}
           />
         )}
-        {activeTab === "chat" && <ChatTab />}
-        {activeTab === "revisions" && <RevisionsTab />}
+        {activeTab === "chat" && <ChatTab messages={chatMessages} />}
+        {activeTab === "revisions" && (
+          <RevisionsTab
+            snapshots={snapshots}
+            loading={revisionsLoading}
+            activeSnapshotId={activeSnapshotId}
+            onSelectRevision={onSelectRevision}
+          />
+        )}
       </div>
     </aside>
   );
