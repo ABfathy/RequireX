@@ -31,8 +31,53 @@ export async function GET(
       },
     });
 
+    const commentIds = events
+      .filter((e) => e.type === "CLIENT_COMMENT_ADDED")
+      .map((e) => (e.metadata as Record<string, unknown>)?.commentId as string | undefined)
+      .filter(Boolean) as string[];
+
+    const answerIds = events
+      .filter((e) => e.type === "CLIENT_ANSWER_ADDED")
+      .map((e) => (e.metadata as Record<string, unknown>)?.answerId as string | undefined)
+      .filter(Boolean) as string[];
+
+    const [comments, answers] = await Promise.all([
+      commentIds.length > 0
+        ? prisma.briefComment.findMany({
+          where: { id: { in: commentIds } },
+          select: { id: true, body: true, authorName: true },
+        })
+        : [],
+      answerIds.length > 0
+        ? prisma.followUpAnswer.findMany({
+          where: { id: { in: answerIds } },
+          select: { id: true, body: true, authorName: true },
+        })
+        : [],
+    ]);
+
+    const commentMap = new Map(comments.map((c) => [c.id, c]));
+    const answerMap = new Map(answers.map((a) => [a.id, a]));
+
     const result = events.map((evt) => {
       const meta = (evt.metadata ?? {}) as Record<string, unknown>;
+      let feedbackBody: string | null = null;
+      let feedbackAuthor: string | null = null;
+
+      if (evt.type === "CLIENT_COMMENT_ADDED" && typeof meta.commentId === "string") {
+        const c = commentMap.get(meta.commentId);
+        if (c) {
+          feedbackBody = c.body;
+          feedbackAuthor = c.authorName;
+        }
+      } else if (evt.type === "CLIENT_ANSWER_ADDED" && typeof meta.answerId === "string") {
+        const a = answerMap.get(meta.answerId);
+        if (a) {
+          feedbackBody = a.body;
+          feedbackAuthor = a.authorName;
+        }
+      }
+
       return {
         id: evt.id,
         type: evt.type,
@@ -45,6 +90,8 @@ export async function GET(
         trigger: typeof meta.trigger === "string" ? meta.trigger : null,
         userMessage: typeof meta.userMessage === "string" ? meta.userMessage : null,
         selectionText: typeof meta.selectionText === "string" ? meta.selectionText : null,
+        feedbackBody,
+        feedbackAuthor,
       };
     });
 

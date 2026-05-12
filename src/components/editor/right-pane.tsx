@@ -54,6 +54,8 @@ export interface SnapshotSummary {
   createdAt: string;
   trigger: string | null;
   userMessage: string | null;
+  feedbackBody?: string | null;
+  feedbackAuthor?: string | null;
 }
 
 export interface RightPaneProps {
@@ -660,11 +662,12 @@ function RevisionsTab({
           const isActive = snap.id != null && snap.id === viewingSnapshotId;
           const isLast = idx === snapshots.length - 1;
           const isChatRevision = snap.trigger === "chat";
+          const isFeedback = snap.type === "CLIENT_COMMENT_ADDED" || snap.type === "CLIENT_ANSWER_ADDED" || snap.type === "BRIEF_CONFIRMED";
           const isLoadingThis = loadingId === snap.id;
           const isClickable = !!snap.id && !!onViewSnapshot && !isActive && !loadingId;
           return (
             <div
-              key={snap.id ?? `rev-${idx}`}
+              key={snap.id ?? `rev-${idx}-${snap.createdAt}`}
               className={`flex items-start gap-3 mb-2 rounded-[5px] px-1 -mx-1 transition-colors duration-[100ms] ${isClickable ? "cursor-pointer hover:bg-[var(--surface-3)]" : ""} ${isLoadingThis ? "opacity-70" : ""}`}
               role={isClickable ? "button" : undefined}
               tabIndex={isClickable ? 0 : undefined}
@@ -676,7 +679,7 @@ function RevisionsTab({
                 <div
                   className={`size-[8px] rounded-full shrink-0 ${isLoadingThis ? "animate-pulse" : ""}`}
                   style={{
-                    background: isActive ? "var(--accent)" : isLoadingThis ? "var(--warning)" : isChatRevision ? "var(--info)" : "var(--fg-muted)",
+                    background: isActive ? "var(--accent)" : isLoadingThis ? "var(--warning)" : isChatRevision ? "var(--info)" : isFeedback ? "var(--success)" : "var(--fg-muted)",
                     boxShadow: isActive ? "0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent)" : undefined,
                   }}
                 />
@@ -717,6 +720,21 @@ function RevisionsTab({
                 >
                   {relRevTime(snap.createdAt)}
                 </span>
+                {snap.feedbackBody && (
+                  <div 
+                    className="mt-1.5 p-2 rounded-[6px] rounded-tl-[2px] text-[12px] leading-relaxed border"
+                    style={{
+                      background: "var(--surface-1)",
+                      borderColor: "var(--border)",
+                      color: "var(--fg-primary)"
+                    }}
+                  >
+                    <div className="text-[10px] font-medium mb-1 uppercase tracking-[0.06em]" style={{ color: "var(--success)" }}>
+                      {snap.feedbackAuthor || "Client"}
+                    </div>
+                    {snap.feedbackBody}
+                  </div>
+                )}
               </div>
             </div>
           );

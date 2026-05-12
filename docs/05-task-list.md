@@ -55,11 +55,11 @@
 - [ ] Add retry/regenerate controls to the internal workspace
 - [ ] Add job history / failure inspection UI for generation runs
 - [ ] Replace public mock brief data with real share-link/snapshot-backed data
-- [ ] Wire public comment submission to `/api/public/briefs/[shareToken]/comments`
-- [ ] Wire public answer submission to `/api/public/briefs/[shareToken]/answers`
-- [ ] Wire public confirmation submission to `/api/public/briefs/[shareToken]/confirm`
-- [ ] Surface public mutation success, validation, rate-limit, and read-only errors in the UI
-- [ ] Show revision history and public feedback inside the internal workspace once the read models exist
+- [x] Wire public comment submission to `/api/public/briefs/[shareToken]/comments`
+- [x] Wire public answer submission to `/api/public/briefs/[shareToken]/answers`
+- [x] Wire public confirmation submission to `/api/public/briefs/[shareToken]/confirm`
+- [x] Surface public mutation success, validation, rate-limit, and read-only errors in the UI
+- [x] Show revision history and public feedback inside the internal workspace once the read models exist
 
 ## Discovered Enhancements
 

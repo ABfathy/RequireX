@@ -1,7 +1,8 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { Send, Check } from "lucide-react";
 
+import type { BriefCommentSection } from "../../../generated/prisma/client";
 import {
   type Requirement,
   RequirementCard,
@@ -17,9 +18,42 @@ interface ClientDocProps {
     label: string;
   };
   requirements: Requirement[];
+  /**
+   * Page-level comment submit handler.
+   * Receives the API target metadata and the comment body text.
+   * Should throw a string message on error to surface inline feedback.
+   */
+  onSubmitComment?: (
+    target: {
+      section: BriefCommentSection;
+      claimId?: string;
+      questionId?: string;
+    },
+    body: string,
+  ) => Promise<void>;
+  /**
+   * Page-level answer submit handler.
+   * Receives the questionId UUID and the answer body text.
+   * Should throw a string message on error to surface inline feedback.
+   */
+  onSubmitAnswer?: (questionId: string, body: string) => Promise<void>;
+  isConfirming?: boolean;
+  isConfirmed?: boolean;
+  confirmError?: string | null;
+  onSubmitConfirmation?: () => void;
 }
 
-function ClientDoc({ title, meta, requirements }: ClientDocProps) {
+function ClientDoc({ 
+  title, 
+  meta, 
+  requirements, 
+  onSubmitComment, 
+  onSubmitAnswer,
+  isConfirming,
+  isConfirmed,
+  confirmError,
+  onSubmitConfirmation
+}: ClientDocProps) {
   const sections = [...new Set(requirements.map((r) => r.section))];
 
   return (
@@ -50,19 +84,42 @@ function ClientDoc({ title, meta, requirements }: ClientDocProps) {
             {requirements
               .filter((r) => r.section === section)
               .map((req) => (
-                <RequirementCard key={req.id} req={req} />
+                <RequirementCard
+                  key={req.id}
+                  req={req}
+                  onSubmitComment={onSubmitComment}
+                  onSubmitAnswer={onSubmitAnswer}
+                />
               ))}
           </div>
         ))}
 
-        {/* Bottom actions */}
+        {/* Bottom actions — "Submit all feedback" belongs to the /confirm flow, not comments */}
         <div className="h-px bg-border my-8 mb-6" />
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary">Download PDF</Button>
-          <Button variant="default">
-            <Send size={13} />
-            Submit all feedback
-          </Button>
+        <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-2">
+          {confirmError && (
+            <span className="text-sm text-destructive mr-auto text-right sm:text-left">{confirmError}</span>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary">Download PDF</Button>
+            {isConfirmed ? (
+              <Button variant="secondary" disabled>
+                <Check size={13} />
+                Feedback submitted
+              </Button>
+            ) : (
+              <Button variant="default" disabled={isConfirming} onClick={onSubmitConfirmation}>
+                {isConfirming ? (
+                  "Submitting..."
+                ) : (
+                  <>
+                    <Send size={13} />
+                    Submit all feedback
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
