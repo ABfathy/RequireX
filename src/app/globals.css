@@ -3,8 +3,8 @@
 /* ── Tailwind theme extensions ─────────────────────── */
 
 @theme inline {
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, Helvetica, Arial, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
   /* Type scale */
   --text-2xs: 10px;
