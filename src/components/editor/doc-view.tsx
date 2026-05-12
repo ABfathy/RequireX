@@ -666,6 +666,7 @@ export interface DocViewProps {
   onAddSources?: () => void;
   onGenerateBrief?: () => void;
   generating?: boolean;
+  hasSnapshot?: boolean;
   streamingLines?: DocLineData[] | null;
   onAttachFiles?: (files: File[]) => Promise<void>;
   onOpenSource?: (sourceId: string) => void;
@@ -688,6 +689,7 @@ export function DocView({
   onAddSources,
   onGenerateBrief,
   generating = false,
+  hasSnapshot = false,
   streamingLines = null,
   onAttachFiles,
   onOpenSource,
@@ -756,7 +758,9 @@ export function DocView({
                 ? "Generation in progress"
                 : generateDisabled
                   ? "Add sources first"
-                  : undefined
+                  : hasSnapshot
+                    ? "Generate a new version of this brief"
+                    : undefined
             }
             onClick={onGenerateBrief}
             className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
@@ -766,12 +770,18 @@ export function DocView({
                 : { background: "var(--surface-3)", color: "var(--fg-muted)" }
             }
           >
-            <Icons.Download
-              size={11}
-              aria-hidden="true"
-              className={generating ? "animate-spin" : undefined}
-            />
-            <span>{generating ? "Generating..." : "Generate Brief"}</span>
+            {hasSnapshot && !generating ? (
+              <Icons.Refresh size={11} aria-hidden="true" />
+            ) : (
+              <Icons.Download
+                size={11}
+                aria-hidden="true"
+                className={generating ? "animate-spin" : undefined}
+              />
+            )}
+            <span>
+              {generating ? "Generating..." : hasSnapshot ? "Regenerate" : "Generate Brief"}
+            </span>
           </button>
         </div>
       </div>

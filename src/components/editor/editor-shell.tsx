@@ -895,6 +895,7 @@ export function EditorShell({
           onAttachFiles={sessionId ? handleUploadFiles : undefined}
           onGenerateBrief={sessionId ? handleGenerateBrief : undefined}
           generating={generating}
+          hasSnapshot={displayHasSnapshot}
           streamingLines={streamingLines}
           lines={displayLines}
           selectedReqText={selectedReqText}
