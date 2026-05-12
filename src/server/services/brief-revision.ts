@@ -1,21 +1,20 @@
-import { ZodError } from "zod";
-
 import { prisma } from "@/lib/prisma";
-import {
-  reviseBriefFromBundle,
-  reviseBriefStreamFromBundle,
-  extractJson,
-} from "@/server/services/google-genai";
 import {
   BriefPipelineError,
   buildSourceBundle,
-  ensureTextChunks,
-  loadTextAssets,
+  ensureSourceChunks,
+  loadPromptSourceAssets,
   persistSnapshot,
   pipelineErrorFromUnknown,
-  textForPrompt,
   type StreamEvent,
+  textForPrompt,
 } from "@/server/services/brief-pipeline";
+import {
+  extractJson,
+  reviseBriefFromBundle,
+  reviseBriefStreamFromBundle,
+} from "@/server/services/google-genai";
+import { processSessionFileSources } from "@/server/services/source-processing";
 import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 export { BriefPipelineError };
@@ -37,8 +36,12 @@ function serializeCurrentBrief(snapshot: {
 
   const summaryItems = snapshot.claims.filter((c) => c.section === "SUMMARY");
   const goalItems = snapshot.claims.filter((c) => c.section === "GOALS");
-  const ambiguityItems = snapshot.questions.filter((q) => q.section === "AMBIGUITIES");
-  const followUpItems = snapshot.questions.filter((q) => q.section === "FOLLOW_UP_QUESTIONS");
+  const ambiguityItems = snapshot.questions.filter(
+    (q) => q.section === "AMBIGUITIES",
+  );
+  const followUpItems = snapshot.questions.filter(
+    (q) => q.section === "FOLLOW_UP_QUESTIONS",
+  );
 
   if (summaryItems.length > 0) {
     lines.push("SUMMARY:");
@@ -50,11 +53,15 @@ function serializeCurrentBrief(snapshot: {
   }
   if (ambiguityItems.length > 0) {
     lines.push("AMBIGUITIES:");
-    ambiguityItems.forEach((q) => lines.push(`  - ${q.text} (reason: ${q.reason})`));
+    ambiguityItems.forEach((q) =>
+      lines.push(`  - ${q.text} (reason: ${q.reason})`),
+    );
   }
   if (followUpItems.length > 0) {
     lines.push("FOLLOW-UP QUESTIONS:");
-    followUpItems.forEach((q) => lines.push(`  - ${q.text} (reason: ${q.reason})`));
+    followUpItems.forEach((q) =>
+      lines.push(`  - ${q.text} (reason: ${q.reason})`),
+    );
   }
 
   return lines.join("\n");
@@ -74,7 +81,10 @@ export async function runBriefRevision({
   });
 
   if (!session) {
-    throw new BriefPipelineError("SESSION_NOT_FOUND", "Intake session was not found.");
+    throw new BriefPipelineError(
+      "SESSION_NOT_FOUND",
+      "Intake session was not found.",
+    );
   }
 
   const snapshot = await prisma.briefSnapshot.findUnique({
@@ -87,11 +97,18 @@ export async function runBriefRevision({
   });
 
   if (!snapshot) {
-    throw new BriefPipelineError("SNAPSHOT_NOT_FOUND", "Brief snapshot was not found.");
+    throw new BriefPipelineError(
+      "SNAPSHOT_NOT_FOUND",
+      "Brief snapshot was not found.",
+    );
   }
 
-  const initialAssets = await loadTextAssets(sessionId);
-  const assetsWithText = initialAssets.filter((asset) => textForPrompt(asset).trim());
+  await processSessionFileSources({ sessionId, requestedBy });
+
+  const initialAssets = await loadPromptSourceAssets(sessionId);
+  const assetsWithText = initialAssets.filter((asset) =>
+    textForPrompt(asset).trim(),
+  );
 
   if (assetsWithText.length === 0) {
     throw new BriefPipelineError(
@@ -100,11 +117,14 @@ export async function runBriefRevision({
     );
   }
 
-  const assets = await ensureTextChunks(assetsWithText);
+  const assets = await ensureSourceChunks(assetsWithText);
   const bundle = buildSourceBundle(assets);
 
   if (bundle.assets.length === 0) {
-    throw new BriefPipelineError("EMPTY_BUNDLE", "Source bundle was empty after assembly.");
+    throw new BriefPipelineError(
+      "EMPTY_BUNDLE",
+      "Source bundle was empty after assembly.",
+    );
   }
 
   const currentBriefSummary = serializeCurrentBrief(snapshot);
@@ -174,7 +194,10 @@ export async function* runBriefRevisionStream(
     });
 
     if (!session) {
-      throw new BriefPipelineError("SESSION_NOT_FOUND", "Intake session was not found.");
+      throw new BriefPipelineError(
+        "SESSION_NOT_FOUND",
+        "Intake session was not found.",
+      );
     }
 
     const snapshot = await prisma.briefSnapshot.findUnique({
@@ -187,21 +210,37 @@ export async function* runBriefRevisionStream(
     });
 
     if (!snapshot) {
-      throw new BriefPipelineError("SNAPSHOT_NOT_FOUND", "Brief snapshot was not found.");
+      throw new BriefPipelineError(
+        "SNAPSHOT_NOT_FOUND",
+        "Brief snapshot was not found.",
+      );
     }
 
-    const initialAssets = await loadTextAssets(input.sessionId);
-    const assetsWithText = initialAssets.filter((asset) => textForPrompt(asset).trim());
+    await processSessionFileSources({
+      sessionId: input.sessionId,
+      requestedBy: input.requestedBy,
+    });
+
+    const initialAssets = await loadPromptSourceAssets(input.sessionId);
+    const assetsWithText = initialAssets.filter((asset) =>
+      textForPrompt(asset).trim(),
+    );
 
     if (assetsWithText.length === 0) {
-      throw new BriefPipelineError("NO_SOURCES", "No text sources are available for this session.");
+      throw new BriefPipelineError(
+        "NO_SOURCES",
+        "No text sources are available for this session.",
+      );
     }
 
-    const assets = await ensureTextChunks(assetsWithText);
+    const assets = await ensureSourceChunks(assetsWithText);
     const bundle = buildSourceBundle(assets);
 
     if (bundle.assets.length === 0) {
-      throw new BriefPipelineError("EMPTY_BUNDLE", "Source bundle was empty after assembly.");
+      throw new BriefPipelineError(
+        "EMPTY_BUNDLE",
+        "Source bundle was empty after assembly.",
+      );
     }
 
     const currentBriefSummary = serializeCurrentBrief(snapshot);
@@ -227,7 +266,13 @@ export async function* runBriefRevisionStream(
     } catch (parseError) {
       const hint = pipelineErrorFromUnknown(parseError).message;
       try {
-        output = await reviseBriefFromBundle(bundle, currentBriefSummary, input.userMessage, input.selectionText, hint);
+        output = await reviseBriefFromBundle(
+          bundle,
+          currentBriefSummary,
+          input.userMessage,
+          input.selectionText,
+          hint,
+        );
       } catch (retryError) {
         throw pipelineErrorFromUnknown(retryError);
       }
@@ -260,9 +305,17 @@ export async function* runBriefRevisionStream(
       },
     });
 
-    yield { type: "complete", snapshotId: newSnapshot.id, version: newSnapshot.version };
+    yield {
+      type: "complete",
+      snapshotId: newSnapshot.id,
+      version: newSnapshot.version,
+    };
   } catch (error) {
     const pipelineError = pipelineErrorFromUnknown(error);
-    yield { type: "error", code: pipelineError.code, message: pipelineError.message };
+    yield {
+      type: "error",
+      code: pipelineError.code,
+      message: pipelineError.message,
+    };
   }
 }

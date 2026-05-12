@@ -14,7 +14,7 @@ import { type AppState, type DocLineData, DocView } from "./doc-view";
 import { ProjectSearchPalette } from "./project-search-palette";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
-import { RightPane, type SnapshotListItem, type SourceItem, type SourceType } from "./right-pane";
+import { RightPane, type SourceItem, type SourceType } from "./right-pane";
 import { SourcePreviewModal } from "./source-preview-modal";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
@@ -401,20 +401,24 @@ export function EditorShell({
   const loadRevisions = useCallback(async (sid: string) => {
     setRevisionsLoading(true);
     try {
-      const res = await fetch(`/api/sessions/${sid}/revisions`, { cache: "no-store" });
+      const res = await fetch(`/api/sessions/${sid}/revisions`, {
+        cache: "no-store",
+      });
       if (!res.ok) return;
-      const data = await res.json() as { revisions: Array<{
-        id: string;
-        type: string;
-        summary: string;
-        createdAt: string;
-        snapshotId: string | null;
-        version: number | null;
-        snapshotStatus: string | null;
-        trigger: string | null;
-        userMessage: string | null;
-        selectionText: string | null;
-      }> };
+      const data = (await res.json()) as {
+        revisions: Array<{
+          id: string;
+          type: string;
+          summary: string;
+          createdAt: string;
+          snapshotId: string | null;
+          version: number | null;
+          snapshotStatus: string | null;
+          trigger: string | null;
+          userMessage: string | null;
+          selectionText: string | null;
+        }>;
+      };
       const allRevisions = data.revisions ?? [];
 
       // Chat messages are REGENERATED events with trigger=chat
@@ -486,6 +490,8 @@ export function EditorShell({
 
       if (newSnapshotId) setCurrentSnapshotId(newSnapshotId);
       if (sessionId) await loadRevisions(sessionId);
+      await refreshSources();
+
       router.refresh();
     } catch (error) {
       setGenerationError(
@@ -495,7 +501,7 @@ export function EditorShell({
     } finally {
       setGenerating(false);
     }
-  }, [sessionId, generating, router, loadRevisions]);
+  }, [sessionId, generating, router, loadRevisions, refreshSources]);
 
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {

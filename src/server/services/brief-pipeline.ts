@@ -9,13 +9,17 @@ import {
   type SourceBundle,
 } from "@/server/services/google-genai";
 import { normalizeTextToChunks } from "@/server/services/source-normalization";
-import { BriefOutputSchema } from "@/server/validators/brief-output";
+import {
+  normalizeSourceTextToChunks,
+  processSessionFileSources,
+} from "@/server/services/source-processing";
 import type {
   BriefClaimOutput,
   BriefEvidenceOutput,
   BriefOutput,
   BriefQuestionOutput,
 } from "@/server/validators/brief-output";
+import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 import type {
   BriefClaimSection,
@@ -65,9 +69,10 @@ type RunBriefGenerationInput = {
   jobId: string;
   sessionId: string;
   requestedBy: string;
+  processFileSources?: boolean;
 };
 
-export type TextAssetWithChunks = SourceAsset & {
+export type PromptAssetWithChunks = SourceAsset & {
   chunks: SourceChunk[];
 };
 
@@ -92,10 +97,7 @@ export function pipelineErrorFromUnknown(error: unknown) {
   if (error instanceof Error) {
     return new BriefPipelineError("VERTEX_CALL_FAILED", error.message);
   }
-  return new BriefPipelineError(
-    "PIPELINE_FAILED",
-    "Brief generation failed.",
-  );
+  return new BriefPipelineError("PIPELINE_FAILED", "Brief generation failed.");
 }
 
 async function markJobFailed(jobId: string, error: unknown) {
@@ -117,11 +119,28 @@ async function markJobFailed(jobId: string, error: unknown) {
   return pipelineError;
 }
 
-export async function loadTextAssets(sessionId: string) {
+function assertBriefOutputHasContent(output: BriefOutput) {
+  const itemCount =
+    output.summary.length +
+    output.goals.length +
+    output.ambiguities.length +
+    output.followUpQuestions.length;
+
+  if (itemCount === 0) {
+    throw new BriefPipelineError(
+      "INVALID_MODEL_OUTPUT",
+      "Model returned an empty brief. Return at least one summary, goal, ambiguity, or follow-up question grounded in the provided sources.",
+    );
+  }
+
+  return output;
+}
+
+export async function loadPromptSourceAssets(sessionId: string) {
   return prisma.sourceAsset.findMany({
     where: {
       sessionId,
-      sourceType: "TEXT",
+      sourceType: { in: ["TEXT", "PDF", "AUDIO", "IMAGE"] },
       status: { in: ["UPLOADED", "PROCESSED"] },
     },
     include: {
@@ -133,8 +152,8 @@ export async function loadTextAssets(sessionId: string) {
   });
 }
 
-export async function ensureTextChunks(assets: TextAssetWithChunks[]) {
-  logBriefPipeline("info", "Ensuring text chunks exist.", {
+export async function ensureSourceChunks(assets: PromptAssetWithChunks[]) {
+  logBriefPipeline("info", "Ensuring source chunks exist.", {
     sessionId: assets[0]?.sessionId ?? null,
     assetCount: assets.length,
   });
@@ -142,11 +161,19 @@ export async function ensureTextChunks(assets: TextAssetWithChunks[]) {
   for (const asset of assets) {
     if (asset.chunks.length > 0) continue;
 
-    const normalizedChunks = normalizeTextToChunks(asset.textContent ?? "");
+    const normalizedChunks =
+      asset.sourceType === "IMAGE"
+        ? [imageSourceChunk(asset)]
+        : asset.sourceType === "TEXT"
+          ? normalizeTextToChunks(asset.textContent ?? "")
+          : normalizeSourceTextToChunks({
+              sourceType: asset.sourceType,
+              text: asset.textContent ?? "",
+            });
     if (normalizedChunks.length === 0) {
       throw new BriefPipelineError(
         "EMPTY_TEXT_SOURCE",
-        "A text source had no usable content to process.",
+        "A source had no usable content to process.",
       );
     }
 
@@ -171,19 +198,42 @@ export async function ensureTextChunks(assets: TextAssetWithChunks[]) {
     });
   }
 
-  return loadTextAssets(assets[0]?.sessionId ?? "");
+  return loadPromptSourceAssets(assets[0]?.sessionId ?? "");
 }
 
-function assetLabel(asset: TextAssetWithChunks) {
+function assetLabel(asset: PromptAssetWithChunks) {
   return asset.displayLabel ?? asset.originalFileName ?? "Untitled source";
 }
 
-export function textForPrompt(asset: TextAssetWithChunks) {
-  if (asset.textContent?.trim()) return asset.textContent.trim();
-  return asset.chunks.map((chunk) => chunk.text).join("\n\n").trim();
+function imageSourceText(asset: PromptAssetWithChunks) {
+  return `Image source: ${assetLabel(asset)}. Inspect the attached image for client chat text, UI details, diagrams, feature notes, and other project requirements. If the image is unclear or not project-relevant, say that it does not provide enough actionable project information.`;
 }
 
-export function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
+function imageSourceChunk(asset: PromptAssetWithChunks) {
+  return {
+    kind: "IMAGE_OBSERVATION" as const,
+    orderIndex: 0,
+    text: imageSourceText(asset),
+    locator: {
+      kind: "image-source",
+      sourceAssetId: asset.id,
+    },
+    chunkLabel: "Image 1",
+  };
+}
+
+export function textForPrompt(asset: PromptAssetWithChunks) {
+  if (asset.sourceType === "IMAGE") return imageSourceText(asset);
+  if (asset.textContent?.trim()) return asset.textContent.trim();
+  return asset.chunks
+    .map((chunk) => chunk.text)
+    .join("\n\n")
+    .trim();
+}
+
+export function buildSourceBundle(
+  assets: PromptAssetWithChunks[],
+): SourceBundle {
   const bodies = assets
     .map((asset) => ({
       asset,
@@ -196,7 +246,9 @@ export function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
 
   // First pass: give each source an equal share of the budget.
   const perSource = Math.floor(PROMPT_BUNDLE_MAX_CHARS / bodies.length);
-  const allocations = bodies.map(({ body }) => Math.min(body.length, perSource));
+  const allocations = bodies.map(({ body }) =>
+    Math.min(body.length, perSource),
+  );
 
   // Second pass: redistribute unused budget from short sources to longer ones.
   const surplus = allocations.reduce(
@@ -204,7 +256,9 @@ export function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
     0,
   );
   if (surplus > 0) {
-    const needMoreCount = bodies.filter((e, i) => e.body.length > (allocations[i] ?? 0)).length;
+    const needMoreCount = bodies.filter(
+      (e, i) => e.body.length > (allocations[i] ?? 0),
+    ).length;
     if (needMoreCount > 0) {
       const extra = Math.floor(surplus / needMoreCount);
       for (let i = 0; i < bodies.length; i++) {
@@ -222,6 +276,9 @@ export function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
       id: asset.id,
       label,
       text: body.slice(0, allocations[i]),
+      sourceType: asset.sourceType,
+      mimeType: asset.mimeType,
+      fileUrl: asset.appUrl ?? asset.ufsUrl,
     })),
   };
 }
@@ -230,10 +287,13 @@ async function callModelWithRetry(bundle: SourceBundle) {
   try {
     logBriefPipeline("info", "Calling Gemini for brief generation.", {
       sourceAssetCount: bundle.assets.length,
-      promptChars: bundle.assets.reduce((sum, asset) => sum + asset.text.length, 0),
+      promptChars: bundle.assets.reduce(
+        (sum, asset) => sum + asset.text.length,
+        0,
+      ),
       retry: false,
     });
-    return await generateBriefFromBundle(bundle);
+    return assertBriefOutputHasContent(await generateBriefFromBundle(bundle));
   } catch (error) {
     const firstError = pipelineErrorFromUnknown(error);
     logBriefPipeline("warn", "Initial Gemini call failed.", {
@@ -249,7 +309,9 @@ async function callModelWithRetry(bundle: SourceBundle) {
         sourceAssetCount: bundle.assets.length,
         retry: true,
       });
-      return await generateBriefFromBundle(bundle, firstError.message);
+      return assertBriefOutputHasContent(
+        await generateBriefFromBundle(bundle, firstError.message),
+      );
     } catch (retryError) {
       throw pipelineErrorFromUnknown(retryError);
     }
@@ -261,7 +323,7 @@ export type PersistSnapshotInput = {
   sessionId: string;
   requestedBy: string;
   output: BriefOutput;
-  assets: TextAssetWithChunks[];
+  assets: PromptAssetWithChunks[];
   revisionEvent?: {
     type: "GENERATED" | "REGENERATED";
     actorType: "SYSTEM" | "INTERNAL_USER";
@@ -270,7 +332,7 @@ export type PersistSnapshotInput = {
   };
 };
 
-function firstChunkByAssetId(assets: TextAssetWithChunks[]) {
+function firstChunkByAssetId(assets: PromptAssetWithChunks[]) {
   const map = new Map<string, SourceChunk>();
   for (const asset of assets) {
     const firstChunk = asset.chunks[0];
@@ -284,7 +346,7 @@ function buildEvidenceRows(input: {
   claimId?: string;
   questionId?: string;
   evidence: BriefEvidenceOutput[];
-  assetById: Map<string, TextAssetWithChunks>;
+  assetById: Map<string, PromptAssetWithChunks>;
   chunkByAssetId: Map<string, SourceChunk>;
 }) {
   return input.evidence
@@ -429,7 +491,8 @@ export async function persistSnapshot({
       snapshotId: snapshot.id,
       version: snapshot.version,
       claimCount: output.summary.length + output.goals.length,
-      questionCount: output.ambiguities.length + output.followUpQuestions.length,
+      questionCount:
+        output.ambiguities.length + output.followUpQuestions.length,
     });
 
     return snapshot;
@@ -462,20 +525,38 @@ export async function* runBriefGenerationStream(
     });
 
     if (!session) {
-      throw new BriefPipelineError("SESSION_NOT_FOUND", "Intake session was not found.");
+      throw new BriefPipelineError(
+        "SESSION_NOT_FOUND",
+        "Intake session was not found.",
+      );
     }
 
-    const initialAssets = await loadTextAssets(input.sessionId);
-    const assetsWithText = initialAssets.filter((asset) => textForPrompt(asset).trim());
+    if (input.processFileSources !== false) {
+      await processSessionFileSources({
+        sessionId: input.sessionId,
+        requestedBy: input.requestedBy,
+      });
+    }
+
+    const initialAssets = await loadPromptSourceAssets(input.sessionId);
+    const assetsWithText = initialAssets.filter((asset) =>
+      textForPrompt(asset).trim(),
+    );
 
     if (assetsWithText.length === 0) {
-      throw new BriefPipelineError("NO_SOURCES", "No text sources are available for this session.");
+      throw new BriefPipelineError(
+        "NO_SOURCES",
+        "No text sources are available for this session.",
+      );
     }
 
-    const assets = await ensureTextChunks(assetsWithText);
+    const assets = await ensureSourceChunks(assetsWithText);
     const bundle = buildSourceBundle(assets);
     if (bundle.assets.length === 0) {
-      throw new BriefPipelineError("EMPTY_BUNDLE", "Source bundle was empty after assembly.");
+      throw new BriefPipelineError(
+        "EMPTY_BUNDLE",
+        "Source bundle was empty after assembly.",
+      );
     }
 
     let fullText = "";
@@ -490,15 +571,26 @@ export async function* runBriefGenerationStream(
 
     let output: BriefOutput;
     try {
-      output = BriefOutputSchema.parse(extractJson(fullText));
-    } catch (parseError) {
-      logBriefPipeline("warn", "Stream output invalid, retrying non-streaming.", {
-        jobId: input.jobId,
-        errorMessage: parseError instanceof Error ? parseError.message : "Parse failed.",
-      });
-      const hint = pipelineErrorFromUnknown(parseError).message;
+      output = assertBriefOutputHasContent(
+        BriefOutputSchema.parse(extractJson(fullText)),
+      );
+    } catch (outputError) {
+      logBriefPipeline(
+        "warn",
+        "Stream output invalid or empty, retrying non-streaming.",
+        {
+          jobId: input.jobId,
+          errorMessage:
+            outputError instanceof Error
+              ? outputError.message
+              : "Output validation failed.",
+        },
+      );
+      const hint = pipelineErrorFromUnknown(outputError).message;
       try {
-        output = await generateBriefFromBundle(bundle, hint);
+        output = assertBriefOutputHasContent(
+          await generateBriefFromBundle(bundle, hint),
+        );
       } catch (retryError) {
         throw pipelineErrorFromUnknown(retryError);
       }
@@ -530,10 +622,18 @@ export async function* runBriefGenerationStream(
       version: snapshot.version,
     });
 
-    yield { type: "complete", snapshotId: snapshot.id, version: snapshot.version };
+    yield {
+      type: "complete",
+      snapshotId: snapshot.id,
+      version: snapshot.version,
+    };
   } catch (error) {
     const pipelineError = await markJobFailed(input.jobId, error);
-    yield { type: "error", code: pipelineError.code, message: pipelineError.message };
+    yield {
+      type: "error",
+      code: pipelineError.code,
+      message: pipelineError.message,
+    };
   }
 }
 
@@ -541,6 +641,7 @@ export async function runBriefGeneration({
   jobId,
   sessionId,
   requestedBy,
+  processFileSources: shouldProcessFileSources = true,
 }: RunBriefGenerationInput) {
   logBriefPipeline("info", "Starting brief generation run.", {
     jobId,
@@ -572,16 +673,23 @@ export async function runBriefGeneration({
       );
     }
 
-    const initialAssets = await loadTextAssets(sessionId);
+    if (shouldProcessFileSources) {
+      await processSessionFileSources({
+        sessionId,
+        requestedBy,
+      });
+    }
+
+    const initialAssets = await loadPromptSourceAssets(sessionId);
     const assetsWithText = initialAssets.filter((asset) =>
       textForPrompt(asset).trim(),
     );
 
-    logBriefPipeline("info", "Loaded text assets for generation.", {
+    logBriefPipeline("info", "Loaded prompt assets for generation.", {
       jobId,
       sessionId,
       totalAssets: initialAssets.length,
-      usableTextAssets: assetsWithText.length,
+      usablePromptAssets: assetsWithText.length,
     });
 
     if (assetsWithText.length === 0) {
@@ -591,7 +699,7 @@ export async function runBriefGeneration({
       );
     }
 
-    const assets = await ensureTextChunks(assetsWithText);
+    const assets = await ensureSourceChunks(assetsWithText);
     const bundle = buildSourceBundle(assets);
     if (bundle.assets.length === 0) {
       throw new BriefPipelineError(

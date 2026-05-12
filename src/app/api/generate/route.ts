@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { serverEnv } from "@/lib/env/server";
+import { prisma } from "@/lib/prisma";
 import {
   isInternalAuthorizationError,
   requireInternalAuth,
 } from "@/server/auth/internal";
 import {
   BriefGenerationRequestError,
+  processSessionFileSourcesWithInngest,
   requestBriefGeneration,
 } from "@/server/services/brief-generation";
 import { runBriefGenerationStream } from "@/server/services/brief-pipeline";
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
     const auth = await requireInternalAuth();
     const body = generateRequestSchema.parse(await request.json());
     const runMode =
-      serverEnv.BRIEF_GENERATION_ASYNC === "1" ? "async" : "sync";
+      serverEnv.BRIEF_GENERATION_ASYNC === "1" ? "async-stream" : "sync";
 
     logGenerateRequest("info", "Received brief generation request.", {
       sessionId: body.sessionId,
@@ -61,51 +63,102 @@ export async function POST(request: Request) {
       status: job.status,
     });
 
-    if (runMode === "async") {
-      logGenerateRequest("info", "Queued async generation job.", {
-        sessionId: body.sessionId,
-        jobId: job.id,
-      });
-      return NextResponse.json(
-        {
-          jobId: job.id,
-          sessionId: job.sessionId,
-          status: job.status,
-          type: job.type,
-        },
-        { status: 202 },
-      );
-    }
-
     const encoder = new TextEncoder();
     const sessionId = body.sessionId;
     const jobId = job.id;
     const requestedBy = auth.clerkUserId;
+    const requestedAt = new Date().toISOString();
+    const processFileSourcesWithInngest = runMode === "async-stream";
 
     const sseStream = new ReadableStream({
       async start(controller) {
         const send = (data: object) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+          );
 
-        send({ type: "start", jobId });
+        try {
+          send({ type: "start", jobId });
 
-        for await (const event of runBriefGenerationStream({ jobId, sessionId, requestedBy })) {
-          send(event);
-          if (event.type === "complete") {
-            logGenerateRequest("info", "Streaming brief generation succeeded.", {
+          if (processFileSourcesWithInngest) {
+            logGenerateRequest(
+              "info",
+              "Processing file sources through Inngest before streaming.",
+              {
+                sessionId,
+                jobId,
+              },
+            );
+            await processSessionFileSourcesWithInngest({
               sessionId,
+              requestedBy,
+              requestedAt,
               jobId,
-              snapshotId: event.snapshotId,
-              version: event.version,
-            });
-          } else if (event.type === "error") {
-            logGenerateRequest("error", "Streaming brief generation failed.", {
-              sessionId,
-              jobId,
-              errorCode: event.code,
-              errorMessage: event.message,
             });
           }
+
+          for await (const event of runBriefGenerationStream({
+            jobId,
+            sessionId,
+            requestedBy,
+            processFileSources: !processFileSourcesWithInngest,
+          })) {
+            send(event);
+            if (event.type === "complete") {
+              logGenerateRequest(
+                "info",
+                "Streaming brief generation succeeded.",
+                {
+                  sessionId,
+                  jobId,
+                  snapshotId: event.snapshotId,
+                  version: event.version,
+                },
+              );
+            } else if (event.type === "error") {
+              logGenerateRequest(
+                "error",
+                "Streaming brief generation failed.",
+                {
+                  sessionId,
+                  jobId,
+                  errorCode: event.code,
+                  errorMessage: event.message,
+                },
+              );
+            }
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Failed to generate brief.";
+          const code =
+            error instanceof BriefGenerationRequestError
+              ? error.code
+              : "GENERATION_STREAM_FAILED";
+
+          await prisma.processingJob.update({
+            where: { id: jobId },
+            data: {
+              status: "FAILED",
+              completedAt: new Date(),
+              errorCode: code,
+              errorMessage: message,
+            },
+          });
+
+          logGenerateRequest(
+            "error",
+            "Streaming brief generation failed before model stream.",
+            {
+              sessionId,
+              jobId,
+              errorCode: code,
+              errorMessage: message,
+            },
+          );
+          send({ type: "error", code, message });
         }
 
         controller.close();
@@ -116,7 +169,7 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
+        Connection: "keep-alive",
       },
     });
   } catch (error) {
