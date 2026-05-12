@@ -1,64 +1,40 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { snapshotToDocLines } from "@/lib/snapshot-to-doclines";
 import {
   isInternalAuthorizationError,
   requireInternalAuth,
-} from "@/server/auth/internal";
+} from "@/server/auth";
+import { getSnapshotById } from "@/server/services/snapshot";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ snapshotId: string }> },
-) {
+type RouteContext = { params: Promise<{ snapshotId: string }> };
+
+export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     await requireInternalAuth();
     const { snapshotId } = await params;
 
-    const snapshot = await prisma.briefSnapshot.findUnique({
-      where: { id: snapshotId },
-      include: {
-        claims: {
-          orderBy: [{ section: "asc" }, { orderIndex: "asc" }],
-          include: {
-            evidenceRefs: {
-              orderBy: { createdAt: "asc" },
-              include: {
-                sourceAsset: {
-                  select: { id: true, displayLabel: true, originalFileName: true },
-                },
-              },
-            },
-          },
-        },
-        questions: {
-          orderBy: [{ section: "asc" }, { orderIndex: "asc" }],
-          include: {
-            evidenceRefs: {
-              orderBy: { createdAt: "asc" },
-              include: {
-                sourceAsset: {
-                  select: { id: true, displayLabel: true, originalFileName: true },
-                },
-              },
-            },
-          },
-        },
-        session: { select: { title: true } },
-      },
+    const snapshot = await getSnapshotById(snapshotId);
+    if (!snapshot) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const session = await prisma.intakeSession.findUnique({
+      where: { id: snapshot.sessionId },
+      select: { title: true },
     });
 
-    if (!snapshot) {
-      return NextResponse.json({ error: "NOT_FOUND", message: "Snapshot not found." }, { status: 404 });
-    }
-
-    const lines = snapshotToDocLines(snapshot, snapshot.session.title);
+    const lines = snapshotToDocLines(snapshot, session?.title ?? null);
     return NextResponse.json({ lines, version: snapshot.version, status: snapshot.status });
-  } catch (error) {
-    if (isInternalAuthorizationError(error)) {
-      return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
+  } catch (err) {
+    if (isInternalAuthorizationError(err)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error({ scope: "api.snapshots.get", error });
-    return NextResponse.json({ error: "FETCH_FAILED", message: "Failed to fetch snapshot." }, { status: 500 });
+    console.error({ scope: "api.snapshots.get", err });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

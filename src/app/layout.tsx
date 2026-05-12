@@ -35,7 +35,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen text-foreground">
+      <body className="min-h-screen text-foreground antialiased">
         {/* Clerk bot-protection widget mount point — required for Smart CAPTCHA */}
         <div id="clerk-captcha" style={{ display: "none" }} />
         <Providers>

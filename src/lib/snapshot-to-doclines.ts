@@ -11,32 +11,28 @@ const SECTION_LABELS = {
 type EvidenceRow =
   SnapshotWithDetails["claims"][number]["evidenceRefs"][number];
 
-function buildSourceIndexMap(snapshot: SnapshotWithDetails): Map<string, number> {
+function buildSourceIndex(snapshot: SnapshotWithDetails): Map<string, number> {
   const map = new Map<string, number>();
-  let counter = 0;
-  const allEvidence = [
+  const allRefs = [
     ...snapshot.claims.flatMap((c) => c.evidenceRefs),
     ...snapshot.questions.flatMap((q) => q.evidenceRefs),
   ];
-  for (const ev of allEvidence) {
-    if (!map.has(ev.sourceAssetId)) {
-      map.set(ev.sourceAssetId, ++counter);
-    }
+  for (const ref of allRefs) {
+    if (!map.has(ref.sourceAssetId)) map.set(ref.sourceAssetId, map.size + 1);
   }
   return map;
 }
 
-function evidenceLine(row: EvidenceRow, sourceIndex: number) {
-  const sourceName =
-    row.sourceAsset.displayLabel ??
-    row.sourceAsset.originalFileName ??
-    "Source";
-
+function evidenceLine(row: EvidenceRow, sourceIndex: Map<string, number>) {
+  const num = sourceIndex.get(row.sourceAssetId) ?? 1;
   return {
     sourceId: row.sourceAssetId,
-    ref: `S${sourceIndex}`,
+    ref: `S${num}`,
     quote: row.excerpt,
-    sourceName,
+    sourceName:
+      row.sourceAsset.displayLabel ??
+      row.sourceAsset.originalFileName ??
+      "Source",
   };
 }
 
@@ -54,7 +50,7 @@ export function snapshotToDocLines(
 
   if (!snapshot) return lines;
 
-  const sourceIndexMap = buildSourceIndexMap(snapshot);
+  const sourceIndex = buildSourceIndex(snapshot);
 
   lines.push({
     lineNum: lineNum++,
@@ -77,9 +73,7 @@ export function snapshotToDocLines(
         reqId: claim.id,
         reqType: "claim",
         tags: [claim.confidence.toLowerCase()],
-        evidence: claim.evidenceRefs.map((ev) =>
-          evidenceLine(ev, sourceIndexMap.get(ev.sourceAssetId) ?? 0),
-        ),
+        evidence: claim.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
       });
     }
     lines.push({ lineNum: lineNum++, type: "blank" });
@@ -100,9 +94,7 @@ export function snapshotToDocLines(
         reqId: question.id,
         reqType: "question",
         tags: [question.status.toLowerCase()],
-        evidence: question.evidenceRefs.map((ev) =>
-          evidenceLine(ev, sourceIndexMap.get(ev.sourceAssetId) ?? 0),
-        ),
+        evidence: question.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
       });
       lines.push({
         lineNum: lineNum++,

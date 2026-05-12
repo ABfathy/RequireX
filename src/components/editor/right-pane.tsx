@@ -6,10 +6,16 @@ import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 
 import { AddTextDialog } from "./add-text-dialog";
-import { SourcePreviewModal } from "./source-preview-modal";
 
 /* ── Types ─────────────────────────────────────────────── */
 type RightTab = "sources" | "chat" | "revisions";
+
+export interface SnapshotListItem {
+  id: string;
+  version: number;
+  status: string;
+  createdAt: Date | string;
+}
 
 export type SourceType = "TEXT" | "AUDIO" | "IMAGE" | "PDF";
 export type SourceStatus =
@@ -63,13 +69,14 @@ export interface RightPaneProps {
   onSubmitText?: (text: string) => Promise<void>;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRetrySourceLoad?: () => void;
+  onPreviewSource?: (item: SourceItem) => void;
   /* chat tab */
   chatMessages?: ChatMessage[];
   /* revisions tab */
   snapshots?: SnapshotSummary[];
-  revisionsLoading?: boolean;
-  activeSnapshotId?: string | null;
-  onSelectRevision?: (snapshotId: string) => Promise<void>;
+  snapshotsLoading?: boolean;
+  viewingSnapshotId?: string | null;
+  onViewSnapshot?: (id: string | null) => Promise<void>;
 }
 
 const TABS: { id: RightTab; label: string }[] = [
@@ -102,7 +109,7 @@ function EmptyState({
       <div style={{ color: "var(--fg-disabled)" }}>{icon}</div>
       <p
         className="text-[11px] leading-[1.5] whitespace-pre-line"
-        style={{ color: "var(--fg-muted)" }}
+        style={{ color: "var(--fg-muted)", textWrap: "pretty" } as React.CSSProperties}
       >
         {message}
       </p>
@@ -338,6 +345,7 @@ interface SourcesTabProps {
   onSubmitText?: (text: string) => Promise<void>;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRetry?: () => void;
+  onPreview?: (item: SourceItem) => void;
 }
 
 function SourcesTab({
@@ -349,9 +357,9 @@ function SourcesTab({
   onSubmitText,
   onUploadFiles,
   onRetry,
+  onPreview,
 }: SourcesTabProps) {
   const [pasteOpen, setPasteOpen] = useState(false);
-  const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -363,7 +371,7 @@ function SourcesTab({
   }
 
   return (
-    <>
+    <div className="flex flex-col min-h-full">
       <SectionLabel>Ingested sources</SectionLabel>
 
       {/* Error state */}
@@ -408,7 +416,7 @@ function SourcesTab({
               item={item}
               onDelete={onDelete}
               onRename={onRename}
-              onPreview={setPreviewItem}
+              onPreview={onPreview}
             />
           ))}
         </div>
@@ -425,7 +433,7 @@ function SourcesTab({
       )}
 
       {/* Add buttons */}
-      <div className="px-3 pb-3 mt-1">
+      <div className="px-3 pb-3 pt-2 mt-auto border-t" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -473,13 +481,7 @@ function SourcesTab({
         />
       )}
 
-      {previewItem && (
-        <SourcePreviewModal
-          item={previewItem}
-          onClose={() => setPreviewItem(null)}
-        />
-      )}
-    </>
+    </div>
   );
 }
 
@@ -559,6 +561,33 @@ function ChatTab({ messages }: { messages?: ChatMessage[] }) {
   );
 }
 
+/* ── Status chip for snapshot ───────────────────────────── */
+const SNAPSHOT_STATUS_COLOR: Record<string, string> = {
+  DRAFT: "var(--fg-disabled)",
+  SHARED: "var(--info)",
+  CONFIRMED: "var(--success)",
+  SUPERSEDED: "var(--fg-disabled)",
+};
+
+function relativeTimeSnapshot(date: Date | string): string {
+  try {
+    const diffMinutes = Math.round(
+      (new Date(date).getTime() - Date.now()) / 60_000,
+    );
+    if (Math.abs(diffMinutes) >= 60 * 24) {
+      const days = Math.round(diffMinutes / (60 * 24));
+      return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(days, "day");
+    }
+    if (Math.abs(diffMinutes) >= 60) {
+      const hours = Math.round(diffMinutes / 60);
+      return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(hours, "hour");
+    }
+    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(diffMinutes, "minute");
+  } catch {
+    return "";
+  }
+}
+
 /* ── RevisionsTab ───────────────────────────────────────── */
 function relRevTime(dateStr: string): string {
   try {
@@ -577,21 +606,21 @@ function relRevTime(dateStr: string): string {
 function RevisionsTab({
   snapshots,
   loading,
-  activeSnapshotId,
-  onSelectRevision,
+  viewingSnapshotId,
+  onViewSnapshot,
 }: {
   snapshots?: SnapshotSummary[];
   loading?: boolean;
-  activeSnapshotId?: string | null;
-  onSelectRevision?: (snapshotId: string) => Promise<void>;
+  viewingSnapshotId?: string | null;
+  onViewSnapshot?: (id: string | null) => Promise<void>;
 }) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  async function handleRevisionClick(snapshotId: string) {
-    if (!onSelectRevision || loadingId) return;
-    setLoadingId(snapshotId);
+  async function handleRevisionClick(id: string) {
+    if (!onViewSnapshot || loadingId) return;
+    setLoadingId(id);
     try {
-      await onSelectRevision(snapshotId);
+      await onViewSnapshot(id);
     } finally {
       setLoadingId(null);
     }
@@ -634,14 +663,32 @@ function RevisionsTab({
   return (
     <>
       <SectionLabel>Revision history</SectionLabel>
+
+      {viewingSnapshotId && (
+        <div className="mx-3 mb-2">
+          <button
+            type="button"
+            onClick={() => void onViewSnapshot?.(null)}
+            className="flex items-center gap-1.5 w-full h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+            style={{
+              color: "var(--accent)",
+              borderColor: "color-mix(in srgb, var(--accent) 40%, transparent)",
+              background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+            }}
+          >
+            <Icons.ArrowLeft size={11} aria-hidden="true" />
+            <span>Return to latest</span>
+          </button>
+        </div>
+      )}
+
       <div className="px-3 pb-3">
         {snapshots.map((snap, idx) => {
-          const isActive = snap.id != null && snap.id === activeSnapshotId;
+          const isActive = snap.id != null && snap.id === viewingSnapshotId;
           const isLast = idx === snapshots.length - 1;
           const isChatRevision = snap.trigger === "chat";
-
           const isLoadingThis = loadingId === snap.id;
-          const isClickable = !!snap.id && !!onSelectRevision && !isActive && !loadingId;
+          const isClickable = !!snap.id && !!onViewSnapshot && !isActive && !loadingId;
           return (
             <div
               key={snap.id ?? `rev-${idx}`}
@@ -718,11 +765,12 @@ export function RightPane({
   onSubmitText,
   onUploadFiles,
   onRetrySourceLoad,
+  onPreviewSource,
   chatMessages,
   snapshots,
-  revisionsLoading,
-  activeSnapshotId,
-  onSelectRevision,
+  snapshotsLoading,
+  viewingSnapshotId,
+  onViewSnapshot,
 }: RightPaneProps) {
   return (
     <aside
@@ -785,15 +833,16 @@ export function RightPane({
             onSubmitText={onSubmitText}
             onUploadFiles={onUploadFiles}
             onRetry={onRetrySourceLoad}
+            onPreview={onPreviewSource}
           />
         )}
         {activeTab === "chat" && <ChatTab messages={chatMessages} />}
         {activeTab === "revisions" && (
           <RevisionsTab
             snapshots={snapshots}
-            loading={revisionsLoading}
-            activeSnapshotId={activeSnapshotId}
-            onSelectRevision={onSelectRevision}
+            loading={snapshotsLoading}
+            viewingSnapshotId={viewingSnapshotId}
+            onViewSnapshot={onViewSnapshot}
           />
         )}
       </div>

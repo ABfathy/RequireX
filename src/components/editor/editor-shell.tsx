@@ -10,9 +10,11 @@ import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
 import { type AppState, type DocLineData, DocView } from "./doc-view";
+import { ProjectSearchPalette } from "./project-search-palette";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
-import { RightPane, type SourceItem, type SourceType } from "./right-pane";
+import { RightPane, type SnapshotListItem, type SourceItem, type SourceType } from "./right-pane";
+import { SourcePreviewModal } from "./source-preview-modal";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
 
@@ -132,6 +134,8 @@ export function EditorShell({
   );
   const [resizing, setResizing] = useState<null | "left" | "right">(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [projectSearchOpen, setProjectSearchOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -152,6 +156,8 @@ export function EditorShell({
   const [sourcesError, setSourcesError] = useState<string | undefined>(
     undefined,
   );
+
+  const [viewingVersion, setViewingVersion] = useState<number | null>(null);
 
   const [projectCache, setProjectCache] = useState<Map<string, CacheEntry>>(
     () => new Map(Object.entries(initialProjectCache)),
@@ -487,13 +493,19 @@ export function EditorShell({
     [],
   );
 
-  const handleSelectRevision = useCallback(async (snapshotId: string) => {
+  const handleSelectRevision = useCallback(async (snapshotId: string | null) => {
+    if (!snapshotId) {
+      setClientLines(null);
+      setViewingVersion(null);
+      return;
+    }
     if (snapshotId === currentSnapshotId) return;
     try {
       const res = await fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" });
       if (!res.ok) return;
-      const data = await res.json() as { lines: DocLineData[] };
+      const data = await res.json() as { lines: DocLineData[]; version: number };
       setClientLines(data.lines);
+      setViewingVersion(data.version ?? null);
       setCurrentSnapshotId(snapshotId);
     } catch {
       // silently ignore
@@ -593,12 +605,12 @@ export function EditorShell({
   );
 
   const usesServerSnapshot = activeProjectId === initialActiveProjectId;
-  const serverLines = usesServerSnapshot
+  const baseLines = usesServerSnapshot
     ? lines
     : session?.title
       ? [{ lineNum: 1, type: "h1" as const, text: session.title }]
       : [];
-  const displayLines = clientLines ?? serverLines;
+  const displayLines = clientLines ?? baseLines;
   displayLinesRef.current = displayLines;
   const displayHasSnapshot = usesServerSnapshot && hasSnapshot;
 
@@ -624,15 +636,20 @@ export function EditorShell({
       )?.text ?? null)
     : null;
 
-  /* ⌘K shortcut */
+  /* ⌘K → command palette · ⌘P → project search */
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setPaletteOpen((p) => !p);
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+        e.preventDefault();
+        setProjectSearchOpen((p) => !p);
+      }
       if (e.key === "Escape") {
         setPaletteOpen(false);
+        setProjectSearchOpen(false);
       }
     }
     window.addEventListener("keydown", handleKey);
@@ -690,6 +707,14 @@ export function EditorShell({
     setRightTab("sources");
   }
 
+  /* Reset snapshot state when session changes */
+  useEffect(() => {
+    setSnapshots([]);
+    setViewingVersion(null);
+    setClientLines(null);
+    setChatMessages([]);
+  }, [sessionId]);
+
   const colTemplate = [
     sidebarOpen ? `${sidebarWidth}px` : "0px",
     "1fr",
@@ -726,7 +751,7 @@ export function EditorShell({
             <ProjectSidebar
               projects={projects}
               activeProjectId={activeProjectId}
-              onOpenPalette={() => setPaletteOpen(true)}
+              onOpenPalette={() => setProjectSearchOpen(true)}
               onSwitchProject={handleSwitchProject}
               onDeleteProject={handleDeleteProject}
             />
@@ -761,6 +786,12 @@ export function EditorShell({
           onSendMessage={sessionId && currentSnapshotId ? handleSendMessage : undefined}
           revising={revising}
           onUpdateLine={currentSnapshotId ? handleUpdateLine : undefined}
+          viewingVersion={viewingVersion}
+          onExitVersionView={() => void handleSelectRevision(null)}
+          onOpenSource={(id) => {
+            const s = sources.find((src) => src.id === id);
+            if (s) setPreviewItem(s);
+          }}
         />
 
         <div className="relative overflow-hidden" style={{ minWidth: 0 }}>
@@ -789,11 +820,12 @@ export function EditorShell({
               onRenameSource={sessionId ? handleRenameSource : undefined}
               onUploadFiles={sessionId ? handleUploadFiles : undefined}
               onRetrySourceLoad={refreshSources}
+              onPreviewSource={setPreviewItem}
               chatMessages={chatMessages}
               snapshots={snapshots}
-              revisionsLoading={revisionsLoading}
-              activeSnapshotId={currentSnapshotId}
-              onSelectRevision={handleSelectRevision}
+              snapshotsLoading={revisionsLoading}
+              viewingSnapshotId={currentSnapshotId}
+              onViewSnapshot={handleSelectRevision}
             />
           )}
         </div>
@@ -804,7 +836,18 @@ export function EditorShell({
         sessionName={session?.title ?? null}
       />
 
+      {previewItem && (
+        <SourcePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+      )}
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      {projectSearchOpen && (
+        <ProjectSearchPalette
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelect={handleSwitchProject}
+          onClose={() => setProjectSearchOpen(false)}
+        />
+      )}
     </div>
   );
 }

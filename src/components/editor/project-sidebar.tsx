@@ -89,7 +89,7 @@ export function ProjectSidebar({
         <button
           type="button"
           onClick={onOpenPalette}
-          className="flex items-center gap-2 mx-2 mt-3 mb-1 h-[26px] px-2 rounded-[5px] border transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
+          className="flex items-center gap-2 mx-2 mt-2 mb-1.5 h-[26px] px-2 rounded-[5px] border transition-colors duration-[120ms] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
           style={{
             background: "var(--surface-2)",
             borderColor: "var(--border)",
@@ -98,7 +98,7 @@ export function ProjectSidebar({
         >
           <Icons.Search size={12} aria-hidden="true" />
           <span className="flex-1 text-left text-[11px]">Find Project…</span>
-          <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>
+          <Kbd>{isMac ? "⌘P" : "Ctrl+P"}</Kbd>
         </button>
 
         {/* Scrollable tree */}
@@ -220,7 +220,7 @@ function ProjectRow({
             {project.name}
           </span>
           <span
-            className="text-[10px] truncate"
+            className="text-[10px] truncate tabular-nums"
             style={{
               color: "var(--fg-disabled)",
               fontFamily: "var(--font-mono)",
@@ -267,7 +267,7 @@ function ProjectRow({
               type="button"
               aria-label={`Delete ${project.name}`}
               onClick={() => setConfirmingDelete(true)}
-              className="inline-flex items-center justify-center size-6 rounded-[4px] opacity-0 group-hover:opacity-100 transition-[opacity,background-color,color] duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              className="inline-flex items-center justify-center size-6 rounded-[4px] opacity-0 group-hover:opacity-100 transition-[opacity,transform,background-color,color] duration-[120ms] active:scale-[0.96] hover:bg-[var(--surface-3)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
               style={{ color: "var(--fg-muted)" }}
             >
               <Icons.Trash size={11} />

@@ -63,25 +63,39 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /* ── EvidenceBit ────────────────────────────────────────── */
-function EvidenceBit({ ev }: { ev: EvidenceRef }) {
+function EvidenceBit({
+  ev,
+  onOpenSource,
+}: {
+  ev: EvidenceRef;
+  onOpenSource?: (sourceId: string) => void;
+}) {
   const [show, setShow] = useState(false);
   return (
     <span
-      className="relative inline-flex items-center gap-1 ml-1.5 px-1.5 h-[18px] rounded-[3px] border cursor-default select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)]"
+      className="relative inline-flex items-center gap-1 ml-1.5 px-1.5 h-[18px] rounded-[3px] border select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)]"
       tabIndex={0}
       role="button"
-      aria-label={`Evidence: ${ev.sourceName} — ${ev.ref}`}
+      aria-label={`Evidence from ${ev.sourceName} — click to open source`}
       style={{
         background: "var(--surface-3)",
         borderColor: "var(--border-strong)",
         color: "var(--fg-tertiary)",
         fontSize: 10,
         fontFamily: "var(--font-mono)",
+        cursor: onOpenSource ? "pointer" : "default",
       }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
       onFocus={() => setShow(true)}
       onBlur={() => setShow(false)}
+      onClick={() => onOpenSource?.(ev.sourceId)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpenSource?.(ev.sourceId);
+        }
+      }}
     >
       <Icons.FileText size={9} aria-hidden="true" />
       <span>{ev.ref}</span>
@@ -111,6 +125,14 @@ function EvidenceBit({ ev }: { ev: EvidenceRef }) {
           >
             {ev.quote}
           </span>
+          {onOpenSource && (
+            <span
+              className="block text-[10px] mt-1.5"
+              style={{ color: "var(--accent)" }}
+            >
+              Click to open source
+            </span>
+          )}
         </span>
       )}
     </span>
@@ -123,11 +145,13 @@ function DocLine({
   selectedReq,
   onSelectReq,
   onUpdateLine,
+  onOpenSource,
 }: {
   line: DocLineData;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
   onUpdateLine?: (reqId: string, reqType: "claim" | "question", newText: string) => Promise<void>;
+  onOpenSource?: (sourceId: string) => void;
 }) {
   const isReq = !!line.reqId && !!line.reqType;
   const isActive = isReq && line.reqId === selectedReq;
@@ -139,6 +163,7 @@ function DocLine({
   const heights: Partial<Record<LineType, string>> = {
     h1: "min-h-[32px] py-1",
     h2: "min-h-[28px] py-0.5",
+    body: "min-h-[22px] py-0.5",
     blank: line.small ? "h-[8px]" : "h-[16px]",
   };
   const heightCls = heights[line.type] ?? "min-h-[21px]";
@@ -220,7 +245,7 @@ function DocLine({
         {line.type === "h1" && (
           <span
             className="text-[21px] font-semibold tracking-[-0.02em] leading-tight"
-            style={{ color: "var(--fg-primary)" }}
+            style={{ color: "var(--fg-primary)", textWrap: "balance" } as React.CSSProperties}
           >
             {line.text}
           </span>
@@ -276,7 +301,7 @@ function DocLine({
           >
             {line.text}
             {line.evidence?.map((ev, i) => (
-              <EvidenceBit key={i} ev={ev} />
+              <EvidenceBit key={i} ev={ev} onOpenSource={onOpenSource} />
             ))}
             {isReq && onUpdateLine && (
               <button
@@ -553,7 +578,7 @@ function ChatBar({
 
   return (
     <div
-      className="shrink-0 border-t"
+      className="shrink-0 border-t px-3 py-2.5"
       style={{ borderColor: "var(--border)", background: "var(--background)" }}
     >
       {/* Context pill */}
@@ -661,12 +686,15 @@ export interface DocViewProps {
   onGenerateBrief?: () => void;
   generating?: boolean;
   onAttachFiles?: (files: File[]) => Promise<void>;
+  onOpenSource?: (sourceId: string) => void;
   lines?: DocLineData[];
   selectedReqText?: string | null;
   onClearSelection?: () => void;
   onSendMessage?: (msg: string, selectionText?: string) => Promise<void>;
   revising?: boolean;
   onUpdateLine?: (reqId: string, reqType: "claim" | "question", newText: string) => Promise<void>;
+  viewingVersion?: number | null;
+  onExitVersionView?: () => void;
 }
 
 export function DocView({
@@ -679,12 +707,15 @@ export function DocView({
   onGenerateBrief,
   generating = false,
   onAttachFiles,
+  onOpenSource,
   lines = [],
   selectedReqText,
   onClearSelection,
   onSendMessage,
   revising = false,
   onUpdateLine,
+  viewingVersion = null,
+  onExitVersionView,
 }: DocViewProps) {
   const canGenerate = appState === "ready" || appState === "no-sources";
   const generateDisabled =
@@ -762,6 +793,32 @@ export function DocView({
         </div>
       </div>
 
+      {/* Past-version banner */}
+      {viewingVersion !== null && (
+        <div
+          className="flex items-center justify-between px-4 h-8 shrink-0 border-b text-[11px]"
+          style={{
+            background: "color-mix(in srgb, var(--warning) 10%, transparent)",
+            borderColor: "color-mix(in srgb, var(--warning) 30%, transparent)",
+            color: "var(--fg-secondary)",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <span>
+            Viewing <span className="font-mono font-medium">v{viewingVersion}</span> — this is a past version
+          </span>
+          <button
+            type="button"
+            onClick={onExitVersionView}
+            className="text-[11px] underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+            style={{ color: "var(--accent)" }}
+          >
+            Return to latest
+          </button>
+        </div>
+      )}
+
       {/* Doc scroll */}
       <div className="flex-1 overflow-y-auto py-4">
         {appState !== "ready" && appState !== "revising" ? (
@@ -778,6 +835,7 @@ export function DocView({
               selectedReq={selectedReq}
               onSelectReq={onSelectReq}
               onUpdateLine={onUpdateLine}
+              onOpenSource={onOpenSource}
             />
           ))
         )}

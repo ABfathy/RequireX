@@ -167,6 +167,7 @@ Evidence items use { "sourceAssetId": <one of the provided source ids>, "excerpt
 
 Rules:
 - Use only sourceAssetId values from the SOURCE blocks.
+- Draw evidence from ALL provided SOURCE blocks — do not focus only on the first one or two. Where relevant, every source should appear in at least one evidence reference across the output.
 - Cap each section at 5 items.
 - Prefer HIGH confidence only when the source material clearly supports it.
 - Excerpts must be short and copied from the cited source.
@@ -424,7 +425,7 @@ export async function generateBriefFromBundle(
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 16384,
         responseMimeType: "application/json",
         responseJsonSchema,
       },

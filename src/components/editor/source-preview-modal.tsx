@@ -86,26 +86,29 @@ function TextPreview({ assetId }: { assetId: string }) {
 function ImagePreview({ url, label }: { url: string; label: string }) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
+  if (state === "error") {
+    return <FallbackPreview url={url} label={label} />;
+  }
+
   return (
-    <div className="relative flex items-center justify-center min-h-[200px]">
+    <div className="relative flex items-center justify-center" style={{ minHeight: "65vh" }}>
       {state === "loading" && (
         <div className="absolute inset-0">
           <SkeletonPreview height="100%" />
         </div>
       )}
-      {state === "error" ? (
-        <FallbackPreview url={url} label={label} />
-      ) : (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={url}
-          alt={label}
-          className="max-w-full max-h-[65vh] object-contain rounded-[6px]"
-          style={{ display: state === "ready" ? "block" : "none" }}
-          onLoad={() => setState("ready")}
-          onError={() => setState("error")}
-        />
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={label}
+        className="max-w-full max-h-[65vh] object-contain rounded-[6px]"
+        style={{
+          opacity: state === "ready" ? 1 : 0,
+          transition: "opacity 150ms ease",
+        }}
+        onLoad={() => setState("ready")}
+        onError={() => setState("error")}
+      />
     </div>
   );
 }

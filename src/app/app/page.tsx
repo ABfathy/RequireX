@@ -60,6 +60,8 @@ export default async function InternalWorkspacePage({
       sourceType: mapSourceType(asset.sourceType),
       status: asset.status,
       createdAt: asset.createdAt,
+      fileUrl: asset.ufsUrl ?? undefined,
+      mimeType: asset.mimeType ?? undefined,
     }));
   } else {
     const dbAssets = session ? await getSessionAssets(session.id) : [];
@@ -69,12 +71,17 @@ export default async function InternalWorkspacePage({
       sourceType: mapSourceType(asset.sourceType),
       status: asset.status,
       createdAt: asset.createdAt.toISOString(),
+      fileUrl: asset.ufsUrl ?? undefined,
+      mimeType: asset.mimeType ?? undefined,
     }));
   }
 
   const lines = snapshotToDocLines(latestSnapshot, session?.title ?? null);
 
-  const initialProjectCache = Object.fromEntries(
+  const initialProjectCache: Record<
+    string,
+    { session: { id: string; title: string } | null; sources: SourceItem[] }
+  > = Object.fromEntries(
     bundledProjects.map((project) => [
       project.id,
       {
@@ -86,6 +93,8 @@ export default async function InternalWorkspacePage({
           sourceType: mapSourceType(asset.sourceType),
           status: asset.status,
           createdAt: asset.createdAt,
+          fileUrl: asset.ufsUrl ?? undefined,
+          mimeType: asset.mimeType ?? undefined,
         })),
       },
     ]),

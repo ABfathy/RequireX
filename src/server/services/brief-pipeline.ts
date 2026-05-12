@@ -181,29 +181,46 @@ export function textForPrompt(asset: TextAssetWithChunks) {
 }
 
 export function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
-  const bundleAssets: SourceBundle["assets"] = [];
-  let used = 0;
+  const bodies = assets
+    .map((asset) => ({
+      asset,
+      body: textForPrompt(asset),
+      label: assetLabel(asset),
+    }))
+    .filter((e) => e.body.length > 0);
 
-  for (const asset of assets) {
-    const body = textForPrompt(asset);
-    if (!body) continue;
+  if (bodies.length === 0) return { assets: [] };
 
-    const label = assetLabel(asset);
-    const blockOverhead = `[SOURCE id="${asset.id}" label="${label}"]\n\n[/SOURCE]\n\n`
-      .length;
-    const remaining = PROMPT_BUNDLE_MAX_CHARS - used - blockOverhead;
-    if (remaining <= 0) break;
+  // First pass: give each source an equal share of the budget.
+  const perSource = Math.floor(PROMPT_BUNDLE_MAX_CHARS / bodies.length);
+  const allocations = bodies.map(({ body }) => Math.min(body.length, perSource));
 
-    const text = body.slice(0, remaining);
-    bundleAssets.push({
-      id: asset.id,
-      label,
-      text,
-    });
-    used += blockOverhead + text.length;
+  // Second pass: redistribute unused budget from short sources to longer ones.
+  const surplus = allocations.reduce(
+    (acc, alloc) => acc + (perSource - alloc),
+    0,
+  );
+  if (surplus > 0) {
+    const needMoreCount = bodies.filter((e, i) => e.body.length > (allocations[i] ?? 0)).length;
+    if (needMoreCount > 0) {
+      const extra = Math.floor(surplus / needMoreCount);
+      for (let i = 0; i < bodies.length; i++) {
+        const body = bodies[i]?.body ?? "";
+        const current = allocations[i] ?? 0;
+        if (body.length > current) {
+          allocations[i] = Math.min(body.length, current + extra);
+        }
+      }
+    }
   }
 
-  return { assets: bundleAssets };
+  return {
+    assets: bodies.map(({ asset, body, label }, i) => ({
+      id: asset.id,
+      label,
+      text: body.slice(0, allocations[i]),
+    })),
+  };
 }
 
 async function callModelWithRetry(bundle: SourceBundle) {
