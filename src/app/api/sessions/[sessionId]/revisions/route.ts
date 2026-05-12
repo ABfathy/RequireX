@@ -33,12 +33,12 @@ export async function GET(
 
     const commentIds = events
       .filter((e) => e.type === "CLIENT_COMMENT_ADDED")
-      .map((e) => (e.metadata as any)?.commentId)
+      .map((e) => (e.metadata as Record<string, unknown>)?.commentId as string | undefined)
       .filter(Boolean) as string[];
 
     const answerIds = events
       .filter((e) => e.type === "CLIENT_ANSWER_ADDED")
-      .map((e) => (e.metadata as any)?.answerId)
+      .map((e) => (e.metadata as Record<string, unknown>)?.answerId as string | undefined)
       .filter(Boolean) as string[];
 
     const [comments, answers] = await Promise.all([
