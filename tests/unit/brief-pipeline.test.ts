@@ -30,6 +30,11 @@ vi.mock("@/server/services/google-genai", () => ({
   },
 }));
 
+vi.mock("@/server/services/source-processing", () => ({
+  normalizeSourceTextToChunks: vi.fn(() => []),
+  processSessionFileSources: vi.fn().mockResolvedValue([]),
+}));
+
 import { prisma } from "@/lib/prisma";
 import { runBriefGeneration } from "@/server/services/brief-pipeline";
 import { generateBriefFromBundle } from "@/server/services/google-genai";
@@ -126,7 +131,11 @@ describe("runBriefGeneration", () => {
               kind: "TEXT_BLOCK",
               orderIndex: 0,
               text: "Client needs a portal.",
-              locator: { kind: "text-range", paragraphStart: 0, paragraphEnd: 0 },
+              locator: {
+                kind: "text-range",
+                paragraphStart: 0,
+                paragraphEnd: 0,
+              },
               chunkLabel: "Text 1",
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -144,14 +153,18 @@ describe("runBriefGeneration", () => {
         {
           text: "The client needs a portal.",
           confidence: "HIGH",
-          evidence: [{ sourceAssetId: "asset_1", excerpt: "Client needs a portal." }],
+          evidence: [
+            { sourceAssetId: "asset_1", excerpt: "Client needs a portal." },
+          ],
         },
       ],
       goals: [
         {
           text: "Support approvals.",
           confidence: "MEDIUM",
-          evidence: [{ sourceAssetId: "asset_1", excerpt: "They also need approvals." }],
+          evidence: [
+            { sourceAssetId: "asset_1", excerpt: "They also need approvals." },
+          ],
         },
       ],
       ambiguities: [],

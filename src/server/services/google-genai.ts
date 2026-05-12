@@ -3,12 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { GoogleGenAI, Type } from "@google/genai";
+import { z } from "zod";
 
 import { serverEnv } from "@/lib/env/server";
 import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 const MODEL = "gemini-2.5-flash";
-const TEMP_CREDENTIALS_PATH = join(tmpdir(), "requirex-google-service-account.json");
+const TEMP_CREDENTIALS_PATH = join(
+  tmpdir(),
+  "requirex-google-service-account.json",
+);
 
 let cachedClient: GoogleGenAI | null = null;
 let cachedCredentialsPath: string | null = null;
@@ -148,6 +152,36 @@ const responseJsonSchema = {
   required: ["summary", "goals", "ambiguities", "followUpQuestions"],
 } as const;
 
+const audioTranscriptionJsonSchema = {
+  type: Type.OBJECT,
+  properties: {
+    detectedLanguage: { type: Type.STRING },
+    originalTranscript: { type: Type.STRING },
+    englishTranscript: { type: Type.STRING },
+  },
+  required: ["englishTranscript"],
+} as const;
+
+const AudioTranscriptionResultSchema = z.object({
+  detectedLanguage: z.string().optional().nullable(),
+  originalTranscript: z.string().optional().nullable(),
+  englishTranscript: z.string().min(1),
+});
+
+export type AudioTranscriptionResult = z.infer<
+  typeof AudioTranscriptionResultSchema
+>;
+
+const AUDIO_TRANSCRIPTION_SYSTEM_PROMPT = `You transcribe client voice notes for a product analyst.
+
+Return JSON only with:
+- "detectedLanguage": the likely spoken language name or BCP-47 code if clear
+- "originalTranscript": the best transcript in the original spoken language
+- "englishTranscript": a clear English translation of the full voice note
+
+If the voice note is already English, use the same content for originalTranscript and englishTranscript.
+Preserve project requirements, constraints, names, dates, numbers, and open questions.`;
+
 const SYSTEM_PROMPT = `You are a senior product analyst building a structured brief from raw client intake material.
 
 You will receive one or more SOURCE blocks delimited like:
@@ -200,10 +234,9 @@ function ensureGoogleCredentials() {
 
   if (serverEnv.GOOGLE_SERVICE_ACCOUNT_JSON) {
     try {
-      const parsed = JSON.parse(serverEnv.GOOGLE_SERVICE_ACCOUNT_JSON) as Record<
-        string,
-        unknown
-      >;
+      const parsed = JSON.parse(
+        serverEnv.GOOGLE_SERVICE_ACCOUNT_JSON,
+      ) as Record<string, unknown>;
       writeFileSync(TEMP_CREDENTIALS_PATH, JSON.stringify(parsed), {
         encoding: "utf8",
         mode: 0o600,
@@ -213,7 +246,8 @@ function ensureGoogleCredentials() {
 
       logGoogleGenAI("info", "Materialized Google service account JSON.", {
         path: TEMP_CREDENTIALS_PATH,
-        source: serverEnv.NODE_ENV === "production" ? "env-json" : "env-json-local",
+        source:
+          serverEnv.NODE_ENV === "production" ? "env-json" : "env-json-local",
       });
 
       return TEMP_CREDENTIALS_PATH;
@@ -382,7 +416,8 @@ export async function* generateBriefStreamFromBundle(
       sourceAssetCount: bundle.assets.length,
       retry: Boolean(retryHint),
       errorName: error instanceof Error ? error.name : "UnknownError",
-      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown Gemini error.",
     });
     throw error;
   }
@@ -404,7 +439,13 @@ export async function* reviseBriefStreamFromBundle(
   try {
     stream = await getClient().models.generateContentStream({
       model: MODEL,
-      contents: buildRevisionPrompt(bundle, currentBriefSummary, userMessage, selectionText, retryHint),
+      contents: buildRevisionPrompt(
+        bundle,
+        currentBriefSummary,
+        userMessage,
+        selectionText,
+        retryHint,
+      ),
       config: {
         systemInstruction: REVISION_SYSTEM_PROMPT,
         temperature: 0.3,
@@ -420,7 +461,8 @@ export async function* reviseBriefStreamFromBundle(
       sourceAssetCount: bundle.assets.length,
       retry: Boolean(retryHint),
       errorName: error instanceof Error ? error.name : "UnknownError",
-      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown Gemini error.",
     });
     throw error;
   }
@@ -442,7 +484,13 @@ export async function reviseBriefFromBundle(
   try {
     response = await getClient().models.generateContent({
       model: MODEL,
-      contents: buildRevisionPrompt(bundle, currentBriefSummary, userMessage, selectionText, retryHint),
+      contents: buildRevisionPrompt(
+        bundle,
+        currentBriefSummary,
+        userMessage,
+        selectionText,
+        retryHint,
+      ),
       config: {
         systemInstruction: REVISION_SYSTEM_PROMPT,
         temperature: 0.3,
@@ -458,7 +506,8 @@ export async function reviseBriefFromBundle(
       sourceAssetCount: bundle.assets.length,
       retry: Boolean(retryHint),
       errorName: error instanceof Error ? error.name : "UnknownError",
-      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown Gemini error.",
     });
     throw error;
   }
@@ -475,13 +524,85 @@ export async function reviseBriefFromBundle(
   try {
     return BriefOutputSchema.parse(extractJson(rawText));
   } catch (error) {
-    logGoogleGenAI("warn", "Gemini revision returned invalid structured output.", {
-      sourceAssetCount: bundle.assets.length,
-      retry: Boolean(retryHint),
-      rawPreview: rawText.slice(0, 500),
-      errorMessage:
-        error instanceof Error ? error.message : "Failed to parse Gemini output.",
+    logGoogleGenAI(
+      "warn",
+      "Gemini revision returned invalid structured output.",
+      {
+        sourceAssetCount: bundle.assets.length,
+        retry: Boolean(retryHint),
+        rawPreview: rawText.slice(0, 500),
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Failed to parse Gemini output.",
+      },
+    );
+    throw error;
+  }
+}
+
+export async function transcribeAudioToEnglish(input: {
+  audioBase64: string;
+  mimeType: string;
+}): Promise<AudioTranscriptionResult> {
+  let response;
+  try {
+    response = await getClient().models.generateContent({
+      model: MODEL,
+      contents: [
+        {
+          text: "Transcribe this voice note and translate it to English.",
+        },
+        {
+          inlineData: {
+            mimeType: input.mimeType,
+            data: input.audioBase64,
+          },
+        },
+      ],
+      config: {
+        systemInstruction: AUDIO_TRANSCRIPTION_SYSTEM_PROMPT,
+        temperature: 0,
+        maxOutputTokens: 8192,
+        responseMimeType: "application/json",
+        responseJsonSchema: audioTranscriptionJsonSchema,
+      },
     });
+  } catch (error) {
+    logGoogleGenAI("error", "Gemini audio transcription call failed.", {
+      project: serverEnv.GOOGLE_CLOUD_PROJECT ?? null,
+      location: serverEnv.GOOGLE_CLOUD_LOCATION ?? null,
+      mimeType: input.mimeType,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown Gemini error.",
+    });
+    throw error;
+  }
+
+  const rawText = response.text;
+  if (!rawText) {
+    logGoogleGenAI("error", "Gemini audio transcription returned empty text.", {
+      mimeType: input.mimeType,
+    });
+    throw new Error("Model returned an empty audio transcription response.");
+  }
+
+  try {
+    return AudioTranscriptionResultSchema.parse(extractJson(rawText));
+  } catch (error) {
+    logGoogleGenAI(
+      "warn",
+      "Gemini audio transcription returned invalid JSON.",
+      {
+        mimeType: input.mimeType,
+        rawPreview: rawText.slice(0, 500),
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Failed to parse Gemini output.",
+      },
+    );
     throw error;
   }
 }
@@ -510,7 +631,8 @@ export async function generateBriefFromBundle(
       sourceAssetCount: bundle.assets.length,
       retry: Boolean(retryHint),
       errorName: error instanceof Error ? error.name : "UnknownError",
-      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown Gemini error.",
     });
     throw error;
   }
@@ -532,7 +654,9 @@ export async function generateBriefFromBundle(
       retry: Boolean(retryHint),
       rawPreview: rawText.slice(0, 500),
       errorMessage:
-        error instanceof Error ? error.message : "Failed to parse Gemini output.",
+        error instanceof Error
+          ? error.message
+          : "Failed to parse Gemini output.",
     });
     throw error;
   }
