@@ -2,11 +2,14 @@ import { ZodError } from "zod";
 
 import { prisma } from "@/lib/prisma";
 import {
+  extractJson,
   generateBriefFromBundle,
+  generateBriefStreamFromBundle,
   GoogleGenAIConfigError,
   type SourceBundle,
 } from "@/server/services/google-genai";
 import { normalizeTextToChunks } from "@/server/services/source-normalization";
+import { BriefOutputSchema } from "@/server/validators/brief-output";
 import type {
   BriefClaimOutput,
   BriefEvidenceOutput,
@@ -431,6 +434,107 @@ export async function persistSnapshot({
 
     return snapshot;
   });
+}
+
+export type StreamEvent =
+  | { type: "token"; text: string }
+  | { type: "complete"; snapshotId: string; version: number }
+  | { type: "error"; code: string; message: string };
+
+export async function* runBriefGenerationStream(
+  input: RunBriefGenerationInput,
+): AsyncGenerator<StreamEvent> {
+  await prisma.processingJob.update({
+    where: { id: input.jobId },
+    data: {
+      status: "RUNNING",
+      startedAt: new Date(),
+      attemptCount: { increment: 1 },
+      errorCode: null,
+      errorMessage: null,
+    },
+  });
+
+  try {
+    const session = await prisma.intakeSession.findUnique({
+      where: { id: input.sessionId },
+      select: { id: true, projectId: true },
+    });
+
+    if (!session) {
+      throw new BriefPipelineError("SESSION_NOT_FOUND", "Intake session was not found.");
+    }
+
+    const initialAssets = await loadTextAssets(input.sessionId);
+    const assetsWithText = initialAssets.filter((asset) => textForPrompt(asset).trim());
+
+    if (assetsWithText.length === 0) {
+      throw new BriefPipelineError("NO_SOURCES", "No text sources are available for this session.");
+    }
+
+    const assets = await ensureTextChunks(assetsWithText);
+    const bundle = buildSourceBundle(assets);
+    if (bundle.assets.length === 0) {
+      throw new BriefPipelineError("EMPTY_BUNDLE", "Source bundle was empty after assembly.");
+    }
+
+    let fullText = "";
+    try {
+      for await (const chunk of generateBriefStreamFromBundle(bundle)) {
+        fullText += chunk;
+        yield { type: "token", text: chunk };
+      }
+    } catch (streamError) {
+      throw pipelineErrorFromUnknown(streamError);
+    }
+
+    let output: BriefOutput;
+    try {
+      output = BriefOutputSchema.parse(extractJson(fullText));
+    } catch (parseError) {
+      logBriefPipeline("warn", "Stream output invalid, retrying non-streaming.", {
+        jobId: input.jobId,
+        errorMessage: parseError instanceof Error ? parseError.message : "Parse failed.",
+      });
+      const hint = pipelineErrorFromUnknown(parseError).message;
+      try {
+        output = await generateBriefFromBundle(bundle, hint);
+      } catch (retryError) {
+        throw pipelineErrorFromUnknown(retryError);
+      }
+    }
+
+    const snapshot = await persistSnapshot({
+      projectId: session.projectId,
+      sessionId: input.sessionId,
+      requestedBy: input.requestedBy,
+      output,
+      assets,
+    });
+
+    await prisma.processingJob.update({
+      where: { id: input.jobId },
+      data: {
+        status: "SUCCEEDED",
+        completedAt: new Date(),
+        resultSnapshotId: snapshot.id,
+        errorCode: null,
+        errorMessage: null,
+      },
+    });
+
+    logBriefPipeline("info", "Completed streaming brief generation.", {
+      jobId: input.jobId,
+      sessionId: input.sessionId,
+      snapshotId: snapshot.id,
+      version: snapshot.version,
+    });
+
+    yield { type: "complete", snapshotId: snapshot.id, version: snapshot.version };
+  } catch (error) {
+    const pipelineError = await markJobFailed(input.jobId, error);
+    yield { type: "error", code: pipelineError.code, message: pipelineError.message };
+  }
 }
 
 export async function runBriefGeneration({

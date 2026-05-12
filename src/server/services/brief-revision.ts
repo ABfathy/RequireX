@@ -3,7 +3,8 @@ import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
   reviseBriefFromBundle,
-  GoogleGenAIConfigError,
+  reviseBriefStreamFromBundle,
+  extractJson,
 } from "@/server/services/google-genai";
 import {
   BriefPipelineError,
@@ -13,7 +14,9 @@ import {
   persistSnapshot,
   pipelineErrorFromUnknown,
   textForPrompt,
+  type StreamEvent,
 } from "@/server/services/brief-pipeline";
+import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 export { BriefPipelineError };
 
@@ -159,4 +162,107 @@ export async function runBriefRevision({
   });
 
   return { snapshotId: newSnapshot.id, version: newSnapshot.version };
+}
+
+export async function* runBriefRevisionStream(
+  input: RunBriefRevisionInput,
+): AsyncGenerator<StreamEvent> {
+  try {
+    const session = await prisma.intakeSession.findUnique({
+      where: { id: input.sessionId },
+      select: { id: true, projectId: true },
+    });
+
+    if (!session) {
+      throw new BriefPipelineError("SESSION_NOT_FOUND", "Intake session was not found.");
+    }
+
+    const snapshot = await prisma.briefSnapshot.findUnique({
+      where: { id: input.snapshotId },
+      select: {
+        id: true,
+        claims: { select: { section: true, text: true, confidence: true } },
+        questions: { select: { section: true, text: true, reason: true } },
+      },
+    });
+
+    if (!snapshot) {
+      throw new BriefPipelineError("SNAPSHOT_NOT_FOUND", "Brief snapshot was not found.");
+    }
+
+    const initialAssets = await loadTextAssets(input.sessionId);
+    const assetsWithText = initialAssets.filter((asset) => textForPrompt(asset).trim());
+
+    if (assetsWithText.length === 0) {
+      throw new BriefPipelineError("NO_SOURCES", "No text sources are available for this session.");
+    }
+
+    const assets = await ensureTextChunks(assetsWithText);
+    const bundle = buildSourceBundle(assets);
+
+    if (bundle.assets.length === 0) {
+      throw new BriefPipelineError("EMPTY_BUNDLE", "Source bundle was empty after assembly.");
+    }
+
+    const currentBriefSummary = serializeCurrentBrief(snapshot);
+
+    let fullText = "";
+    try {
+      for await (const chunk of reviseBriefStreamFromBundle(
+        bundle,
+        currentBriefSummary,
+        input.userMessage,
+        input.selectionText,
+      )) {
+        fullText += chunk;
+        yield { type: "token", text: chunk };
+      }
+    } catch (streamError) {
+      throw pipelineErrorFromUnknown(streamError);
+    }
+
+    let output;
+    try {
+      output = BriefOutputSchema.parse(extractJson(fullText));
+    } catch (parseError) {
+      const hint = pipelineErrorFromUnknown(parseError).message;
+      try {
+        output = await reviseBriefFromBundle(bundle, currentBriefSummary, input.userMessage, input.selectionText, hint);
+      } catch (retryError) {
+        throw pipelineErrorFromUnknown(retryError);
+      }
+    }
+
+    if (output.summary.length === 0 && output.goals.length === 0) {
+      throw new BriefPipelineError(
+        "INVALID_MODEL_OUTPUT",
+        "Revised brief was empty. Please try a more specific instruction.",
+      );
+    }
+
+    const newSnapshot = await persistSnapshot({
+      projectId: session.projectId,
+      sessionId: input.sessionId,
+      requestedBy: input.requestedBy,
+      output,
+      assets,
+      revisionEvent: {
+        type: "REGENERATED",
+        actorType: "INTERNAL_USER",
+        summary: `Revised brief via chat: "${input.userMessage.slice(0, 100)}${input.userMessage.length > 100 ? "…" : ""}"`,
+        metadata: {
+          trigger: "chat",
+          userMessage: input.userMessage,
+          selectionText: input.selectionText ?? null,
+          selectedItemId: input.selectedItemId ?? null,
+          sourceSnapshotId: input.snapshotId,
+        },
+      },
+    });
+
+    yield { type: "complete", snapshotId: newSnapshot.id, version: newSnapshot.version };
+  } catch (error) {
+    const pipelineError = pipelineErrorFromUnknown(error);
+    yield { type: "error", code: pipelineError.code, message: pipelineError.message };
+  }
 }

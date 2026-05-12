@@ -10,10 +10,7 @@ import {
   BriefGenerationRequestError,
   requestBriefGeneration,
 } from "@/server/services/brief-generation";
-import {
-  BriefPipelineError,
-  runBriefGeneration,
-} from "@/server/services/brief-pipeline";
+import { runBriefGenerationStream } from "@/server/services/brief-pipeline";
 
 const generateRequestSchema = z.object({
   sessionId: z.string().min(1),
@@ -80,51 +77,48 @@ export async function POST(request: Request) {
       );
     }
 
-    try {
-      const result = await runBriefGeneration({
-        jobId: job.id,
-        sessionId: body.sessionId,
-        requestedBy: auth.clerkUserId,
-      });
+    const encoder = new TextEncoder();
+    const sessionId = body.sessionId;
+    const jobId = job.id;
+    const requestedBy = auth.clerkUserId;
 
-      logGenerateRequest("info", "Sync brief generation succeeded.", {
-        sessionId: body.sessionId,
-        jobId: job.id,
-        snapshotId: result.snapshotId,
-        version: result.version,
-      });
+    const sseStream = new ReadableStream({
+      async start(controller) {
+        const send = (data: object) =>
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
 
-      return NextResponse.json(
-        {
-          jobId: job.id,
-          status: "SUCCEEDED",
-          snapshotId: result.snapshotId,
-          version: result.version,
-        },
-        { status: 200 },
-      );
-    } catch (pipelineError) {
-      const code =
-        pipelineError instanceof BriefPipelineError
-          ? pipelineError.code
-          : "PIPELINE_FAILED";
-      const message =
-        pipelineError instanceof Error
-          ? pipelineError.message
-          : "Brief generation failed.";
+        send({ type: "start", jobId });
 
-      logGenerateRequest("error", "Sync brief generation failed.", {
-        sessionId: body.sessionId,
-        jobId: job.id,
-        errorCode: code,
-        errorMessage: message,
-      });
+        for await (const event of runBriefGenerationStream({ jobId, sessionId, requestedBy })) {
+          send(event);
+          if (event.type === "complete") {
+            logGenerateRequest("info", "Streaming brief generation succeeded.", {
+              sessionId,
+              jobId,
+              snapshotId: event.snapshotId,
+              version: event.version,
+            });
+          } else if (event.type === "error") {
+            logGenerateRequest("error", "Streaming brief generation failed.", {
+              sessionId,
+              jobId,
+              errorCode: event.code,
+              errorMessage: event.message,
+            });
+          }
+        }
 
-      return NextResponse.json(
-        { jobId: job.id, status: "FAILED", error: code, message },
-        { status: 500 },
-      );
-    }
+        controller.close();
+      },
+    });
+
+    return new Response(sseStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (error) {
     if (isInternalAuthorizationError(error)) {
       logGenerateRequest("error", "Unauthorized generation request.", {

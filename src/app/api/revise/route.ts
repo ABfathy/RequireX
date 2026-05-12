@@ -5,10 +5,7 @@ import {
   isInternalAuthorizationError,
   requireInternalAuth,
 } from "@/server/auth/internal";
-import {
-  BriefPipelineError,
-  runBriefRevision,
-} from "@/server/services/brief-revision";
+import { runBriefRevisionStream } from "@/server/services/brief-revision";
 
 const reviseRequestSchema = z.object({
   sessionId: z.string().uuid(),
@@ -23,16 +20,34 @@ export async function POST(request: Request) {
     const auth = await requireInternalAuth();
     const body = reviseRequestSchema.parse(await request.json());
 
-    const result = await runBriefRevision({
-      sessionId: body.sessionId,
-      snapshotId: body.snapshotId,
-      userMessage: body.userMessage,
-      selectionText: body.selectionText,
-      selectedItemId: body.selectedItemId,
-      requestedBy: auth.clerkUserId,
+    const encoder = new TextEncoder();
+    const sseStream = new ReadableStream({
+      async start(controller) {
+        const send = (data: object) =>
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+
+        for await (const event of runBriefRevisionStream({
+          sessionId: body.sessionId,
+          snapshotId: body.snapshotId,
+          userMessage: body.userMessage,
+          selectionText: body.selectionText,
+          selectedItemId: body.selectedItemId,
+          requestedBy: auth.clerkUserId,
+        })) {
+          send(event);
+        }
+
+        controller.close();
+      },
     });
 
-    return NextResponse.json(result, { status: 200 });
+    return new Response(sseStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (error) {
     if (isInternalAuthorizationError(error)) {
       return NextResponse.json(
@@ -45,19 +60,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "INVALID_REQUEST", message: "Invalid request body." },
         { status: 400 },
-      );
-    }
-
-    if (error instanceof BriefPipelineError) {
-      const statusMap: Record<string, number> = {
-        SESSION_NOT_FOUND: 404,
-        SNAPSHOT_NOT_FOUND: 404,
-        NO_SOURCES: 400,
-        EMPTY_BUNDLE: 400,
-      };
-      return NextResponse.json(
-        { error: error.code, message: error.message },
-        { status: statusMap[error.code] ?? 500 },
       );
     }
 

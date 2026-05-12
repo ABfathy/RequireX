@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { usePersistentState } from "@/lib/hooks/use-persistent-state";
+import { StreamingBriefParser } from "@/lib/streaming-brief-parser";
 import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
@@ -110,6 +111,43 @@ function assetToSource(a: ApiAsset): SourceItem {
   };
 }
 
+type SseEvent =
+  | { type: "start"; jobId?: string }
+  | { type: "token"; text: string }
+  | { type: "complete"; snapshotId: string; version: number }
+  | { type: "error"; code: string; message: string };
+
+async function readSseStream(
+  body: ReadableStream<Uint8Array>,
+  onLines: (lines: DocLineData[]) => void,
+): Promise<{ snapshotId: string; version: number }> {
+  const parser = new StreamingBriefParser();
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split("\n\n");
+    buf = parts.pop() ?? "";
+    for (const part of parts) {
+      if (!part.startsWith("data: ")) continue;
+      const evt = JSON.parse(part.slice(6)) as SseEvent;
+      if (evt.type === "token") {
+        parser.feed(evt.text);
+        const snapshot = parser.getSnapshot();
+        if (snapshot.length > 0) onLines(snapshot);
+      } else if (evt.type === "complete") {
+        return { snapshotId: evt.snapshotId, version: evt.version };
+      } else if (evt.type === "error") {
+        throw new Error(evt.message);
+      }
+    }
+  }
+  throw new Error("Stream ended without a complete event.");
+}
+
 export function EditorShell({
   projects: initialProjects = [],
   activeProjectId: initialActiveProjectId = null,
@@ -140,6 +178,7 @@ export function EditorShell({
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(null);
   const [revising, setRevising] = useState(false);
   const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(initialSnapshotId);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -336,6 +375,7 @@ export function EditorShell({
 
     setGenerating(true);
     setGenerationError(null);
+    setStreamingLines(null);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -352,6 +392,12 @@ export function EditorShell({
         );
       }
 
+      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+        await readSseStream(res.body, setStreamingLines);
+        router.refresh();
+        return;
+      }
+
       router.refresh();
     } catch (error) {
       setGenerationError(
@@ -359,6 +405,7 @@ export function EditorShell({
       );
     } finally {
       setGenerating(false);
+      setStreamingLines(null);
     }
   }, [sessionId, generating, router]);
 
@@ -422,6 +469,7 @@ export function EditorShell({
 
       setRevising(true);
       setGenerationError(null);
+      setStreamingLines(null);
       setRightTab("chat");
 
       try {
@@ -444,8 +492,16 @@ export function EditorShell({
           throw new Error(payload?.message ?? payload?.error ?? "Failed to revise brief.");
         }
 
-        const result = await res.json() as { snapshotId: string; version: number };
-        setCurrentSnapshotId(result.snapshotId);
+        let newSnapshotId: string;
+        if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+          const result = await readSseStream(res.body, setStreamingLines);
+          newSnapshotId = result.snapshotId;
+        } else {
+          const result = await res.json() as { snapshotId: string; version: number };
+          newSnapshotId = result.snapshotId;
+        }
+
+        setCurrentSnapshotId(newSnapshotId);
         setSelectedReq(null);
         setClientLines(null);
         await loadRevisions(sessionId);
@@ -456,6 +512,7 @@ export function EditorShell({
         );
       } finally {
         setRevising(false);
+        setStreamingLines(null);
       }
     },
     [sessionId, currentSnapshotId, revising, selectedReq, loadRevisions, router],
@@ -780,6 +837,7 @@ export function EditorShell({
           onAttachFiles={sessionId ? handleUploadFiles : undefined}
           onGenerateBrief={sessionId ? handleGenerateBrief : undefined}
           generating={generating}
+          streamingLines={streamingLines}
           lines={displayLines}
           selectedReqText={selectedReqText}
           onClearSelection={() => setSelectedReq(null)}

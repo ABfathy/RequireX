@@ -294,7 +294,7 @@ function buildPrompt(bundle: SourceBundle, retryHint?: string) {
   return `Use only these sourceAssetId values in evidence:\n${validIds}\n\n${sourceText}${retryText}`;
 }
 
-function extractJson(raw: string) {
+export function extractJson(raw: string) {
   const trimmed = raw.trim();
   try {
     return JSON.parse(trimmed) as unknown;
@@ -356,6 +356,79 @@ function buildRevisionPrompt(
     : "";
 
   return `Use only these sourceAssetId values in evidence:\n${validIds}\n\nCurrent brief:\n${currentBriefSummary}\n\nUser instruction: ${userMessage}${selectionNote}\n\n${sourceText}${retryText}`;
+}
+
+export async function* generateBriefStreamFromBundle(
+  bundle: SourceBundle,
+  retryHint?: string,
+): AsyncGenerator<string> {
+  let stream;
+  try {
+    stream = await getClient().models.generateContentStream({
+      model: MODEL,
+      contents: buildPrompt(bundle, retryHint),
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        temperature: 0.2,
+        maxOutputTokens: 16384,
+        responseMimeType: "application/json",
+        responseJsonSchema,
+      },
+    });
+  } catch (error) {
+    logGoogleGenAI("error", "Gemini streaming call failed.", {
+      project: serverEnv.GOOGLE_CLOUD_PROJECT ?? null,
+      location: serverEnv.GOOGLE_CLOUD_LOCATION ?? null,
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+    });
+    throw error;
+  }
+
+  for await (const chunk of stream) {
+    const text = chunk.text ?? "";
+    if (text) yield text;
+  }
+}
+
+export async function* reviseBriefStreamFromBundle(
+  bundle: SourceBundle,
+  currentBriefSummary: string,
+  userMessage: string,
+  selectionText?: string,
+  retryHint?: string,
+): AsyncGenerator<string> {
+  let stream;
+  try {
+    stream = await getClient().models.generateContentStream({
+      model: MODEL,
+      contents: buildRevisionPrompt(bundle, currentBriefSummary, userMessage, selectionText, retryHint),
+      config: {
+        systemInstruction: REVISION_SYSTEM_PROMPT,
+        temperature: 0.3,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        responseJsonSchema,
+      },
+    });
+  } catch (error) {
+    logGoogleGenAI("error", "Gemini revision streaming call failed.", {
+      project: serverEnv.GOOGLE_CLOUD_PROJECT ?? null,
+      location: serverEnv.GOOGLE_CLOUD_LOCATION ?? null,
+      sourceAssetCount: bundle.assets.length,
+      retry: Boolean(retryHint),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "Unknown Gemini error.",
+    });
+    throw error;
+  }
+
+  for await (const chunk of stream) {
+    const text = chunk.text ?? "";
+    if (text) yield text;
+  }
 }
 
 export async function reviseBriefFromBundle(

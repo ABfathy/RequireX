@@ -44,6 +44,8 @@ export interface DocLineData {
   tags?: string[];
   evidence?: EvidenceRef[];
   small?: boolean;
+  /** True while this line is actively being typed by the model. Renders a blinking cursor. */
+  streaming?: boolean;
 }
 
 const STATUS_TONE: Record<string, Tone> = {
@@ -300,10 +302,17 @@ function DocLine({
             title={isReq && onUpdateLine ? "Double-click to edit" : undefined}
           >
             {line.text}
-            {line.evidence?.map((ev, i) => (
+            {line.streaming && (
+              <span
+                className="inline-block w-[1.5px] h-[13px] rounded-[1px] ml-[1px] align-middle animate-pulse"
+                aria-hidden="true"
+                style={{ background: "var(--fg-tertiary)", verticalAlign: "middle" }}
+              />
+            )}
+            {!line.streaming && line.evidence?.map((ev, i) => (
               <EvidenceBit key={i} ev={ev} onOpenSource={onOpenSource} />
             ))}
-            {isReq && onUpdateLine && (
+            {isReq && !line.streaming && onUpdateLine && (
               <button
                 type="button"
                 aria-label="Edit"
@@ -442,7 +451,8 @@ function EmptyDoc({
     );
   }
 
-  if (state === "revising") {
+  if (state === "revising" || state === "generating") {
+    const isRevising = state === "revising";
     return (
       <div
         className="flex flex-col h-full py-6 px-[52px] pr-6"
@@ -452,40 +462,11 @@ function EmptyDoc({
         <div className="flex items-center gap-2 mb-6">
           <span
             className="size-[8px] rounded-full animate-pulse shrink-0"
-            style={{ background: "var(--accent)" }}
+            style={{ background: isRevising ? "var(--accent)" : "var(--warning)" }}
             aria-hidden="true"
           />
           <span className="text-[13px]" style={{ color: "var(--fg-tertiary)" }}>
-            Revising brief…
-          </span>
-        </div>
-        {[80, 60, 90, 50, 70].map((w, i) => (
-          <div key={i} className="flex items-center gap-3 mb-3">
-            <div
-              className="h-[14px] rounded-[3px] animate-pulse"
-              style={{ width: `${w}%`, background: "var(--surface-3)" }}
-            />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (state === "generating") {
-    return (
-      <div
-        className="flex flex-col h-full py-6 px-[52px] pr-6"
-        aria-live="polite"
-        aria-busy="true"
-      >
-        <div className="flex items-center gap-2 mb-6">
-          <span
-            className="size-[8px] rounded-full animate-pulse shrink-0"
-            style={{ background: "var(--warning)" }}
-            aria-hidden="true"
-          />
-          <span className="text-[13px]" style={{ color: "var(--fg-tertiary)" }}>
-            Generating brief…
+            {isRevising ? "Revising brief…" : "Generating brief…"}
           </span>
         </div>
         {[80, 60, 90, 50, 70].map((w, i) => (
@@ -685,6 +666,7 @@ export interface DocViewProps {
   onAddSources?: () => void;
   onGenerateBrief?: () => void;
   generating?: boolean;
+  streamingLines?: DocLineData[] | null;
   onAttachFiles?: (files: File[]) => Promise<void>;
   onOpenSource?: (sourceId: string) => void;
   lines?: DocLineData[];
@@ -706,6 +688,7 @@ export function DocView({
   onAddSources,
   onGenerateBrief,
   generating = false,
+  streamingLines = null,
   onAttachFiles,
   onOpenSource,
   lines = [],
@@ -821,10 +804,21 @@ export function DocView({
 
       {/* Doc scroll */}
       <div className="flex-1 overflow-y-auto py-4">
-        {appState !== "ready" && appState !== "revising" ? (
+        {(appState === "generating" || appState === "revising") ? (
+          streamingLines && streamingLines.length > 0 ? (
+            streamingLines.map((line, i) => (
+              <DocLine
+                key={i}
+                line={line}
+                selectedReq={null}
+                onSelectReq={() => undefined}
+              />
+            ))
+          ) : (
+            <EmptyDoc state={appState} onAddSources={onAddSources} />
+          )
+        ) : appState !== "ready" ? (
           <EmptyDoc state={appState} onAddSources={onAddSources} />
-        ) : appState === "revising" ? (
-          <EmptyDoc state="revising" />
         ) : lines.length === 0 ? (
           <EmptyDoc state="no-sources" onAddSources={onAddSources} />
         ) : (
