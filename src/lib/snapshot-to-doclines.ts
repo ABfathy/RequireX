@@ -50,21 +50,18 @@ export function snapshotToDocLines(
 
   if (!snapshot) return lines;
 
-  const snapshotDetails = snapshot;
-  const sourceIndex = buildSourceIndex(snapshotDetails);
+  const sourceIndex = buildSourceIndex(snapshot);
 
   lines.push({
     lineNum: lineNum++,
     type: "meta",
-    text: `v${snapshotDetails.version} - ${snapshotDetails.status.toLowerCase()}`,
+    text: `v${snapshot.version} - ${snapshot.status.toLowerCase()}`,
     small: true,
   });
   lines.push({ lineNum: lineNum++, type: "blank" });
 
   function pushClaims(section: "SUMMARY" | "GOALS") {
-    const claims = snapshotDetails.claims.filter(
-      (claim) => claim.section === section,
-    );
+    const claims = snapshot!.claims.filter((claim) => claim.section === section);
     if (claims.length === 0) return;
 
     lines.push({ lineNum: lineNum++, type: "h2", text: SECTION_LABELS[section] });
@@ -74,6 +71,7 @@ export function snapshotToDocLines(
         type: "body",
         text: claim.text,
         reqId: claim.id,
+        reqType: "claim",
         tags: [claim.confidence.toLowerCase()],
         evidence: claim.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
       });
@@ -81,10 +79,8 @@ export function snapshotToDocLines(
     lines.push({ lineNum: lineNum++, type: "blank" });
   }
 
-  function pushQuestions(
-    section: "AMBIGUITIES" | "FOLLOW_UP_QUESTIONS",
-  ) {
-    const questions = snapshotDetails.questions.filter(
+  function pushQuestions(section: "AMBIGUITIES" | "FOLLOW_UP_QUESTIONS") {
+    const questions = snapshot!.questions.filter(
       (question) => question.section === section,
     );
     if (questions.length === 0) return;
@@ -96,6 +92,7 @@ export function snapshotToDocLines(
         type: "body",
         text: question.text,
         reqId: question.id,
+        reqType: "question",
         tags: [question.status.toLowerCase()],
         evidence: question.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
       });

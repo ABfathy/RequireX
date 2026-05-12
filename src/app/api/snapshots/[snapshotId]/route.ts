@@ -26,11 +26,12 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     });
 
     const lines = snapshotToDocLines(snapshot, session?.title ?? null);
-    return NextResponse.json({ lines, version: snapshot.version });
+    return NextResponse.json({ lines, version: snapshot.version, status: snapshot.status });
   } catch (err) {
     if (isInternalAuthorizationError(err)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    console.error({ scope: "api.snapshots.get", err });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

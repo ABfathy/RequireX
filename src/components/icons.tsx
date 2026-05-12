@@ -15,6 +15,7 @@ import {
   Moon,
   PanelLeft,
   PanelRight,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -64,6 +65,7 @@ export const Icons = {
   X:            icon(X),
   ArrowLeft:    icon(ArrowLeft),
   ArrowRight:   icon(ArrowRight),
+  Pencil:       icon(Pencil),
 } as const;
 
 export function RxLogo({ size = 16, className }: { size?: number; className?: string }) {

@@ -64,11 +64,11 @@ type RunBriefGenerationInput = {
   requestedBy: string;
 };
 
-type TextAssetWithChunks = SourceAsset & {
+export type TextAssetWithChunks = SourceAsset & {
   chunks: SourceChunk[];
 };
 
-function pipelineErrorFromUnknown(error: unknown) {
+export function pipelineErrorFromUnknown(error: unknown) {
   if (error instanceof BriefPipelineError) return error;
   if (error instanceof GoogleGenAIConfigError) {
     return new BriefPipelineError(error.code, error.message);
@@ -114,7 +114,7 @@ async function markJobFailed(jobId: string, error: unknown) {
   return pipelineError;
 }
 
-async function loadTextAssets(sessionId: string) {
+export async function loadTextAssets(sessionId: string) {
   return prisma.sourceAsset.findMany({
     where: {
       sessionId,
@@ -130,7 +130,7 @@ async function loadTextAssets(sessionId: string) {
   });
 }
 
-async function ensureTextChunks(assets: TextAssetWithChunks[]) {
+export async function ensureTextChunks(assets: TextAssetWithChunks[]) {
   logBriefPipeline("info", "Ensuring text chunks exist.", {
     sessionId: assets[0]?.sessionId ?? null,
     assetCount: assets.length,
@@ -175,12 +175,12 @@ function assetLabel(asset: TextAssetWithChunks) {
   return asset.displayLabel ?? asset.originalFileName ?? "Untitled source";
 }
 
-function textForPrompt(asset: TextAssetWithChunks) {
+export function textForPrompt(asset: TextAssetWithChunks) {
   if (asset.textContent?.trim()) return asset.textContent.trim();
   return asset.chunks.map((chunk) => chunk.text).join("\n\n").trim();
 }
 
-function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
+export function buildSourceBundle(assets: TextAssetWithChunks[]): SourceBundle {
   const bodies = assets
     .map((asset) => ({
       asset,
@@ -253,12 +253,18 @@ async function callModelWithRetry(bundle: SourceBundle) {
   }
 }
 
-type PersistSnapshotInput = {
+export type PersistSnapshotInput = {
   projectId: string;
   sessionId: string;
   requestedBy: string;
   output: BriefOutput;
   assets: TextAssetWithChunks[];
+  revisionEvent?: {
+    type: "GENERATED" | "REGENERATED";
+    actorType: "SYSTEM" | "INTERNAL_USER";
+    summary: string;
+    metadata: Record<string, unknown>;
+  };
 };
 
 function firstChunkByAssetId(assets: TextAssetWithChunks[]) {
@@ -299,12 +305,13 @@ function buildEvidenceRows(input: {
     .filter(<T>(row: T | null): row is T => row !== null);
 }
 
-async function persistSnapshot({
+export async function persistSnapshot({
   projectId,
   sessionId,
   requestedBy,
   output,
   assets,
+  revisionEvent,
 }: PersistSnapshotInput) {
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
   const chunkByAssetId = firstChunkByAssetId(assets);
@@ -386,18 +393,22 @@ async function persistSnapshot({
     await insertQuestions("AMBIGUITIES", output.ambiguities);
     await insertQuestions("FOLLOW_UP_QUESTIONS", output.followUpQuestions);
 
+    const evt = revisionEvent ?? {
+      type: "GENERATED" as const,
+      actorType: "SYSTEM" as const,
+      summary: `Generated brief snapshot v${version}.`,
+      metadata: { sourceAssetCount: assets.length },
+    };
     await tx.revisionEvent.create({
       data: {
         projectId,
         sessionId,
         snapshotId: snapshot.id,
-        type: "GENERATED",
-        actorType: "SYSTEM",
+        type: evt.type,
+        actorType: evt.actorType,
         actorId: requestedBy,
-        summary: `Generated brief snapshot v${version}.`,
-        metadata: {
-          sourceAssetCount: assets.length,
-        },
+        summary: evt.summary,
+        metadata: evt.metadata as Prisma.InputJsonValue,
       },
     });
 

@@ -20,6 +20,27 @@ import { TitleBar } from "./titlebar";
 
 type RightTab = "sources" | "chat" | "revisions";
 
+export interface ChatMessage {
+  id: string;
+  userMessage: string;
+  version: number | null;
+  snapshotId: string | null;
+  createdAt: string;
+  trigger: string | null;
+  selectionText: string | null;
+}
+
+export interface SnapshotSummary {
+  id: string | null;
+  version: number | null;
+  snapshotStatus: string | null;
+  type: string;
+  summary: string;
+  createdAt: string;
+  trigger: string | null;
+  userMessage: string | null;
+}
+
 type SessionRef = { id: string; title: string } | null;
 const SIDEBAR_STORAGE_KEY = "rx-sidebar-width-v2";
 const SIDEBAR_DEFAULT = 196;
@@ -40,6 +61,7 @@ interface EditorShellProps {
   initialProjectCache?: SerializableProjectCache;
   lines?: DocLineData[];
   hasSnapshot?: boolean;
+  initialSnapshotId?: string | null;
 }
 
 interface CacheEntry {
@@ -96,6 +118,7 @@ export function EditorShell({
   initialProjectCache = {},
   lines = [],
   hasSnapshot = false,
+  initialSnapshotId = null,
 }: EditorShellProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectListItem[]>(initialProjects);
@@ -117,6 +140,12 @@ export function EditorShell({
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [revising, setRevising] = useState(false);
+  const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(initialSnapshotId);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [clientLines, setClientLines] = useState<DocLineData[] | null>(null);
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     initialActiveProjectId,
@@ -128,11 +157,6 @@ export function EditorShell({
     undefined,
   );
 
-  const [snapshots, setSnapshots] = useState<SnapshotListItem[] | undefined>(undefined);
-  const [snapshotsLoading, setSnapshotsLoading] = useState(false);
-  const snapshotsFetchedRef = useRef(false);
-  const [viewingSnapshotId, setViewingSnapshotId] = useState<string | null>(null);
-  const [viewingLines, setViewingLines] = useState<DocLineData[] | null>(null);
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
 
   const [projectCache, setProjectCache] = useState<Map<string, CacheEntry>>(
@@ -338,6 +362,156 @@ export function EditorShell({
     }
   }, [sessionId, generating, router]);
 
+  const loadRevisions = useCallback(async (sid: string) => {
+    setRevisionsLoading(true);
+    try {
+      const res = await fetch(`/api/sessions/${sid}/revisions`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json() as { revisions: Array<{
+        id: string;
+        type: string;
+        summary: string;
+        createdAt: string;
+        snapshotId: string | null;
+        version: number | null;
+        snapshotStatus: string | null;
+        trigger: string | null;
+        userMessage: string | null;
+        selectionText: string | null;
+      }> };
+      const allRevisions = data.revisions ?? [];
+
+      // Chat messages are REGENERATED events with trigger=chat
+      setChatMessages(
+        allRevisions
+          .filter((r) => r.trigger === "chat" && r.userMessage)
+          .map((r) => ({
+            id: r.id,
+            userMessage: r.userMessage!,
+            version: r.version,
+            snapshotId: r.snapshotId,
+            createdAt: r.createdAt,
+            trigger: r.trigger,
+            selectionText: r.selectionText,
+          })),
+      );
+
+      // All revisions go to the revisions tab
+      setSnapshots(
+        allRevisions.map((r) => ({
+          id: r.snapshotId,
+          version: r.version,
+          snapshotStatus: r.snapshotStatus,
+          type: r.type,
+          summary: r.summary,
+          createdAt: r.createdAt,
+          trigger: r.trigger,
+          userMessage: r.userMessage,
+        })),
+      );
+    } catch {
+      // silently fail — not critical
+    } finally {
+      setRevisionsLoading(false);
+    }
+  }, []);
+
+  const handleSendMessage = useCallback(
+    async (userMessage: string, selectionText?: string) => {
+      if (!sessionId || !currentSnapshotId || revising) return;
+
+      setRevising(true);
+      setGenerationError(null);
+      setRightTab("chat");
+
+      try {
+        const res = await fetch("/api/revise", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            snapshotId: currentSnapshotId,
+            userMessage,
+            selectionText: selectionText || undefined,
+            selectedItemId: selectedReq || undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as
+            | { error?: string; message?: string }
+            | null;
+          throw new Error(payload?.message ?? payload?.error ?? "Failed to revise brief.");
+        }
+
+        const result = await res.json() as { snapshotId: string; version: number };
+        setCurrentSnapshotId(result.snapshotId);
+        setSelectedReq(null);
+        setClientLines(null);
+        await loadRevisions(sessionId);
+        router.refresh();
+      } catch (error) {
+        setGenerationError(
+          error instanceof Error ? error.message : "Failed to revise brief.",
+        );
+      } finally {
+        setRevising(false);
+      }
+    },
+    [sessionId, currentSnapshotId, revising, selectedReq, loadRevisions, router],
+  );
+
+  useEffect(() => {
+    if (sessionId) void loadRevisions(sessionId);
+  }, [sessionId, loadRevisions]);
+
+  // Ref keeps the latest displayLines accessible inside callbacks without
+  // causing the callback to re-create every time lines change.
+  const displayLinesRef = useRef<DocLineData[]>([]);
+
+  const handleUpdateLine = useCallback(
+    async (reqId: string, reqType: "claim" | "question", newText: string) => {
+      const endpoint = reqType === "claim"
+        ? `/api/claims/${reqId}`
+        : `/api/questions/${reqId}`;
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newText }),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? "Failed to save edit.");
+      }
+      // Optimistic update: patch the text in the current display lines
+      setClientLines(
+        displayLinesRef.current.map((l: DocLineData) =>
+          l.reqId === reqId ? { ...l, text: newText } : l,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleSelectRevision = useCallback(async (snapshotId: string | null) => {
+    if (!snapshotId) {
+      setClientLines(null);
+      setViewingVersion(null);
+      return;
+    }
+    if (snapshotId === currentSnapshotId) return;
+    try {
+      const res = await fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json() as { lines: DocLineData[]; version: number };
+      setClientLines(data.lines);
+      setViewingVersion(data.version ?? null);
+      setCurrentSnapshotId(snapshotId);
+    } catch {
+      // silently ignore
+    }
+  }, [currentSnapshotId]);
+
   /* Soft client-side project switch. Cache hit -> swap state + replace URL
      silently (no Next.js routing -> no server roundtrip). Cached switches clear
      snapshot lines rather than showing stale lines from the previous project. */
@@ -351,6 +525,9 @@ export function EditorShell({
         setSources(cached.sources);
         setGenerationError(null);
         setSourcesError(undefined);
+        setCurrentSnapshotId(null);
+        setChatMessages([]);
+        setSnapshots([]);
         if (typeof window !== "undefined") {
           window.history.replaceState({}, "", `/app?projectId=${id}`);
         }
@@ -433,7 +610,8 @@ export function EditorShell({
     : session?.title
       ? [{ lineNum: 1, type: "h1" as const, text: session.title }]
       : [];
-  const displayLines = viewingLines ?? baseLines;
+  const displayLines = clientLines ?? baseLines;
+  displayLinesRef.current = displayLines;
   const displayHasSnapshot = usesServerSnapshot && hasSnapshot;
 
   const baseAppState: AppState = session
@@ -441,14 +619,22 @@ export function EditorShell({
       ? "ready"
       : "no-sources"
     : "no-session";
-  const appState: AppState = generating
-    ? "generating"
-    : generationError
-      ? "failed"
-      : baseAppState;
+  const appState: AppState = revising
+    ? "revising"
+    : generating
+      ? "generating"
+      : generationError
+        ? "failed"
+        : baseAppState;
 
   const activeProjectName =
     projects.find((p) => p.id === activeProjectId)?.name ?? null;
+
+  const selectedReqText = selectedReq
+    ? (displayLines.find(
+        (l) => l.reqId === selectedReq && l.type === "body",
+      )?.text ?? null)
+    : null;
 
   /* ⌘K → command palette · ⌘P → project search */
   useEffect(() => {
@@ -523,55 +709,11 @@ export function EditorShell({
 
   /* Reset snapshot state when session changes */
   useEffect(() => {
-    snapshotsFetchedRef.current = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSnapshots(undefined);
-    setViewingSnapshotId(null);
-    setViewingLines(null);
+    setSnapshots([]);
     setViewingVersion(null);
+    setClientLines(null);
+    setChatMessages([]);
   }, [sessionId]);
-
-  /* Fetch snapshot list when revisions tab first opens for this session */
-  useEffect(() => {
-    if (rightTab !== "revisions" || snapshotsFetchedRef.current || !sessionId) return;
-    snapshotsFetchedRef.current = true;
-    const ctrl = new AbortController();
-    fetch(`/api/sessions/${sessionId}/snapshots`, {
-      cache: "no-store",
-      signal: ctrl.signal,
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { snapshots: SnapshotListItem[] } | null) => {
-        setSnapshots(data?.snapshots ?? []);
-        setSnapshotsLoading(false);
-      })
-      .catch(() => {
-        setSnapshots([]);
-        setSnapshotsLoading(false);
-      });
-     
-    setSnapshotsLoading(true);
-    return () => ctrl.abort();
-  }, [rightTab, sessionId]);
-
-  function handleViewSnapshot(id: string | null) {
-    if (!id) {
-      setViewingSnapshotId(null);
-      setViewingLines(null);
-      setViewingVersion(null);
-      return;
-    }
-    setViewingSnapshotId(id);
-    fetch(`/api/snapshots/${id}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { lines: DocLineData[]; version: number } | null) => {
-        if (data) {
-          setViewingLines(data.lines);
-          setViewingVersion(data.version);
-        }
-      })
-      .catch(() => { /* silently keep current lines on error */ });
-  }
 
   const colTemplate = [
     sidebarOpen ? `${sidebarWidth}px` : "0px",
@@ -639,8 +781,13 @@ export function EditorShell({
           onGenerateBrief={sessionId ? handleGenerateBrief : undefined}
           generating={generating}
           lines={displayLines}
+          selectedReqText={selectedReqText}
+          onClearSelection={() => setSelectedReq(null)}
+          onSendMessage={sessionId && currentSnapshotId ? handleSendMessage : undefined}
+          revising={revising}
+          onUpdateLine={currentSnapshotId ? handleUpdateLine : undefined}
           viewingVersion={viewingVersion}
-          onExitVersionView={() => handleViewSnapshot(null)}
+          onExitVersionView={() => void handleSelectRevision(null)}
           onOpenSource={(id) => {
             const s = sources.find((src) => src.id === id);
             if (s) setPreviewItem(s);
@@ -674,10 +821,11 @@ export function EditorShell({
               onUploadFiles={sessionId ? handleUploadFiles : undefined}
               onRetrySourceLoad={refreshSources}
               onPreviewSource={setPreviewItem}
+              chatMessages={chatMessages}
               snapshots={snapshots}
-              snapshotsLoading={snapshotsLoading}
-              viewingSnapshotId={viewingSnapshotId}
-              onViewSnapshot={handleViewSnapshot}
+              snapshotsLoading={revisionsLoading}
+              viewingSnapshotId={currentSnapshotId}
+              onViewSnapshot={handleSelectRevision}
             />
           )}
         </div>

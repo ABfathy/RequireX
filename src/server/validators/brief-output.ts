@@ -8,7 +8,7 @@ const EvidenceSchema = z.object({
 const ClaimSchema = z.object({
   text: z.string().min(1).max(2_000),
   confidence: z.enum(["LOW", "MEDIUM", "HIGH"]),
-  evidence: z.array(EvidenceSchema).min(1).max(5),
+  evidence: z.array(EvidenceSchema).max(5).default([]),
 });
 
 const QuestionSchema = z.object({

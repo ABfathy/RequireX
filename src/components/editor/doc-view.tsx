@@ -12,6 +12,7 @@ export type AppState =
   | "no-session"
   | "no-sources"
   | "generating"
+  | "revising"
   | "failed"
   | "ready";
 
@@ -38,6 +39,7 @@ export interface DocLineData {
   type: LineType;
   text?: string;
   reqId?: string;
+  reqType?: "claim" | "question";
   status?: string;
   tags?: string[];
   evidence?: EvidenceRef[];
@@ -142,15 +144,21 @@ function DocLine({
   line,
   selectedReq,
   onSelectReq,
+  onUpdateLine,
   onOpenSource,
 }: {
   line: DocLineData;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
+  onUpdateLine?: (reqId: string, reqType: "claim" | "question", newText: string) => Promise<void>;
   onOpenSource?: (sourceId: string) => void;
 }) {
-  const isReq = !!line.reqId;
+  const isReq = !!line.reqId && !!line.reqType;
   const isActive = isReq && line.reqId === selectedReq;
+  const [editing, setEditing] = useState(false);
+  const [editVal, setEditVal] = useState(line.text ?? "");
+  const [saving, setSaving] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const heights: Partial<Record<LineType, string>> = {
     h1: "min-h-[32px] py-1",
@@ -159,6 +167,43 @@ function DocLine({
     blank: line.small ? "h-[8px]" : "h-[16px]",
   };
   const heightCls = heights[line.type] ?? "min-h-[21px]";
+
+  function startEdit() {
+    if (!isReq || !onUpdateLine) return;
+    setEditVal(line.text ?? "");
+    setEditing(true);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.select();
+    }, 0);
+  }
+
+  async function commitEdit() {
+    const trimmed = editVal.trim();
+    if (!trimmed || !line.reqId || !line.reqType || !onUpdateLine) {
+      setEditing(false);
+      return;
+    }
+    if (trimmed === line.text) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onUpdateLine(line.reqId, line.reqType, trimmed);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleEditKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Escape") { setEditing(false); return; }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      void commitEdit();
+    }
+  }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (isReq && (e.key === "Enter" || e.key === " ")) {
@@ -169,13 +214,14 @@ function DocLine({
 
   return (
     <div
-      className={`flex items-start w-full transition-colors duration-[80ms] ${isReq ? "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]" : ""}`}
-      style={{ background: isActive ? "var(--accent-subtle)" : undefined }}
-      role={isReq ? "button" : undefined}
-      tabIndex={isReq ? 0 : undefined}
-      aria-pressed={isReq ? isActive : undefined}
-      onClick={isReq ? () => onSelectReq(line.reqId!) : undefined}
-      onKeyDown={isReq ? handleKeyDown : undefined}
+      className={`flex items-start w-full transition-colors duration-[80ms] group ${isReq && !editing ? "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]" : ""}`}
+      style={{ background: isActive && !editing ? "var(--accent-subtle)" : undefined }}
+      role={isReq && !editing ? "button" : undefined}
+      tabIndex={isReq && !editing ? 0 : undefined}
+      aria-pressed={isReq && !editing ? isActive : undefined}
+      onClick={isReq && !editing ? () => onSelectReq(line.reqId!) : undefined}
+      onDoubleClick={isReq && !editing && onUpdateLine ? startEdit : undefined}
+      onKeyDown={isReq && !editing ? handleKeyDown : undefined}
     >
       {/* Gutter */}
       <div
@@ -193,7 +239,7 @@ function DocLine({
 
       {/* Content */}
       <div
-        className={`flex items-center gap-2 flex-1 pr-6 ${heightCls}`}
+        className={`flex items-center gap-2 flex-1 pr-6 ${editing ? "py-1" : heightCls}`}
         style={{ minWidth: 0 }}
       >
         {line.type === "h1" && (
@@ -247,16 +293,75 @@ function DocLine({
             ))}
           </div>
         )}
-        {line.type === "body" && (
+        {line.type === "body" && !editing && (
           <span
-            className="text-[14px] leading-[1.65]"
-            style={{ color: "var(--fg-secondary)", textWrap: "pretty" } as React.CSSProperties}
+            className="text-[14px] leading-[1.65] w-full"
+            style={{ color: line.small ? "var(--fg-muted)" : "var(--fg-secondary)", fontSize: line.small ? 12 : undefined }}
+            title={isReq && onUpdateLine ? "Double-click to edit" : undefined}
           >
             {line.text}
             {line.evidence?.map((ev, i) => (
               <EvidenceBit key={i} ev={ev} onOpenSource={onOpenSource} />
             ))}
+            {isReq && onUpdateLine && (
+              <button
+                type="button"
+                aria-label="Edit"
+                onClick={(e) => { e.stopPropagation(); startEdit(); }}
+                className="ml-2 opacity-0 group-hover:opacity-60 hover:!opacity-100 inline-flex items-center justify-center size-[16px] rounded-[3px] transition-opacity duration-[100ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+                style={{ color: "var(--fg-muted)", verticalAlign: "middle" }}
+              >
+                <Icons.Pencil size={10} />
+              </button>
+            )}
           </span>
+        )}
+        {line.type === "body" && editing && (
+          <div className="flex flex-col gap-1.5 w-full py-1" onClick={(e) => e.stopPropagation()}>
+            <textarea
+              ref={textareaRef}
+              value={editVal}
+              onChange={(e) => setEditVal(e.target.value)}
+              onKeyDown={handleEditKeyDown}
+              rows={Math.max(2, Math.ceil(editVal.length / 80))}
+              className="w-full text-[13px] leading-[1.65] rounded-[5px] border px-2.5 py-1.5 resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)]"
+              style={{
+                color: "var(--fg-primary)",
+                background: "var(--surface-2)",
+                borderColor: "var(--accent)",
+              }}
+              disabled={saving}
+              autoComplete="off"
+              spellCheck
+            />
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void commitEdit()}
+                disabled={saving || !editVal.trim()}
+                className="inline-flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[100ms] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+                style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+              >
+                {saving ? <Icons.Download size={10} className="animate-spin" /> : <Icons.Check size={10} />}
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="inline-flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[100ms] hover:bg-[var(--surface-3)] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+                style={{ color: "var(--fg-muted)" }}
+              >
+                Cancel
+              </button>
+              <span
+                className="text-[10px] ml-auto"
+                style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+              >
+                ⌘↵ save · Esc cancel
+              </span>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -337,6 +442,35 @@ function EmptyDoc({
     );
   }
 
+  if (state === "revising") {
+    return (
+      <div
+        className="flex flex-col h-full py-6 px-[52px] pr-6"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div className="flex items-center gap-2 mb-6">
+          <span
+            className="size-[8px] rounded-full animate-pulse shrink-0"
+            style={{ background: "var(--accent)" }}
+            aria-hidden="true"
+          />
+          <span className="text-[13px]" style={{ color: "var(--fg-tertiary)" }}>
+            Revising brief…
+          </span>
+        </div>
+        {[80, 60, 90, 50, 70].map((w, i) => (
+          <div key={i} className="flex items-center gap-3 mb-3">
+            <div
+              className="h-[14px] rounded-[3px] animate-pulse"
+              style={{ width: `${w}%`, background: "var(--surface-3)" }}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (state === "generating") {
     return (
       <div
@@ -402,15 +536,34 @@ function EmptyDoc({
 /* ── ChatBar ────────────────────────────────────────────── */
 interface ChatBarProps {
   onAttachFiles?: (files: File[]) => Promise<void>;
+  selectedReqText?: string | null;
+  onClearSelection?: () => void;
+  onSendMessage?: (msg: string, selectionText?: string) => Promise<void>;
+  revising?: boolean;
 }
 
-function ChatBar({ onAttachFiles }: ChatBarProps) {
+function ChatBar({
+  onAttachFiles,
+  selectedReqText,
+  onClearSelection,
+  onSendMessage,
+  revising,
+}: ChatBarProps) {
   const [value, setValue] = useState("");
+  const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleSend() {
-    if (!value.trim()) return;
-    setValue("");
+  async function handleSend() {
+    const trimmed = value.trim();
+    if (!trimmed || sending || revising || !onSendMessage) return;
+    setSending(true);
+    try {
+      await onSendMessage(trimmed, selectedReqText ?? undefined);
+      setValue("");
+    } finally {
+      setSending(false);
+    }
   }
 
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -421,58 +574,102 @@ function ChatBar({ onAttachFiles }: ChatBarProps) {
     }
   }
 
+  const isDisabled = sending || revising || !onSendMessage;
+
   return (
     <div
       className="shrink-0 border-t px-3 py-2.5"
       style={{ borderColor: "var(--border)", background: "var(--background)" }}
     >
-      <div
-        className="flex items-center gap-1.5 px-3 rounded-[10px] transition-shadow duration-[150ms] focus-within:ring-1 focus-within:ring-[var(--accent-ring)]"
-        style={{
-          background: "var(--surface-2)",
-          border: "1px solid var(--border-strong)",
-          minHeight: "38px",
-        }}
-      >
+      {/* Context pill */}
+      {selectedReqText && (
+        <div
+          className="flex items-center gap-1.5 px-4 pt-2 pb-0"
+        >
+          <span
+            className="flex items-center gap-1 h-[20px] px-2 rounded-[4px] border text-[11px] max-w-[calc(100%-28px)] min-w-0"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+              borderColor: "color-mix(in srgb, var(--accent) 35%, transparent)",
+              color: "var(--accent)",
+            }}
+          >
+            <Icons.MessageSquare size={9} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">
+              Re: {selectedReqText.length > 60 ? `${selectedReqText.slice(0, 60)}…` : selectedReqText}
+            </span>
+          </span>
+          <button
+            type="button"
+            aria-label="Clear selection context"
+            onClick={onClearSelection}
+            className="shrink-0 inline-flex items-center justify-center size-[20px] rounded-[3px] transition-colors duration-[100ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+            style={{ color: "var(--fg-muted)" }}
+          >
+            <Icons.X size={10} />
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2.5 h-[52px] px-4">
+        <Icons.MessageSquare
+          size={14}
+          aria-hidden="true"
+          className="shrink-0 text-[var(--fg-muted)]"
+        />
         <label htmlFor="doc-chat-input" className="sr-only">
           Chat input
         </label>
         <input
           id="doc-chat-input"
+          ref={inputRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              handleSend();
+              void handleSend();
             }
           }}
-          placeholder="Ask about the brief, request changes…"
-          className="flex-1 bg-transparent text-[12.5px] py-2 focus-visible:outline-none"
+          placeholder={
+            revising
+              ? "Revising brief…"
+              : onSendMessage
+                ? "Ask about requirements, request changes…"
+                : "Generate a brief first to start chatting"
+          }
+          disabled={isDisabled}
+          className="flex-1 bg-transparent text-[13px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] rounded-[3px] disabled:opacity-50"
           style={{ color: "var(--fg-primary)" }}
           autoComplete="off"
           spellCheck={false}
         />
-        <div className="flex items-center gap-0.5 shrink-0">
-          <IconButton
-            label="Attach source"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={!onAttachFiles}
-          >
-            <Icons.Upload size={13} />
-          </IconButton>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,application/pdf,audio/*"
-            className="hidden"
-            onChange={handleFilePick}
-          />
-          <IconButton label="Send message" onClick={handleSend}>
-            <Icons.Send size={13} />
-          </IconButton>
-        </div>
+        <IconButton
+          label="Attach source"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!onAttachFiles}
+        >
+          <Icons.Upload size={14} />
+        </IconButton>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,application/pdf,audio/*"
+          className="hidden"
+          onChange={handleFilePick}
+        />
+        <IconButton
+          label="Send message"
+          onClick={() => void handleSend()}
+          disabled={isDisabled || !value.trim()}
+        >
+          {sending || revising ? (
+            <Icons.Download size={14} className="animate-spin" />
+          ) : (
+            <Icons.Send size={14} />
+          )}
+        </IconButton>
       </div>
     </div>
   );
@@ -491,6 +688,11 @@ export interface DocViewProps {
   onAttachFiles?: (files: File[]) => Promise<void>;
   onOpenSource?: (sourceId: string) => void;
   lines?: DocLineData[];
+  selectedReqText?: string | null;
+  onClearSelection?: () => void;
+  onSendMessage?: (msg: string, selectionText?: string) => Promise<void>;
+  revising?: boolean;
+  onUpdateLine?: (reqId: string, reqType: "claim" | "question", newText: string) => Promise<void>;
   viewingVersion?: number | null;
   onExitVersionView?: () => void;
 }
@@ -507,6 +709,11 @@ export function DocView({
   onAttachFiles,
   onOpenSource,
   lines = [],
+  selectedReqText,
+  onClearSelection,
+  onSendMessage,
+  revising = false,
+  onUpdateLine,
   viewingVersion = null,
   onExitVersionView,
 }: DocViewProps) {
@@ -515,7 +722,9 @@ export function DocView({
     appState === "no-sources" ||
     appState === "no-session" ||
     appState === "generating" ||
+    appState === "revising" ||
     generating ||
+    revising ||
     !onGenerateBrief;
 
   return (
@@ -612,8 +821,10 @@ export function DocView({
 
       {/* Doc scroll */}
       <div className="flex-1 overflow-y-auto py-4">
-        {appState !== "ready" ? (
+        {appState !== "ready" && appState !== "revising" ? (
           <EmptyDoc state={appState} onAddSources={onAddSources} />
+        ) : appState === "revising" ? (
+          <EmptyDoc state="revising" />
         ) : lines.length === 0 ? (
           <EmptyDoc state="no-sources" onAddSources={onAddSources} />
         ) : (
@@ -623,6 +834,7 @@ export function DocView({
               line={line}
               selectedReq={selectedReq}
               onSelectReq={onSelectReq}
+              onUpdateLine={onUpdateLine}
               onOpenSource={onOpenSource}
             />
           ))
@@ -630,7 +842,13 @@ export function DocView({
       </div>
 
       {/* Chat bar */}
-      <ChatBar onAttachFiles={onAttachFiles} />
+      <ChatBar
+        onAttachFiles={onAttachFiles}
+        selectedReqText={selectedReqText}
+        onClearSelection={onClearSelection}
+        onSendMessage={onSendMessage}
+        revising={revising}
+      />
     </div>
   );
 }
