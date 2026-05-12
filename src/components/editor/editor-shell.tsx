@@ -14,7 +14,7 @@ import { type AppState, type DocLineData, DocView } from "./doc-view";
 import { ProjectSearchPalette } from "./project-search-palette";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
-import { RightPane, type SnapshotListItem, type SourceItem, type SourceType } from "./right-pane";
+import { RightPane, type SourceItem, type SourceType } from "./right-pane";
 import { SourcePreviewModal } from "./source-preview-modal";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
@@ -398,62 +398,27 @@ export function EditorShell({
     [sessionId, startUpload],
   );
 
-  const handleGenerateBrief = useCallback(async () => {
-    if (!sessionId || generating) return;
-
-    setGenerating(true);
-    setGenerationError(null);
-    setStreamingLines(null);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
-
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as
-          | { error?: string; message?: string }
-          | null;
-        throw new Error(
-          payload?.message ?? payload?.error ?? "Failed to generate brief.",
-        );
-      }
-
-      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
-        await readSseStream(res.body, setStreamingLines);
-        router.refresh();
-        return;
-      }
-
-      router.refresh();
-    } catch (error) {
-      setGenerationError(
-        error instanceof Error ? error.message : "Failed to generate brief.",
-      );
-    } finally {
-      setGenerating(false);
-      setStreamingLines(null);
-    }
-  }, [sessionId, generating, router]);
-
   const loadRevisions = useCallback(async (sid: string) => {
     setRevisionsLoading(true);
     try {
-      const res = await fetch(`/api/sessions/${sid}/revisions`, { cache: "no-store" });
+      const res = await fetch(`/api/sessions/${sid}/revisions`, {
+        cache: "no-store",
+      });
       if (!res.ok) return;
-      const data = await res.json() as { revisions: Array<{
-        id: string;
-        type: string;
-        summary: string;
-        createdAt: string;
-        snapshotId: string | null;
-        version: number | null;
-        snapshotStatus: string | null;
-        trigger: string | null;
-        userMessage: string | null;
-        selectionText: string | null;
-      }> };
+      const data = (await res.json()) as {
+        revisions: Array<{
+          id: string;
+          type: string;
+          summary: string;
+          createdAt: string;
+          snapshotId: string | null;
+          version: number | null;
+          snapshotStatus: string | null;
+          trigger: string | null;
+          userMessage: string | null;
+          selectionText: string | null;
+        }>;
+      };
       const allRevisions = data.revisions ?? [];
 
       // Chat messages are REGENERATED events with trigger=chat
@@ -490,6 +455,60 @@ export function EditorShell({
       setRevisionsLoading(false);
     }
   }, []);
+
+  const handleGenerateBrief = useCallback(async () => {
+    if (!sessionId || generating) return;
+
+    setGenerating(true);
+    setGenerationError(null);
+    setStreamingLines(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        throw new Error(
+          payload?.message ?? payload?.error ?? "Failed to generate brief.",
+        );
+      }
+
+      if (
+        res.headers.get("content-type")?.includes("text/event-stream") &&
+        res.body
+      ) {
+        const result = await readSseStream(res.body, setStreamingLines);
+        setCurrentSnapshotId(result.snapshotId);
+        setViewingVersion(null);
+        const snapshotRes = await fetch(`/api/snapshots/${result.snapshotId}`, {
+          cache: "no-store",
+        });
+        if (snapshotRes.ok) {
+          const snapshot = await snapshotRes.json() as { lines: DocLineData[] };
+          setClientLines(snapshot.lines);
+        }
+        await loadRevisions(sessionId);
+        await refreshSources();
+        router.refresh();
+        return;
+      }
+
+      router.refresh();
+    } catch (error) {
+      setGenerationError(
+        error instanceof Error ? error.message : "Failed to generate brief.",
+      );
+    } finally {
+      setGenerating(false);
+      setStreamingLines(null);
+    }
+  }, [sessionId, generating, loadRevisions, refreshSources, router]);
 
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {

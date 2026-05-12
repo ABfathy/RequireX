@@ -10,7 +10,7 @@ import type {
 } from "../../../generated/prisma/client";
 
 const MAX_CHUNK_CHARS = 1_800;
-const PDF_TEXT_PARSER_VERSION = "built-in-pdf-text-v2";
+export const PDF_TEXT_PARSER_VERSION = "built-in-pdf-text-v2";
 
 type FileSourceType = Extract<SourceType, "PDF" | "AUDIO">;
 
