@@ -117,6 +117,11 @@ type SseEvent =
   | { type: "complete"; snapshotId: string; version: number }
   | { type: "error"; code: string; message: string };
 
+const SMOOTH_CHAR_DELAY_MS = 5; // ~200 chars/sec — matches typical model generation speed
+const SMOOTH_RENDER_INTERVAL_MS = 16; // cap React re-renders at ~60fps
+
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 async function readSseStream(
   body: ReadableStream<Uint8Array>,
   onLines: (lines: DocLineData[]) => void,
@@ -125,6 +130,18 @@ async function readSseStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
+  let completeResult: { snapshotId: string; version: number } | null = null;
+  let lastRenderTime = 0;
+
+  const flushIfDue = () => {
+    const now = Date.now();
+    if (now - lastRenderTime >= SMOOTH_RENDER_INTERVAL_MS) {
+      lastRenderTime = now;
+      const snapshot = parser.getSnapshot();
+      if (snapshot.length > 0) onLines(snapshot);
+    }
+  };
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -135,17 +152,28 @@ async function readSseStream(
       if (!part.startsWith("data: ")) continue;
       const evt = JSON.parse(part.slice(6)) as SseEvent;
       if (evt.type === "token") {
-        parser.feed(evt.text);
+        for (const ch of evt.text) {
+          parser.feed(ch);
+          flushIfDue();
+          await delay(SMOOTH_CHAR_DELAY_MS);
+        }
+        // Ensure final state of this token is always rendered
         const snapshot = parser.getSnapshot();
         if (snapshot.length > 0) onLines(snapshot);
       } else if (evt.type === "complete") {
-        return { snapshotId: evt.snapshotId, version: evt.version };
+        completeResult = { snapshotId: evt.snapshotId, version: evt.version };
       } else if (evt.type === "error") {
         throw new Error(evt.message);
       }
     }
   }
-  throw new Error("Stream ended without a complete event.");
+
+  // Final flush for any trailing in-progress line
+  const snapshot = parser.getSnapshot();
+  if (snapshot.length > 0) onLines(snapshot);
+
+  if (!completeResult) throw new Error("Stream ended without a complete event.");
+  return completeResult;
 }
 
 export function EditorShell({
