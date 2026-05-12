@@ -1,8 +1,6 @@
 "use client";
 
-import { AuthenticateWithRedirectCallback, useAuth } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { AuthenticateWithRedirectCallback } from "@clerk/nextjs";
 
 function Spinner() {
   return (
@@ -19,26 +17,10 @@ function Spinner() {
 }
 
 export default function SignInSSOCallback() {
-  const { isLoaded, isSignedIn } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    router.prefetch("/app");
-  }, [router]);
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      router.replace("/app");
-    }
-  }, [isLoaded, isSignedIn, router]);
-
   return (
     <>
       <Spinner />
-      <AuthenticateWithRedirectCallback
-        signInForceRedirectUrl="/app"
-        signUpForceRedirectUrl="/app"
-      />
+      <AuthenticateWithRedirectCallback />
     </>
   );
 }

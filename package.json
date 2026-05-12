@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "lint:fix": "eslint . --fix",
     "test:unit": "vitest run",
     "test:e2e": "node -e \"console.log('E2E tests are not configured yet. Planned for Workstream 10.')\"",
     "test:a11y": "node -e \"console.log('Accessibility tests are not configured yet. Planned for Workstream 10.')\"",
