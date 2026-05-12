@@ -13,6 +13,7 @@ import {
 } from "@/components/brief/revision-panel";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { cn } from "@/lib/utils";
+
 import type { BriefCommentSection } from "../../../../generated/prisma/client";
 
 /* ── Mock data (matches design/client.html) ─────────── */
@@ -253,8 +254,8 @@ export default function BriefClientShell() {
       if (data.snapshot?.status === "CONFIRMED") {
         setIsConfirmed(true);
       }
-    } catch (err: any) {
-      setConfirmError(err.message || mapApiError(500));
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : mapApiError(500));
     } finally {
       setIsConfirming(false);
     }

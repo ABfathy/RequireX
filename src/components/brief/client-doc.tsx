@@ -1,13 +1,14 @@
 "use client";
 
-import { Send, Check } from "lucide-react";
+import { Check,Send } from "lucide-react";
 
-import type { BriefCommentSection } from "../../../generated/prisma/client";
 import {
   type Requirement,
   RequirementCard,
 } from "@/components/brief/requirement-card";
 import { Button } from "@/components/ui/button";
+
+import type { BriefCommentSection } from "../../../generated/prisma/client";
 
 interface ClientDocProps {
   title: string;
