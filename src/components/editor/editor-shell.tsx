@@ -398,45 +398,6 @@ export function EditorShell({
     [sessionId, startUpload],
   );
 
-  const handleGenerateBrief = useCallback(async () => {
-    if (!sessionId || generating) return;
-
-    setGenerating(true);
-    setGenerationError(null);
-    setStreamingLines(null);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
-
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as
-          | { error?: string; message?: string }
-          | null;
-        throw new Error(
-          payload?.message ?? payload?.error ?? "Failed to generate brief.",
-        );
-      }
-
-      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
-        await readSseStream(res.body, setStreamingLines);
-        router.refresh();
-        return;
-      }
-
-      router.refresh();
-    } catch (error) {
-      setGenerationError(
-        error instanceof Error ? error.message : "Failed to generate brief.",
-      );
-    } finally {
-      setGenerating(false);
-      setStreamingLines(null);
-    }
-  }, [sessionId, generating, router]);
-
   const loadRevisions = useCallback(async (sid: string) => {
     setRevisionsLoading(true);
     try {
@@ -491,6 +452,51 @@ export function EditorShell({
     }
   }, []);
 
+  const handleGenerateBrief = useCallback(async () => {
+    if (!sessionId || generating) return;
+
+    setGenerating(true);
+    setGenerationError(null);
+    setStreamingLines(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as
+          | { error?: string; message?: string }
+          | null;
+        throw new Error(
+          payload?.message ?? payload?.error ?? "Failed to generate brief.",
+        );
+      }
+
+      let newSnapshotId: string | null = null;
+
+      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+        const result = await readSseStream(res.body, setStreamingLines);
+        newSnapshotId = result.snapshotId;
+      } else {
+        const result = await res.json() as { snapshotId: string; version: number };
+        newSnapshotId = result.snapshotId;
+      }
+
+      if (newSnapshotId) setCurrentSnapshotId(newSnapshotId);
+      if (sessionId) await loadRevisions(sessionId);
+      router.refresh();
+    } catch (error) {
+      setGenerationError(
+        error instanceof Error ? error.message : "Failed to generate brief.",
+      );
+      setStreamingLines(null);
+    } finally {
+      setGenerating(false);
+    }
+  }, [sessionId, generating, router, loadRevisions]);
+
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {
       if (!sessionId || !currentSnapshotId || revising) return;
@@ -540,7 +546,6 @@ export function EditorShell({
         );
       } finally {
         setRevising(false);
-        setStreamingLines(null);
       }
     },
     [sessionId, currentSnapshotId, revising, selectedReq, loadRevisions, router],
@@ -549,6 +554,16 @@ export function EditorShell({
   useEffect(() => {
     if (sessionId) void loadRevisions(sessionId);
   }, [sessionId, loadRevisions]);
+
+  // Clear streaming lines once the server-refreshed lines arrive, preventing
+  // the flash from streamed content → empty state → server content.
+  const streamingLinesRef = useRef(streamingLines);
+  useEffect(() => { streamingLinesRef.current = streamingLines; }, [streamingLines]);
+  useEffect(() => {
+    if (streamingLinesRef.current && lines.length > 0) {
+      setStreamingLines(null);
+    }
+  }, [lines]);
 
   // Ref keeps the latest displayLines accessible inside callbacks without
   // causing the callback to re-create every time lines change.
@@ -696,7 +711,7 @@ export function EditorShell({
       ? [{ lineNum: 1, type: "h1" as const, text: session.title }]
       : [];
   const displayLines = clientLines ?? baseLines;
-  displayLinesRef.current = displayLines;
+  useEffect(() => { displayLinesRef.current = displayLines; });
   const displayHasSnapshot = usesServerSnapshot && hasSnapshot;
 
   const baseAppState: AppState = session
@@ -794,6 +809,7 @@ export function EditorShell({
 
   /* Reset snapshot state when session changes */
   useEffect(() => {
+    if (!sessionId) return;
     setSnapshots([]);
     setViewingVersion(null);
     setClientLines(null);

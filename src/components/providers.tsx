@@ -52,6 +52,12 @@ function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
       appearance={isDark ? DARK_APPEARANCE : LIGHT_APPEARANCE}
       signInUrl={clientEnv.NEXT_PUBLIC_CLERK_SIGN_IN_URL}
       signUpUrl={clientEnv.NEXT_PUBLIC_CLERK_SIGN_UP_URL}
+      signInForceRedirectUrl={
+        clientEnv.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL
+      }
+      signUpForceRedirectUrl={
+        clientEnv.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL
+      }
       signInFallbackRedirectUrl={
         clientEnv.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL
       }

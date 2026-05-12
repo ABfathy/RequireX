@@ -804,19 +804,17 @@ export function DocView({
 
       {/* Doc scroll */}
       <div className="flex-1 overflow-y-auto py-4">
-        {(appState === "generating" || appState === "revising") ? (
-          streamingLines && streamingLines.length > 0 ? (
-            streamingLines.map((line, i) => (
-              <DocLine
-                key={i}
-                line={line}
-                selectedReq={null}
-                onSelectReq={() => undefined}
-              />
-            ))
-          ) : (
-            <EmptyDoc state={appState} onAddSources={onAddSources} />
-          )
+        {streamingLines && streamingLines.length > 0 ? (
+          streamingLines.map((line, i) => (
+            <DocLine
+              key={i}
+              line={line}
+              selectedReq={null}
+              onSelectReq={() => undefined}
+            />
+          ))
+        ) : (appState === "generating" || appState === "revising") ? (
+          <EmptyDoc state={appState} onAddSources={onAddSources} />
         ) : appState !== "ready" ? (
           <EmptyDoc state={appState} onAddSources={onAddSources} />
         ) : lines.length === 0 ? (
