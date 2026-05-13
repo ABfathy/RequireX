@@ -817,6 +817,8 @@ export interface DocViewProps {
   activeComparisonContent?: ReactNode;
   onSelectWorkspaceTab?: (id: string) => void;
   onCloseComparisonTab?: (id: string) => void;
+  snapshotId?: string | null;
+  onShareBrief?: () => void;
 }
 
 export function DocView({
@@ -847,6 +849,8 @@ export function DocView({
   activeComparisonContent,
   onSelectWorkspaceTab,
   onCloseComparisonTab,
+  snapshotId,
+  onShareBrief,
 }: DocViewProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
@@ -950,6 +954,17 @@ export function DocView({
             >
               <Icons.Filter size={11} aria-hidden="true" />
               <span>Filter</span>
+            </button>
+          )}
+          {hasSnapshot && !!snapshotId && !!onShareBrief && (
+            <button
+              type="button"
+              onClick={onShareBrief}
+              className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ background: "var(--surface-3)", color: "var(--fg-muted)" }}
+            >
+              <Icons.Share size={11} aria-hidden="true" />
+              <span>Share</span>
             </button>
           )}
           <button

@@ -18,6 +18,7 @@ import { ProjectSettingsModal } from "./project-settings-modal";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
 import { RightPane, type SourceItem, type SourceType } from "./right-pane";
+import { ShareModal } from "./share-modal";
 import { SourcePreviewModal } from "./source-preview-modal";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
@@ -257,6 +258,7 @@ export function EditorShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [projectSearchOpen, setProjectSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
@@ -1124,6 +1126,8 @@ export function EditorShell({
     setRightTab("sources");
   }
 
+  const handleShareBrief = useCallback(() => setShareModalOpen(true), []);
+
   function handleExportPdf() {
     const lines = displayLinesRef.current;
     if (!lines.length) return;
@@ -1265,6 +1269,8 @@ ${lines.map((l) => {
           }
           revising={revising}
           onUpdateLine={currentSnapshotId ? handleUpdateLine : undefined}
+          snapshotId={currentSnapshotId}
+          onShareBrief={currentSnapshotId ? handleShareBrief : undefined}
           viewingVersion={viewingVersion}
           onExitVersionView={() => void handleSelectRevision(null)}
           comparisonTabs={comparisonTabs.map((tab) => ({
@@ -1339,6 +1345,13 @@ ${lines.map((l) => {
           onViewRevisions={() => { setRightOpen(true); setRightTab("revisions"); }}
           onExportPdf={displayLinesRef.current.length > 0 ? handleExportPdf : undefined}
           onOpenSettings={activeProjectId ? () => setSettingsOpen(true) : undefined}
+          onShare={currentSnapshotId ? handleShareBrief : undefined}
+        />
+      )}
+      {shareModalOpen && currentSnapshotId && (
+        <ShareModal
+          snapshotId={currentSnapshotId}
+          onClose={() => setShareModalOpen(false)}
         />
       )}
       {settingsOpen && activeProjectId && (

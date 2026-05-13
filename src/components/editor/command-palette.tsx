@@ -21,6 +21,7 @@ interface CommandPaletteProps {
   onViewRevisions?: () => void;
   onExportPdf?: () => void;
   onOpenSettings?: () => void;
+  onShare?: () => void;
 }
 
 function makeCommands(handlers: Omit<CommandPaletteProps, "onClose">): Command[] {
@@ -28,18 +29,18 @@ function makeCommands(handlers: Omit<CommandPaletteProps, "onClose">): Command[]
     { icon: <Icons.Upload size={14} />, label: "Add source", onExecute: handlers.onAddSource },
     { icon: <Icons.Refresh size={14} />, label: "Re-extract requirements", onExecute: handlers.onRegenerate },
     { icon: <Icons.Download size={14} />, label: "Export as PDF", onExecute: handlers.onExportPdf, disabled: !handlers.onExportPdf, disabledLabel: "generate brief first" },
-    { icon: <Icons.Share size={14} />, label: "Share with client", disabled: true, disabledLabel: "coming soon" },
+    { icon: <Icons.Share size={14} />, label: "Share with client", onExecute: handlers.onShare, disabled: !handlers.onShare, disabledLabel: "generate brief first" },
     { icon: <Icons.History size={14} />, label: "View revision history", onExecute: handlers.onViewRevisions },
     { icon: <Icons.Settings size={14} />, label: "Project settings", onExecute: handlers.onOpenSettings },
   ];
 }
 
-export function CommandPalette({ onClose, onAddSource, onRegenerate, onViewRevisions, onExportPdf, onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ onClose, onAddSource, onRegenerate, onViewRevisions, onExportPdf, onOpenSettings, onShare }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const COMMANDS = makeCommands({ onAddSource, onRegenerate, onViewRevisions, onExportPdf, onOpenSettings });
+  const COMMANDS = makeCommands({ onAddSource, onRegenerate, onViewRevisions, onExportPdf, onOpenSettings, onShare });
 
   const filtered = COMMANDS.filter(
     (cmd) => !query || cmd.label.toLowerCase().includes(query.toLowerCase()),
