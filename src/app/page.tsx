@@ -19,7 +19,7 @@ export default function HomePage() {
       <div className="w-full max-w-[480px]">
         {/* Brand */}
         <div className="flex items-center gap-2.5 mb-8">
-          <RxLogo size={22} className="text-[var(--accent)]" />
+          <RxLogo size={28} className="text-[var(--accent)]" />
           <span
             className="text-[17px] font-semibold tracking-[-0.01em]"
             style={{ color: "var(--fg-primary)" }}

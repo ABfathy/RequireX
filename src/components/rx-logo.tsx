@@ -7,21 +7,17 @@ interface RxLogoProps {
 
 function RxLogo({ size = 16, className }: RxLogoProps) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
+    // mix-blend-mode:screen makes the black background transparent,
+    // showing only the neon teal lines on any background colour.
+    <img
+      src="/rx-logo.png"
       width={size}
       height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      alt=""
+      aria-hidden="true"
       className={cn("shrink-0", className)}
-    >
-      <path d="M4 4 v16 M4 4 h10 q4 0 4 4 q0 4-4 4 H4" />
-      <path d="M10.5 12 l8.5 8 M16 12 l-5.5 8" />
-    </svg>
+      style={{ mixBlendMode: "screen", display: "inline-block" }}
+    />
   );
 }
 

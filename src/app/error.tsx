@@ -41,7 +41,7 @@ export default function RootError({
         >
           {/* Logo */}
           <div className="rx-err-1">
-            <RxLogo size={16} className="text-[var(--fg-disabled)]" />
+            <RxLogo size={24} className="text-[var(--fg-disabled)]" />
           </div>
 
           {/* Error icon */}

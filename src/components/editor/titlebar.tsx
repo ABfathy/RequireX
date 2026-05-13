@@ -41,7 +41,7 @@ export function TitleBar({
         className="flex items-center gap-1.5 h-[22px] px-2 rounded-[4px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] shrink-0"
         aria-label="RequireX — go to home"
       >
-        <RxLogo size={13} className="text-[var(--accent)]" />
+        <RxLogo size={18} className="text-[var(--accent)]" />
         <span
           className="text-[12px] font-semibold tracking-[-0.01em]"
           style={{ color: "var(--fg-primary)" }}
