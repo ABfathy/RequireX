@@ -43,7 +43,7 @@ function ClientHeader({
         className="flex items-center gap-[7px] text-[13px] font-semibold tracking-[-0.015em] text-fg-1 shrink-0 rounded-[4px] transition-colors duration-[120ms] hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
         aria-label="RequireX — go to home"
       >
-        <RxLogo size={15} className="text-accent" />
+        <RxLogo size={20} className="text-accent" />
         <span className="hidden sm:inline" translate="no">RequireX</span>
       </Link>
 

@@ -559,6 +559,23 @@ export async function* runBriefGenerationStream(
       );
     }
 
+    const latestSnapshot = await prisma.briefSnapshot.findFirst({
+      where: { sessionId: input.sessionId },
+      orderBy: { version: "desc" },
+      select: {
+        claims: {
+          select: { text: true, section: true },
+          orderBy: [{ section: "asc" }, { orderIndex: "asc" }],
+        },
+      },
+    });
+    if (latestSnapshot?.claims?.length) {
+      bundle.existingClaims = latestSnapshot.claims.map((c) => ({
+        text: c.text,
+        section: c.section as string,
+      }));
+    }
+
     let fullText = "";
     try {
       for await (const chunk of generateBriefStreamFromBundle(bundle)) {
@@ -706,6 +723,23 @@ export async function runBriefGeneration({
         "EMPTY_BUNDLE",
         "Source bundle was empty after assembly.",
       );
+    }
+
+    const latestSnapshotForRun = await prisma.briefSnapshot.findFirst({
+      where: { sessionId },
+      orderBy: { version: "desc" },
+      select: {
+        claims: {
+          select: { text: true, section: true },
+          orderBy: [{ section: "asc" }, { orderIndex: "asc" }],
+        },
+      },
+    });
+    if (latestSnapshotForRun?.claims?.length) {
+      bundle.existingClaims = latestSnapshotForRun.claims.map((c) => ({
+        text: c.text,
+        section: c.section as string,
+      }));
     }
 
     const output = await callModelWithRetry(bundle);

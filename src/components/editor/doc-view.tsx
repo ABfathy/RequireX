@@ -41,6 +41,10 @@ export interface DocLineData {
   text?: string;
   reqId?: string;
   reqType?: "claim" | "question";
+  /** DB section key for claim lines (e.g. "SUMMARY", "GOALS") */
+  section?: string;
+  /** DB orderIndex for claim lines — used for inserting new claims */
+  orderIndex?: number;
   status?: string;
   tags?: string[];
   evidence?: EvidenceRef[];
@@ -153,6 +157,9 @@ function DocLine({
   selectedReq,
   onSelectReq,
   onUpdateLine,
+  onInsertLineAfter,
+  autoFocus,
+  onAutoFocusConsumed,
   onOpenSource,
 }: {
   line: DocLineData;
@@ -163,6 +170,9 @@ function DocLine({
     reqType: "claim" | "question",
     newText: string,
   ) => Promise<void>;
+  onInsertLineAfter?: (section: string, orderIndex: number) => Promise<void>;
+  autoFocus?: boolean;
+  onAutoFocusConsumed?: () => void;
   onOpenSource?: (sourceId: string) => void;
 }) {
   const isReq = !!line.reqId && !!line.reqType;
@@ -179,6 +189,22 @@ function DocLine({
     blank: line.small ? "h-[8px]" : "h-[16px]",
   };
   const heightCls = heights[line.type] ?? "min-h-[21px]";
+
+  // Auto-enter edit mode when this line is the newly inserted one
+  useEffect(() => {
+    if (autoFocus && isReq && onUpdateLine) {
+      setEditVal(line.text ?? "");
+      setEditing(true);
+      onAutoFocusConsumed?.();
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        const len = textareaRef.current?.value.length ?? 0;
+        textareaRef.current?.setSelectionRange(len, len);
+      }, 0);
+    }
+    // Only fire when autoFocus flips to true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFocus]);
 
   function startEdit() {
     if (!isReq || !onUpdateLine) return;
@@ -214,9 +240,45 @@ function DocLine({
       setEditing(false);
       return;
     }
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.altKey) {
       e.preventDefault();
       void commitEdit();
+      return;
+    }
+    // Alt+Enter (⌥↵): save current text, then insert a blank new claim below.
+    // Decoupled from commitEdit() to avoid state-change race conditions.
+    if (
+      e.key === "Enter" &&
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      line.reqType === "claim" &&
+      line.section != null &&
+      line.orderIndex != null &&
+      onInsertLineAfter
+    ) {
+      e.preventDefault();
+      const section = line.section;
+      const orderIndex = line.orderIndex;
+      void (async () => {
+        const trimmed = editVal.trim();
+        const needsSave =
+          !!trimmed &&
+          !!line.reqId &&
+          !!line.reqType &&
+          !!onUpdateLine &&
+          trimmed !== line.text;
+        if (needsSave) {
+          setSaving(true);
+          try {
+            await onUpdateLine(line.reqId!, line.reqType!, trimmed);
+          } finally {
+            setSaving(false);
+          }
+        }
+        setEditing(false);
+        await onInsertLineAfter(section, orderIndex);
+      })();
     }
   }
 
@@ -251,7 +313,28 @@ function DocLine({
         }}
         aria-hidden="true"
       >
-        {line.lineNum > 0 ? line.lineNum : ""}
+        {isReq && line.reqType === "claim" && !editing && onInsertLineAfter &&
+         line.section != null && line.orderIndex != null ? (
+          <span className="relative inline-flex items-center justify-end w-full">
+            <span className="group-hover:opacity-0 transition-opacity duration-[80ms]">
+              {line.lineNum > 0 ? line.lineNum : ""}
+            </span>
+            <button
+              type="button"
+              aria-label="Insert line below"
+              onClick={(e) => {
+                e.stopPropagation();
+                void onInsertLineAfter(line.section!, line.orderIndex!);
+              }}
+              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-60 hover:!opacity-100 rounded-[3px] transition-opacity duration-[80ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ color: "var(--accent)" }}
+            >
+              <Icons.Plus size={11} />
+            </button>
+          </span>
+        ) : (
+          line.lineNum > 0 ? line.lineNum : ""
+        )}
       </div>
 
       {/* Content */}
@@ -410,7 +493,7 @@ function DocLine({
                   fontFamily: "var(--font-mono)",
                 }}
               >
-                ⌘↵ save · Esc cancel
+                ⌘↵ save · ⌥↵ add below · Esc cancel
               </span>
             </div>
           </div>
@@ -788,7 +871,7 @@ function applyFilter(lines: DocLineData[], query: string): DocLineData[] {
 export interface DocViewProps {
   appState?: AppState;
   projectName?: string | null;
-  sessionName?: string | null;
+  currentVersion?: number | null;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
   onAddSources?: () => void;
@@ -810,6 +893,9 @@ export interface DocViewProps {
     reqType: "claim" | "question",
     newText: string,
   ) => Promise<void>;
+  onInsertLineAfter?: (section: string, orderIndex: number) => Promise<void>;
+  autoFocusReqId?: string | null;
+  onAutoFocusConsumed?: () => void;
   viewingVersion?: number | null;
   onExitVersionView?: () => void;
   comparisonTabs?: WorkspaceComparisonTab[];
@@ -822,7 +908,7 @@ export interface DocViewProps {
 export function DocView({
   appState = "no-session",
   projectName,
-  sessionName,
+  currentVersion,
   selectedReq,
   onSelectReq,
   onAddSources,
@@ -840,6 +926,9 @@ export function DocView({
   onSendMessage,
   revising = false,
   onUpdateLine,
+  onInsertLineAfter,
+  autoFocusReqId,
+  onAutoFocusConsumed,
   viewingVersion = null,
   onExitVersionView,
   comparisonTabs = [],
@@ -896,21 +985,26 @@ export function DocView({
               >
                 {projectName}
               </span>
-              <Icons.ChevronRight
-                size={11}
-                aria-hidden="true"
-                className="shrink-0 opacity-40"
-              />
+              {(viewingVersion != null || currentVersion != null) && (
+                <Icons.ChevronRight
+                  size={11}
+                  aria-hidden="true"
+                  className="shrink-0 opacity-40"
+                />
+              )}
             </>
           )}
-          <span
-            className="truncate"
-            style={{
-              color: projectName ? "var(--fg-tertiary)" : "var(--fg-secondary)",
-            }}
-          >
-            {sessionName ?? "—"}
-          </span>
+          {(viewingVersion != null || currentVersion != null) && (
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                color: "var(--accent)",
+                fontSize: 11,
+              }}
+            >
+              v{viewingVersion ?? currentVersion}
+            </span>
+          )}
         </div>
 
         {/* Actions */}
@@ -1112,11 +1206,14 @@ export function DocView({
         ) : (
           applyFilter(lines, filterQuery).map((line, i) => (
             <DocLine
-              key={i}
+              key={line.reqId ?? i}
               line={line}
               selectedReq={selectedReq}
               onSelectReq={onSelectReq}
               onUpdateLine={onUpdateLine}
+              onInsertLineAfter={onInsertLineAfter}
+              autoFocus={!!autoFocusReqId && line.reqId === autoFocusReqId}
+              onAutoFocusConsumed={onAutoFocusConsumed}
               onOpenSource={onOpenSource}
             />
           ))

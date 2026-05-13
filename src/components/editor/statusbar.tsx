@@ -5,13 +5,13 @@ export type ExtractStatus = "idle" | "queued" | "running" | "failed";
 interface StatusBarProps {
   selectedReq?: string | null;
   extractStatus?: ExtractStatus;
-  sessionName?: string | null;
+  currentVersion?: number | null;
 }
 
 export function StatusBar({
   selectedReq,
   extractStatus = "idle",
-  sessionName,
+  currentVersion,
 }: StatusBarProps) {
   const dotColor =
     extractStatus === "running"  ? "var(--warning)"
@@ -45,12 +45,14 @@ export function StatusBar({
       />
       <span>brief: {statusLabel}</span>
 
-      <Sep />
-
-      {/* Session name */}
-      <span style={{ color: sessionName ? "var(--fg-secondary)" : "var(--fg-disabled)" }}>
-        {sessionName ?? "—"}
-      </span>
+      {currentVersion != null && (
+        <>
+          <Sep />
+          <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
+            v{currentVersion}
+          </span>
+        </>
+      )}
 
       {/* Spacer */}
       <span className="flex-1" />

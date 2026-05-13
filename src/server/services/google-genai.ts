@@ -52,6 +52,8 @@ export type SourceBundleAsset = {
 
 export type SourceBundle = {
   assets: SourceBundleAsset[];
+  /** Claims from the most-recent snapshot, included in the prompt on regeneration so the model builds on prior work and user-added lines. */
+  existingClaims?: Array<{ text: string; section: string }>;
 };
 
 const responseJsonSchema = {
@@ -340,7 +342,21 @@ function buildPromptText(bundle: SourceBundle, retryHint?: string) {
     ? `\n\nYour previous response was invalid: ${retryHint}\nReturn only corrected JSON.`
     : "";
 
-  return `Use only these sourceAssetId values in evidence:\n${validIds}\n\n${sourceText}${retryText}`;
+  let existingClaimsText = "";
+  if (bundle.existingClaims && bundle.existingClaims.length > 0) {
+    const bySect = new Map<string, string[]>();
+    for (const c of bundle.existingClaims) {
+      const bucket = bySect.get(c.section) ?? [];
+      bucket.push(c.text);
+      bySect.set(c.section, bucket);
+    }
+    const sections = [...bySect.entries()]
+      .map(([sec, texts]) => `[${sec}]\n${texts.map((t, i) => `${i + 1}. ${t}`).join("\n")}`)
+      .join("\n\n");
+    existingClaimsText = `\n\nEXISTING REQUIREMENTS (preserve and build upon these — they include both AI-generated and manually added lines; update, refine, or extend them based on the sources above):\n\n${sections}`;
+  }
+
+  return `Use only these sourceAssetId values in evidence:\n${validIds}\n\n${sourceText}${existingClaimsText}${retryText}`;
 }
 
 async function imageInlinePart(asset: SourceBundleAsset) {

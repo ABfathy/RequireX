@@ -43,11 +43,6 @@ export function snapshotToDocLines(
   const lines: DocLineData[] = [];
   let lineNum = 1;
 
-  if (sessionTitle) {
-    lines.push({ lineNum: lineNum++, type: "h1", text: sessionTitle });
-    lines.push({ lineNum: 0, type: "blank" });
-  }
-
   if (!snapshot) return lines;
 
   const sourceIndex = buildSourceIndex(snapshot);
@@ -72,6 +67,8 @@ export function snapshotToDocLines(
         text: claim.text,
         reqId: claim.id,
         reqType: "claim",
+        section: claim.section,
+        orderIndex: claim.orderIndex,
         tags: [claim.confidence.toLowerCase()],
         evidence: claim.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
       });

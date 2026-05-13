@@ -273,6 +273,7 @@ export function EditorShell({
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [clientLines, setClientLines] = useState<DocLineData[] | null>(null);
+  const [pendingFocusClaimId, setPendingFocusClaimId] = useState<string | null>(null);
   const [comparisonTabs, setComparisonTabs] = useState<ComparisonTab[]>([]);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState(DRAFT_TAB_ID);
 
@@ -568,11 +569,8 @@ export function EditorShell({
     ];
     let phaseIdx = 0;
     const makeHeaderLines = (phaseLabel: string): DocLineData[] => {
-      if (!session?.title) return [];
       return [
-        { lineNum: 1, type: "h1", text: session.title },
-        { lineNum: 0, type: "blank" },
-        { lineNum: 2, type: "meta", text: phaseLabel, small: true },
+        { lineNum: 1, type: "meta", text: phaseLabel, small: true },
         { lineNum: 0, type: "blank" },
       ];
     };
@@ -866,6 +864,33 @@ export function EditorShell({
     [],
   );
 
+  const handleInsertLineAfter = useCallback(
+    async (section: string, orderIndex: number) => {
+      if (!currentSnapshotId) return;
+      const res = await fetch("/api/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          snapshotId: currentSnapshotId,
+          section,
+          orderIndex: orderIndex + 1,
+          text: "…",
+        }),
+      });
+      if (!res.ok) return;
+      const newClaim = (await res.json()) as { id: string };
+      // Re-fetch snapshot lines to get the renumbered state
+      const data = await fetch(`/api/snapshots/${currentSnapshotId}`, {
+        cache: "no-store",
+      }).then((r) => (r.ok ? (r.json() as Promise<{ lines: DocLineData[] }>) : null));
+      if (data?.lines) {
+        setClientLines(data.lines);
+        setPendingFocusClaimId(newClaim.id);
+      }
+    },
+    [currentSnapshotId],
+  );
+
   const handleSelectRevision = useCallback(
     async (snapshotId: string | null) => {
       if (!snapshotId) {
@@ -992,11 +1017,10 @@ export function EditorShell({
   const usesServerSnapshot = activeProjectId === initialActiveProjectId;
   const baseLines = usesServerSnapshot
     ? lines
-    : session?.title
-      ? [{ lineNum: 1, type: "h1" as const, text: session.title }]
-      : [];
+    : [];
   const displayLines = clientLines ?? baseLines;
   useEffect(() => { displayLinesRef.current = displayLines; });
+  const currentVersion = snapshots.find((s) => s.id === currentSnapshotId)?.version ?? null;
   const displayHasSnapshot = usesServerSnapshot ? hasSnapshot : currentSnapshotId !== null;
 
   // After a client-side project switch, auto-load the latest snapshot's lines so
@@ -1246,7 +1270,7 @@ ${lines.map((l) => {
         <DocView
           appState={appState}
           projectName={activeProjectName}
-          sessionName={session?.title ?? null}
+          currentVersion={currentVersion}
           selectedReq={selectedReq}
           onSelectReq={handleSelectReq}
           onAddSources={handleOpenSources}
@@ -1265,6 +1289,9 @@ ${lines.map((l) => {
           }
           revising={revising}
           onUpdateLine={currentSnapshotId ? handleUpdateLine : undefined}
+          onInsertLineAfter={currentSnapshotId ? handleInsertLineAfter : undefined}
+          autoFocusReqId={pendingFocusClaimId}
+          onAutoFocusConsumed={() => setPendingFocusClaimId(null)}
           viewingVersion={viewingVersion}
           onExitVersionView={() => void handleSelectRevision(null)}
           comparisonTabs={comparisonTabs.map((tab) => ({
@@ -1321,7 +1348,7 @@ ${lines.map((l) => {
 
       <StatusBar
         selectedReq={selectedReq}
-        sessionName={session?.title ?? null}
+        currentVersion={currentVersion}
         extractStatus={extractStatus}
       />
 
