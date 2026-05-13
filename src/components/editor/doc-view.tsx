@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Icons } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
@@ -236,7 +236,7 @@ function DocLine({
         }}
         aria-hidden="true"
       >
-        {line.type !== "blank" ? line.lineNum : ""}
+        {line.lineNum > 0 ? line.lineNum : ""}
       </div>
 
       {/* Content */}
@@ -457,28 +457,75 @@ function EmptyDoc({
 
   if (state === "revising" || state === "generating") {
     const isRevising = state === "revising";
+    // Skeleton rows: [type, width%] — mirror realistic doc structure
+    const skeletonRows: Array<{ kind: "h1" | "h2" | "meta" | "body" | "blank"; w?: number }> = [
+      { kind: "h1", w: 55 },
+      { kind: "blank" },
+      { kind: "meta", w: 28 },
+      { kind: "blank" },
+      { kind: "h2", w: 22 },
+      { kind: "body", w: 92 },
+      { kind: "body", w: 78 },
+      { kind: "body", w: 85 },
+      { kind: "blank" },
+      { kind: "h2", w: 18 },
+      { kind: "body", w: 88 },
+      { kind: "body", w: 64 },
+    ];
+    const heights: Record<string, string> = {
+      h1: "h-[22px]",
+      h2: "h-[11px]",
+      meta: "h-[10px]",
+      body: "h-[13px]",
+      blank: "h-[16px]",
+    };
+    const gutterH: Record<string, string> = {
+      h1: "min-h-[32px] py-1",
+      h2: "min-h-[28px] py-0.5",
+      meta: "min-h-[21px]",
+      body: "min-h-[22px] py-0.5",
+      blank: "h-[16px]",
+    };
     return (
-      <div
-        className="flex flex-col h-full py-6 px-[52px] pr-6"
-        aria-live="polite"
-        aria-busy="true"
-      >
-        <div className="flex items-center gap-2 mb-6">
-          <span
-            className="size-[8px] rounded-full animate-pulse shrink-0"
-            style={{ background: isRevising ? "var(--accent)" : "var(--warning)" }}
-            aria-hidden="true"
-          />
-          <span className="text-[13px]" style={{ color: "var(--fg-tertiary)" }}>
-            {isRevising ? "Revising brief…" : "Generating brief…"}
-          </span>
-        </div>
-        {[80, 60, 90, 50, 70].map((w, i) => (
-          <div key={i} className="flex items-center gap-3 mb-3">
-            <div
-              className="h-[14px] rounded-[3px] animate-pulse"
-              style={{ width: `${w}%`, background: "var(--surface-3)" }}
+      <div aria-live="polite" aria-busy="true">
+        {/* Status line — same gutter layout as DocLine */}
+        <div className="flex items-start w-full mb-1">
+          <div className="shrink-0 w-[52px]" />
+          <div className="flex items-center gap-2 py-2">
+            <span
+              className="size-[7px] rounded-full animate-pulse shrink-0"
+              style={{ background: isRevising ? "var(--accent)" : "var(--warning)" }}
+              aria-hidden="true"
             />
+            <span className="text-[12px]" style={{ color: "var(--fg-muted)" }}>
+              {isRevising ? "Revising brief…" : "Generating brief…"}
+            </span>
+          </div>
+        </div>
+        {skeletonRows.map((row, i) => (
+          <div key={i} className={`flex items-start w-full ${gutterH[row.kind]}`}>
+            {/* Gutter — matches DocLine exactly */}
+            <div className={`shrink-0 flex items-start justify-end pr-3 pt-[3px] w-[52px] ${gutterH[row.kind]}`}>
+              {row.kind !== "blank" && row.kind !== "meta" && (
+                <div
+                  className="h-[9px] w-[18px] rounded-[2px] animate-pulse"
+                  style={{ background: "var(--surface-3)", opacity: 0.5 }}
+                />
+              )}
+            </div>
+            {/* Content */}
+            <div className={`flex items-center flex-1 pr-6 ${gutterH[row.kind]}`}>
+              {row.kind !== "blank" && (
+                <div
+                  className={`${heights[row.kind]} rounded-[3px] animate-pulse`}
+                  style={{
+                    width: `${row.w ?? 60}%`,
+                    background: "var(--surface-3)",
+                    animationDelay: `${i * 60}ms`,
+                  }}
+                />
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -573,32 +620,30 @@ function ChatBar({
 
   return (
     <div
-      className="shrink-0 border-t px-3 py-2.5"
+      className="shrink-0 border-t px-4 pt-3 pb-4"
       style={{ borderColor: "var(--border)", background: "var(--background)" }}
     >
       {/* Context pill */}
       {selectedReqText && (
-        <div
-          className="flex items-center gap-1.5 px-4 pt-2 pb-0"
-        >
+        <div className="flex items-center gap-1.5 mb-2">
           <span
-            className="flex items-center gap-1 h-[20px] px-2 rounded-[4px] border text-[11px] max-w-[calc(100%-28px)] min-w-0"
+            className="flex items-center gap-1.5 h-[22px] px-2.5 rounded-[5px] border text-[11px] max-w-[calc(100%-28px)] min-w-0"
             style={{
-              background: "color-mix(in srgb, var(--accent) 10%, transparent)",
-              borderColor: "color-mix(in srgb, var(--accent) 35%, transparent)",
+              background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+              borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
               color: "var(--accent)",
             }}
           >
-            <Icons.MessageSquare size={9} aria-hidden="true" className="shrink-0" />
-            <span className="truncate">
-              Re: {selectedReqText.length > 60 ? `${selectedReqText.slice(0, 60)}…` : selectedReqText}
+            <Icons.MessageSquare size={10} aria-hidden="true" className="shrink-0" />
+            <span className="truncate text-[11px]">
+              Re: {selectedReqText.length > 72 ? `${selectedReqText.slice(0, 72)}…` : selectedReqText}
             </span>
           </span>
           <button
             type="button"
             aria-label="Clear selection context"
             onClick={onClearSelection}
-            className="shrink-0 inline-flex items-center justify-center size-[20px] rounded-[3px] transition-colors duration-[100ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+            className="shrink-0 inline-flex items-center justify-center size-[22px] rounded-[4px] transition-colors duration-[100ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
             style={{ color: "var(--fg-muted)" }}
           >
             <Icons.X size={10} />
@@ -606,15 +651,15 @@ function ChatBar({
         </div>
       )}
 
-      <div className="flex items-center gap-2.5 h-[52px] px-4">
-        <Icons.MessageSquare
-          size={14}
-          aria-hidden="true"
-          className="shrink-0 text-[var(--fg-muted)]"
-        />
-        <label htmlFor="doc-chat-input" className="sr-only">
-          Chat input
-        </label>
+      {/* Input card */}
+      <div
+        className="flex flex-col rounded-[8px] border overflow-hidden"
+        style={{
+          background: "var(--surface-1)",
+          borderColor: "var(--border-strong)",
+        }}
+      >
+        <label htmlFor="doc-chat-input" className="sr-only">Chat input</label>
         <input
           id="doc-chat-input"
           ref={inputRef}
@@ -634,40 +679,66 @@ function ChatBar({
                 : "Generate a brief first to start chatting"
           }
           disabled={isDisabled}
-          className="flex-1 bg-transparent text-[13px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] rounded-[3px] disabled:opacity-50"
+          className="w-full bg-transparent text-[13px] px-4 pt-3 pb-2 focus-visible:outline-none disabled:opacity-50"
           style={{ color: "var(--fg-primary)" }}
           autoComplete="off"
           spellCheck={false}
         />
-        <IconButton
-          label="Attach source"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!onAttachFiles}
-        >
-          <Icons.Upload size={14} />
-        </IconButton>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,application/pdf,audio/*"
-          className="hidden"
-          onChange={handleFilePick}
-        />
-        <IconButton
-          label="Send message"
-          onClick={() => void handleSend()}
-          disabled={isDisabled || !value.trim()}
-        >
-          {sending || revising ? (
-            <Icons.Download size={14} className="animate-spin" />
-          ) : (
-            <Icons.Send size={14} />
-          )}
-        </IconButton>
+        {/* Action row */}
+        <div className="flex items-center justify-between px-3 pb-2.5">
+          <div className="flex items-center gap-1">
+            <IconButton
+              label="Attach source"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!onAttachFiles}
+            >
+              <Icons.Upload size={13} />
+            </IconButton>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,application/pdf,audio/*"
+              className="hidden"
+              onChange={handleFilePick}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {!isDisabled && (
+              <span
+                className="text-[10px] select-none"
+                style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+              >
+                ↵ send
+              </span>
+            )}
+            <IconButton
+              label="Send message"
+              onClick={() => void handleSend()}
+              disabled={isDisabled || !value.trim()}
+            >
+              {sending || revising ? (
+                <Icons.Download size={13} className="animate-spin" />
+              ) : (
+                <Icons.Send size={13} />
+              )}
+            </IconButton>
+          </div>
+        </div>
       </div>
     </div>
   );
+}
+
+/* ── Filter ─────────────────────────────────────────────── */
+function applyFilter(lines: DocLineData[], query: string): DocLineData[] {
+  if (!query.trim()) return lines;
+  const q = query.toLowerCase();
+  return lines.filter((l) => {
+    if (l.type === "h1" || l.type === "h2" || l.type === "meta" || l.type === "req-header") return true;
+    if (l.type === "blank") return false;
+    return l.text?.toLowerCase().includes(q) ?? false;
+  });
 }
 
 /* ── DocView ────────────────────────────────────────────── */
@@ -720,6 +791,19 @@ export function DocView({
   viewingVersion = null,
   onExitVersionView,
 }: DocViewProps) {
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterQuery, setFilterQuery] = useState("");
+  const filterInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (filterOpen) filterInputRef.current?.focus();
+  }, [filterOpen]);
+
+  function closeFilter() {
+    setFilterOpen(false);
+    setFilterQuery("");
+  }
+
   const canGenerate = appState === "ready" || appState === "no-sources";
   const generateDisabled =
     appState === "no-sources" ||
@@ -760,14 +844,43 @@ export function DocView({
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-            style={{ color: "var(--fg-tertiary)" }}
-          >
-            <Icons.Filter size={11} aria-hidden="true" />
-            <span>Filter</span>
-          </button>
+          {filterOpen ? (
+            <div
+              className="flex items-center gap-1 h-[22px] px-1.5 rounded-[4px] border"
+              style={{ background: "var(--surface-2)", borderColor: "var(--border-strong)" }}
+            >
+              <Icons.Filter size={10} aria-hidden="true" style={{ color: "var(--fg-muted)" }} />
+              <input
+                ref={filterInputRef}
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") closeFilter(); }}
+                placeholder="Filter requirements…"
+                className="w-[160px] bg-transparent text-[11px] focus-visible:outline-none"
+                style={{ color: "var(--fg-primary)" }}
+                aria-label="Filter requirements"
+              />
+              <button
+                type="button"
+                onClick={closeFilter}
+                aria-label="Clear filter"
+                className="inline-flex items-center justify-center size-[14px] rounded-[2px] hover:bg-[var(--surface-3)] focus-visible:outline-none cursor-pointer"
+                style={{ color: "var(--fg-muted)" }}
+              >
+                <Icons.X size={9} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setFilterOpen(true)}
+              className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ color: filterQuery ? "var(--accent)" : "var(--fg-tertiary)" }}
+            >
+              <Icons.Filter size={11} aria-hidden="true" />
+              <span>Filter</span>
+            </button>
+          )}
           <button
             type="button"
             disabled={generateDisabled}
@@ -840,7 +953,7 @@ export function DocView({
         ) : lines.length === 0 ? (
           <EmptyDoc state="no-sources" onAddSources={onAddSources} />
         ) : (
-          lines.map((line, i) => (
+          applyFilter(lines, filterQuery).map((line, i) => (
             <DocLine
               key={i}
               line={line}

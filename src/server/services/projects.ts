@@ -280,3 +280,24 @@ export async function deleteProject(projectId: string, clerkUserId: string) {
     },
   });
 }
+
+export async function updateProject(
+  projectId: string,
+  clerkUserId: string,
+  updates: { name?: string; clientName?: string },
+) {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, createdBy: clerkUserId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (!project) throw new ProjectNotFoundError(projectId);
+
+  return prisma.project.update({
+    where: { id: projectId },
+    data: {
+      ...(updates.name !== undefined ? { name: updates.name } : {}),
+      ...(updates.clientName !== undefined ? { clientName: updates.clientName } : {}),
+    },
+    select: { id: true, name: true, clientName: true, updatedAt: true },
+  });
+}

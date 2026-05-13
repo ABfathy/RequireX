@@ -12,6 +12,7 @@ import { useUploadThing } from "@/lib/uploadthing-client";
 import { CommandPalette } from "./command-palette";
 import { type AppState, type DocLineData, DocView } from "./doc-view";
 import { ProjectSearchPalette } from "./project-search-palette";
+import { ProjectSettingsModal } from "./project-settings-modal";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
 import { RightPane, type SourceItem, type SourceType } from "./right-pane";
@@ -113,6 +114,10 @@ function assetToSource(a: ApiAsset): SourceItem {
   };
 }
 
+function escapeHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 type SseEvent =
   | { type: "start"; jobId?: string }
   | { type: "token"; text: string }
@@ -206,6 +211,7 @@ export function EditorShell({
   const [resizing, setResizing] = useState<null | "left" | "right">(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [projectSearchOpen, setProjectSearchOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
@@ -502,8 +508,39 @@ export function EditorShell({
 
     setGenerating(true);
     setGenerationError(null);
-    setStreamingLines(null);
     setExtractStatus("idle");
+
+    // Seed streaming view with header lines matching what the server will return,
+    // preventing layout shift when router.refresh() prepends them.
+    const PHASE_LABELS = [
+      "Collecting sources…",
+      "Processing content…",
+      "Drafting brief…",
+    ];
+    let phaseIdx = 0;
+    const makeHeaderLines = (phaseLabel: string): DocLineData[] => {
+      if (!session?.title) return [];
+      return [
+        { lineNum: 1, type: "h1", text: session.title },
+        { lineNum: 0, type: "blank" },
+        { lineNum: 2, type: "meta", text: phaseLabel, small: true },
+        { lineNum: 0, type: "blank" },
+      ];
+    };
+    const initialHeader = makeHeaderLines(PHASE_LABELS[0]);
+    setStreamingLines(initialHeader);
+
+    const phaseInterval = setInterval(() => {
+      phaseIdx = Math.min(phaseIdx + 1, PHASE_LABELS.length - 1);
+      const nextLabel = PHASE_LABELS[phaseIdx];
+      setStreamingLines((prev) => {
+        if (!prev || prev.length < 3) return prev;
+        const updated = [...prev];
+        updated[2] = { lineNum: 2, type: "meta", text: nextLabel, small: true };
+        return updated;
+      });
+    }, 3000);
+
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -512,6 +549,7 @@ export function EditorShell({
       });
 
       if (!res.ok) {
+        clearInterval(phaseInterval);
         const payload = (await res.json().catch(() => null)) as
           | { error?: string; message?: string }
           | null;
@@ -521,13 +559,26 @@ export function EditorShell({
       }
 
       let newSnapshotId: string | null = null;
+      const lineOffset = initialHeader.length;
+      let firstToken = true;
+
+      const onStreamLines = (parserLines: DocLineData[]) => {
+        if (firstToken) { clearInterval(phaseInterval); firstToken = false; }
+        const shifted = lineOffset
+          ? parserLines.map((l) => ({ ...l, lineNum: l.lineNum > 0 ? l.lineNum + lineOffset : 0 }))
+          : parserLines;
+        // Rebuild header with final phase label when content is flowing
+        const header = makeHeaderLines("Drafting brief…");
+        setStreamingLines([...header, ...shifted]);
+      };
 
       if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
-        const result = await readSseStream(res.body, setStreamingLines, (jobId) => {
+        const result = await readSseStream(res.body, onStreamLines, (jobId) => {
           startJobPoll(jobId);
         });
         newSnapshotId = result.snapshotId;
       } else {
+        clearInterval(phaseInterval);
         const result = await res.json() as { snapshotId: string; version: number };
         newSnapshotId = result.snapshotId;
       }
@@ -540,6 +591,7 @@ export function EditorShell({
 
       router.refresh();
     } catch (error) {
+      clearInterval(phaseInterval);
       stopJobPoll();
       setExtractStatus("failed");
       setGenerationError(
@@ -549,7 +601,7 @@ export function EditorShell({
     } finally {
       setGenerating(false);
     }
-  }, [sessionId, generating, router, loadRevisions, refreshSources, startJobPoll, stopJobPoll]);
+  }, [sessionId, generating, session, router, loadRevisions, refreshSources, startJobPoll, stopJobPoll]);
 
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {
@@ -767,7 +819,25 @@ export function EditorShell({
       : [];
   const displayLines = clientLines ?? baseLines;
   useEffect(() => { displayLinesRef.current = displayLines; });
-  const displayHasSnapshot = usesServerSnapshot && hasSnapshot;
+  const displayHasSnapshot = usesServerSnapshot ? hasSnapshot : currentSnapshotId !== null;
+
+  // After a client-side project switch, auto-load the latest snapshot's lines so
+  // the doc shows the actual brief instead of just the session title.
+  useEffect(() => {
+    if (usesServerSnapshot || clientLines !== null) return;
+    const latestSnapshot = snapshots.find((s) => s.id !== null && s.version !== null);
+    if (!latestSnapshot?.id) return;
+    const snapshotId = latestSnapshot.id;
+    fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { lines: DocLineData[]; version: number } | null) => {
+        if (!data) return;
+        setClientLines(data.lines);
+        setCurrentSnapshotId(snapshotId);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshots, usesServerSnapshot]);
 
   const baseAppState: AppState = session
     ? sources.length > 0 || displayHasSnapshot
@@ -860,6 +930,55 @@ export function EditorShell({
   function handleOpenSources() {
     setRightOpen(true);
     setRightTab("sources");
+  }
+
+  function handleExportPdf() {
+    const lines = displayLinesRef.current;
+    if (!lines.length) return;
+    const projectName = projects.find((p) => p.id === activeProjectId)?.name ?? "Brief";
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${projectName}</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 24px;color:#111;line-height:1.6}
+  h1{font-size:22px;font-weight:700;margin:0 0 4px}
+  h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#666;margin:24px 0 8px}
+  .meta{font-size:11px;color:#999;font-family:monospace;margin:0 0 16px}
+  .body{font-size:14px;margin:0 0 8px}
+  .body.small{font-size:12px;color:#666}
+  .blank{height:8px}
+  @media print{body{margin:20px}}
+</style></head><body>
+${lines.map((l) => {
+  if (l.type === "h1") return `<h1>${escapeHtml(l.text ?? "")}</h1>`;
+  if (l.type === "h2") return `<h2>${escapeHtml(l.text ?? "")}</h2>`;
+  if (l.type === "meta") return `<div class="meta">${escapeHtml(l.text ?? "")}</div>`;
+  if (l.type === "body") return `<p class="body${l.small ? " small" : ""}">${escapeHtml(l.text ?? "")}</p>`;
+  if (l.type === "blank") return `<div class="blank"></div>`;
+  return "";
+}).join("\n")}
+</body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+    if (!doc) { document.body.removeChild(iframe); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 250);
+  }
+
+  function handleProjectSaved(name: string, clientName: string) {
+    if (!activeProjectId) return;
+    setProjects((prev) =>
+      prev.map((p) => p.id === activeProjectId ? { ...p, name, clientName } : p),
+    );
   }
 
   /* Reset snapshot state when session changes */
@@ -1004,7 +1123,25 @@ export function EditorShell({
       {previewItem && (
         <SourcePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
       )}
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => setPaletteOpen(false)}
+          onAddSource={() => { setRightOpen(true); setRightTab("sources"); }}
+          onRegenerate={!generating ? handleGenerateBrief : undefined}
+          onViewRevisions={() => { setRightOpen(true); setRightTab("revisions"); }}
+          onExportPdf={displayLinesRef.current.length > 0 ? handleExportPdf : undefined}
+          onOpenSettings={activeProjectId ? () => setSettingsOpen(true) : undefined}
+        />
+      )}
+      {settingsOpen && activeProjectId && (
+        <ProjectSettingsModal
+          projectId={activeProjectId}
+          initialName={projects.find((p) => p.id === activeProjectId)?.name ?? ""}
+          initialClientName={projects.find((p) => p.id === activeProjectId)?.clientName ?? ""}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={handleProjectSaved}
+        />
+      )}
       {projectSearchOpen && (
         <ProjectSearchPalette
           projects={projects}

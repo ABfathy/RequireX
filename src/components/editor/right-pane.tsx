@@ -136,15 +136,16 @@ const STATUS_LABEL: Record<SourceStatus, string> = {
   FAILED: "Failed",
 };
 
-function relativeTime(dateStr: string): string {
+function relativeTime(dateStr: string | Date): string {
   try {
-    const diffMinutes = Math.round(
-      (new Date(dateStr).getTime() - Date.now()) / 60_000,
-    );
-    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
-      diffMinutes,
-      "minute",
-    );
+    const diffMs = new Date(dateStr).getTime() - Date.now();
+    const diffMin = Math.round(diffMs / 60_000);
+    const fmt = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+    const absMin = Math.abs(diffMin);
+    if (absMin < 60) return fmt.format(diffMin, "minute");
+    const diffHr = Math.round(diffMin / 60);
+    if (Math.abs(diffHr) < 24) return fmt.format(diffHr, "hour");
+    return fmt.format(Math.round(diffHr / 24), "day");
   } catch {
     return "";
   }
@@ -239,6 +240,7 @@ function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
         <span
           className="text-[10px] truncate tabular-nums"
           style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+          suppressHydrationWarning
         >
           {relTime}
         </span>
@@ -564,19 +566,7 @@ function ChatTab({ messages }: { messages?: ChatMessage[] }) {
 }
 
 /* ── RevisionsTab ───────────────────────────────────────── */
-function relRevTime(dateStr: string): string {
-  try {
-    const diffMinutes = Math.round(
-      (new Date(dateStr).getTime() - Date.now()) / 60_000,
-    );
-    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
-      diffMinutes,
-      "minute",
-    );
-  } catch {
-    return "";
-  }
-}
+const relRevTime = relativeTime;
 
 function RevisionsTab({
   snapshots,
@@ -717,6 +707,7 @@ function RevisionsTab({
                 <span
                   className="text-[10px] tabular-nums mt-0.5"
                   style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+                  suppressHydrationWarning
                 >
                   {relRevTime(snap.createdAt)}
                 </span>
