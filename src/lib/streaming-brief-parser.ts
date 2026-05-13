@@ -215,7 +215,7 @@ export class StreamingBriefParser {
     this.pendingSectionKey = null;
 
     if (this.completedLines.length > 0) {
-      this.completedLines.push({ lineNum: this.lineNum++, type: "blank" });
+      this.completedLines.push({ lineNum: 0, type: "blank" });
     }
     this.completedLines.push({ lineNum: this.lineNum++, type: "h2", text: info.label });
   }

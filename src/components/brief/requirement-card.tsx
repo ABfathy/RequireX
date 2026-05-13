@@ -10,6 +10,8 @@ import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/utils";
 import type { BriefCommentSection } from "../../../generated/prisma/client";
 
+import type { BriefCommentSection } from "../../../generated/prisma/client";
+
 const STATUS_TONE: Record<string, PillTone> = {
   approved: "success",
   "in-review": "info",

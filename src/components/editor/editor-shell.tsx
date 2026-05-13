@@ -6,15 +6,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { usePersistentState } from "@/lib/hooks/use-persistent-state";
+import { diffLines, type LineDiffRow } from "@/lib/line-diff";
 import { StreamingBriefParser } from "@/lib/streaming-brief-parser";
 import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
+import { ComparisonView } from "./comparison-view";
 import { type AppState, type DocLineData, DocView } from "./doc-view";
 import { ProjectSearchPalette } from "./project-search-palette";
+import { ProjectSettingsModal } from "./project-settings-modal";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
-import { RightPane, type SnapshotListItem, type SourceItem, type SourceType } from "./right-pane";
+import { RightPane, type SourceItem, type SourceType } from "./right-pane";
 import { SourcePreviewModal } from "./source-preview-modal";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
@@ -45,6 +48,7 @@ export interface SnapshotSummary {
 }
 
 type SessionRef = { id: string; title: string } | null;
+const DRAFT_TAB_ID = "draft";
 const SIDEBAR_STORAGE_KEY = "rx-sidebar-width-v2";
 const SIDEBAR_DEFAULT = 196;
 const SIDEBAR_MIN = 196;
@@ -73,6 +77,23 @@ interface CacheEntry {
 }
 
 type SerializableProjectCache = Record<string, CacheEntry>;
+
+type ComparableSnapshot = {
+  id: string;
+  version: number;
+};
+
+type ComparisonTab = {
+  id: string;
+  title: string;
+  oldSnapshotId: string;
+  newSnapshotId: string;
+  oldVersion: number;
+  newVersion: number;
+  status: "loading" | "ready" | "error";
+  rows: LineDiffRow[] | null;
+  error: string | null;
+};
 
 function mapSourceType(dbType: string): SourceType {
   if (dbType === "AUDIO") return "AUDIO";
@@ -113,6 +134,10 @@ function assetToSource(a: ApiAsset): SourceItem {
   };
 }
 
+function escapeHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 type SseEvent =
   | { type: "start"; jobId?: string }
   | { type: "token"; text: string }
@@ -127,6 +152,7 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 async function readSseStream(
   body: ReadableStream<Uint8Array>,
   onLines: (lines: DocLineData[]) => void,
+  onJobId?: (jobId: string) => void,
 ): Promise<{ snapshotId: string; version: number }> {
   const parser = new StreamingBriefParser();
   const reader = body.getReader();
@@ -153,7 +179,9 @@ async function readSseStream(
     for (const part of parts) {
       if (!part.startsWith("data: ")) continue;
       const evt = JSON.parse(part.slice(6)) as SseEvent;
-      if (evt.type === "token") {
+      if (evt.type === "start") {
+        if (evt.jobId) onJobId?.(evt.jobId);
+      } else if (evt.type === "token") {
         for (const ch of evt.text) {
           parser.feed(ch);
           flushIfDue();
@@ -174,8 +202,33 @@ async function readSseStream(
   const snapshot = parser.getSnapshot();
   if (snapshot.length > 0) onLines(snapshot);
 
-  if (!completeResult) throw new Error("Stream ended without a complete event.");
+  if (!completeResult)
+    throw new Error("Stream ended without a complete event.");
   return completeResult;
+}
+
+function comparisonTabId(oldSnapshotId: string, newSnapshotId: string) {
+  return `comparison-${oldSnapshotId}-${newSnapshotId}`;
+}
+
+function linesToComparisonText(lines: DocLineData[]) {
+  return lines
+    .filter((line) => line.type !== "meta")
+    .map((line) => (line.type === "blank" ? "" : (line.text ?? "")));
+}
+
+async function fetchSnapshotForComparison(snapshotId: string) {
+  const res = await fetch(`/api/snapshots/${snapshotId}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      res.status === 404
+        ? "One of the selected versions no longer exists."
+        : "Could not load one of the selected versions.",
+    );
+  }
+  return (await res.json()) as { lines: DocLineData[]; version: number };
 }
 
 export function EditorShell({
@@ -203,18 +256,25 @@ export function EditorShell({
   const [resizing, setResizing] = useState<null | "left" | "right">(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [projectSearchOpen, setProjectSearchOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [extractStatus, setExtractStatus] = useState<"idle" | "queued" | "running" | "failed">("idle");
+  const jobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(null);
   const [revising, setRevising] = useState(false);
-  const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(initialSnapshotId);
+  const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(
+    initialSnapshotId,
+  );
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [clientLines, setClientLines] = useState<DocLineData[] | null>(null);
+  const [comparisonTabs, setComparisonTabs] = useState<ComparisonTab[]>([]);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState(DRAFT_TAB_ID);
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     initialActiveProjectId,
@@ -400,64 +460,29 @@ export function EditorShell({
     [sessionId, startUpload],
   );
 
-  const handleGenerateBrief = useCallback(async () => {
-    if (!sessionId || generating) return;
-
-    setGenerating(true);
-    setGenerationError(null);
-    setStreamingLines(null);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
-
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as
-          | { error?: string; message?: string }
-          | null;
-        throw new Error(
-          payload?.message ?? payload?.error ?? "Failed to generate brief.",
-        );
-      }
-
-      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
-        await readSseStream(res.body, setStreamingLines);
-        router.refresh();
-        return;
-      }
-
-      router.refresh();
-    } catch (error) {
-      setGenerationError(
-        error instanceof Error ? error.message : "Failed to generate brief.",
-      );
-    } finally {
-      setGenerating(false);
-      setStreamingLines(null);
-    }
-  }, [sessionId, generating, router]);
-
   const loadRevisions = useCallback(async (sid: string) => {
     setRevisionsLoading(true);
     try {
-      const res = await fetch(`/api/sessions/${sid}/revisions`, { cache: "no-store" });
+      const res = await fetch(`/api/sessions/${sid}/revisions`, {
+        cache: "no-store",
+      });
       if (!res.ok) return;
-      const data = await res.json() as { revisions: Array<{
-        id: string;
-        type: string;
-        summary: string;
-        createdAt: string;
-        snapshotId: string | null;
-        version: number | null;
-        snapshotStatus: string | null;
-        trigger: string | null;
-        userMessage: string | null;
-        selectionText: string | null;
-        feedbackBody: string | null;
-        feedbackAuthor: string | null;
-      }> };
+      const data = (await res.json()) as {
+        revisions: Array<{
+          id: string;
+          type: string;
+          summary: string;
+          createdAt: string;
+          snapshotId: string | null;
+          version: number | null;
+          snapshotStatus: string | null;
+          trigger: string | null;
+          userMessage: string | null;
+          selectionText: string | null;
+          feedbackBody: string | null;
+          feedbackAuthor: string | null;
+        }>;
+      };
       const allRevisions = data.revisions ?? [];
 
       // Chat messages are REGENERATED events with trigger=chat
@@ -497,6 +522,135 @@ export function EditorShell({
     }
   }, []);
 
+  const stopJobPoll = useCallback(() => {
+    if (jobPollRef.current !== null) {
+      clearInterval(jobPollRef.current);
+      jobPollRef.current = null;
+    }
+  }, []);
+
+  const startJobPoll = useCallback((jobId: string) => {
+    stopJobPoll();
+    setExtractStatus("queued");
+    jobPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const job = await res.json() as { status: string; errorCode?: string | null };
+        if (job.status === "RUNNING") {
+          setExtractStatus("running");
+        } else if (job.status === "SUCCEEDED") {
+          setExtractStatus("idle");
+          stopJobPoll();
+        } else if (job.status === "FAILED" || job.status === "CANCELED") {
+          setExtractStatus("failed");
+          stopJobPoll();
+        }
+      } catch {
+        // silently ignore transient fetch errors
+      }
+    }, 2000);
+  }, [stopJobPoll]);
+
+  const handleGenerateBrief = useCallback(async () => {
+    if (!sessionId || generating) return;
+
+    setGenerating(true);
+    setGenerationError(null);
+    setExtractStatus("idle");
+
+    // Seed streaming view with header lines matching what the server will return,
+    // preventing layout shift when router.refresh() prepends them.
+    const PHASE_LABELS = [
+      "Collecting sources…",
+      "Processing content…",
+      "Drafting brief…",
+    ];
+    let phaseIdx = 0;
+    const makeHeaderLines = (phaseLabel: string): DocLineData[] => {
+      if (!session?.title) return [];
+      return [
+        { lineNum: 1, type: "h1", text: session.title },
+        { lineNum: 0, type: "blank" },
+        { lineNum: 2, type: "meta", text: phaseLabel, small: true },
+        { lineNum: 0, type: "blank" },
+      ];
+    };
+    const initialHeader = makeHeaderLines(PHASE_LABELS[0]!);
+    setStreamingLines(initialHeader);
+
+    const phaseInterval = setInterval(() => {
+      phaseIdx = Math.min(phaseIdx + 1, PHASE_LABELS.length - 1);
+      const nextLabel = PHASE_LABELS[phaseIdx];
+      setStreamingLines((prev) => {
+        if (!prev || prev.length < 3) return prev;
+        const updated = [...prev];
+        updated[2] = { lineNum: 2, type: "meta", text: nextLabel, small: true };
+        return updated;
+      });
+    }, 3000);
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      if (!res.ok) {
+        clearInterval(phaseInterval);
+        const payload = (await res.json().catch(() => null)) as
+          | { error?: string; message?: string }
+          | null;
+        throw new Error(
+          payload?.message ?? payload?.error ?? "Failed to generate brief.",
+        );
+      }
+
+      let newSnapshotId: string | null = null;
+      const lineOffset = initialHeader.length;
+      let firstToken = true;
+
+      const onStreamLines = (parserLines: DocLineData[]) => {
+        if (firstToken) { clearInterval(phaseInterval); firstToken = false; }
+        const shifted = lineOffset
+          ? parserLines.map((l) => ({ ...l, lineNum: l.lineNum > 0 ? l.lineNum + lineOffset : 0 }))
+          : parserLines;
+        const header = makeHeaderLines("Drafting brief…");
+        setStreamingLines([...header, ...shifted]);
+      };
+
+      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+        const result = await readSseStream(res.body, onStreamLines, (jobId) => {
+          startJobPoll(jobId);
+        });
+        newSnapshotId = result.snapshotId;
+      } else {
+        clearInterval(phaseInterval);
+        const result = await res.json() as { snapshotId: string; version: number };
+        newSnapshotId = result.snapshotId;
+      }
+
+      stopJobPoll();
+      setExtractStatus("idle");
+      if (newSnapshotId) setCurrentSnapshotId(newSnapshotId);
+      if (sessionId) await loadRevisions(sessionId);
+      await refreshSources();
+
+      router.refresh();
+    } catch (error) {
+      clearInterval(phaseInterval);
+      stopJobPoll();
+      setExtractStatus("failed");
+      setGenerationError(
+        error instanceof Error ? error.message : "Failed to generate brief.",
+      );
+      setStreamingLines(null);
+    } finally {
+      setGenerating(false);
+    }
+  }, [sessionId, generating, session, router, loadRevisions, refreshSources, startJobPoll, stopJobPoll]);
+
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {
       if (!sessionId || !currentSnapshotId || revising) return;
@@ -520,18 +674,27 @@ export function EditorShell({
         });
 
         if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as
-            | { error?: string; message?: string }
-            | null;
-          throw new Error(payload?.message ?? payload?.error ?? "Failed to revise brief.");
+          const payload = (await res.json().catch(() => null)) as {
+            error?: string;
+            message?: string;
+          } | null;
+          throw new Error(
+            payload?.message ?? payload?.error ?? "Failed to revise brief.",
+          );
         }
 
         let newSnapshotId: string;
-        if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+        if (
+          res.headers.get("content-type")?.includes("text/event-stream") &&
+          res.body
+        ) {
           const result = await readSseStream(res.body, setStreamingLines);
           newSnapshotId = result.snapshotId;
         } else {
-          const result = await res.json() as { snapshotId: string; version: number };
+          const result = (await res.json()) as {
+            snapshotId: string;
+            version: number;
+          };
           newSnapshotId = result.snapshotId;
         }
 
@@ -546,15 +709,131 @@ export function EditorShell({
         );
       } finally {
         setRevising(false);
-        setStreamingLines(null);
       }
     },
-    [sessionId, currentSnapshotId, revising, selectedReq, loadRevisions, router],
+    [
+      sessionId,
+      currentSnapshotId,
+      revising,
+      selectedReq,
+      loadRevisions,
+      router,
+    ],
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (sessionId) void loadRevisions(sessionId);
   }, [sessionId, loadRevisions]);
+
+  // Clear streaming lines once the server-refreshed lines arrive, preventing
+  // the flash from streamed content → empty state → server content.
+  const streamingLinesRef = useRef(streamingLines);
+  useEffect(() => { streamingLinesRef.current = streamingLines; }, [streamingLines]);
+  useEffect(() => {
+    if (streamingLinesRef.current && lines.length > 0) {
+      setStreamingLines(null);
+    }
+  }, [lines]);
+
+  const loadComparisonTab = useCallback(async (tab: ComparisonTab) => {
+    setComparisonTabs((prev) =>
+      prev.map((item) =>
+        item.id === tab.id
+          ? { ...item, status: "loading", rows: null, error: null }
+          : item,
+      ),
+    );
+
+    try {
+      const [oldSnapshot, newSnapshot] = await Promise.all([
+        fetchSnapshotForComparison(tab.oldSnapshotId),
+        fetchSnapshotForComparison(tab.newSnapshotId),
+      ]);
+      const rows = diffLines(
+        linesToComparisonText(oldSnapshot.lines),
+        linesToComparisonText(newSnapshot.lines),
+      );
+
+      setComparisonTabs((prev) =>
+        prev.map((item) =>
+          item.id === tab.id
+            ? { ...item, status: "ready", rows, error: null }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setComparisonTabs((prev) =>
+        prev.map((item) =>
+          item.id === tab.id
+            ? {
+                ...item,
+                status: "error",
+                rows: null,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Could not load comparison.",
+              }
+            : item,
+        ),
+      );
+    }
+  }, []);
+
+  const handleOpenComparison = useCallback(
+    (first: ComparableSnapshot, second: ComparableSnapshot) => {
+      if (first.id === second.id || first.version === second.version) return;
+
+      const [older, newer] =
+        first.version < second.version ? [first, second] : [second, first];
+      const id = comparisonTabId(older.id, newer.id);
+      const existing = comparisonTabs.find((tab) => tab.id === id);
+
+      if (existing) {
+        setActiveWorkspaceTab(id);
+        return;
+      }
+
+      const tab: ComparisonTab = {
+        id,
+        title: `Comparison: Version ${older.version} vs Version ${newer.version}`,
+        oldSnapshotId: older.id,
+        newSnapshotId: newer.id,
+        oldVersion: older.version,
+        newVersion: newer.version,
+        status: "loading",
+        rows: null,
+        error: null,
+      };
+
+      setComparisonTabs((prev) => [...prev, tab]);
+      setActiveWorkspaceTab(id);
+      void loadComparisonTab(tab);
+    },
+    [comparisonTabs, loadComparisonTab],
+  );
+
+  const handleCloseComparisonTab = useCallback(
+    (id: string) => {
+      setComparisonTabs((prev) => {
+        const next = prev.filter((tab) => tab.id !== id);
+        if (activeWorkspaceTab === id) {
+          setActiveWorkspaceTab(next[next.length - 1]?.id ?? DRAFT_TAB_ID);
+        }
+        return next;
+      });
+    },
+    [activeWorkspaceTab],
+  );
+
+  const handleRetryComparison = useCallback(
+    (id: string) => {
+      const tab = comparisonTabs.find((item) => item.id === id);
+      if (tab) void loadComparisonTab(tab);
+    },
+    [comparisonTabs, loadComparisonTab],
+  );
 
   // Ref keeps the latest displayLines accessible inside callbacks without
   // causing the callback to re-create every time lines change.
@@ -562,16 +841,19 @@ export function EditorShell({
 
   const handleUpdateLine = useCallback(
     async (reqId: string, reqType: "claim" | "question", newText: string) => {
-      const endpoint = reqType === "claim"
-        ? `/api/claims/${reqId}`
-        : `/api/questions/${reqId}`;
+      const endpoint =
+        reqType === "claim"
+          ? `/api/claims/${reqId}`
+          : `/api/questions/${reqId}`;
       const res = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: newText }),
       });
       if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { message?: string } | null;
+        const payload = (await res.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         throw new Error(payload?.message ?? "Failed to save edit.");
       }
       // Optimistic update: patch the text in the current display lines
@@ -584,24 +866,32 @@ export function EditorShell({
     [],
   );
 
-  const handleSelectRevision = useCallback(async (snapshotId: string | null) => {
-    if (!snapshotId) {
-      setClientLines(null);
-      setViewingVersion(null);
-      return;
-    }
-    if (snapshotId === currentSnapshotId) return;
-    try {
-      const res = await fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" });
-      if (!res.ok) return;
-      const data = await res.json() as { lines: DocLineData[]; version: number };
-      setClientLines(data.lines);
-      setViewingVersion(data.version ?? null);
-      setCurrentSnapshotId(snapshotId);
-    } catch {
-      // silently ignore
-    }
-  }, [currentSnapshotId]);
+  const handleSelectRevision = useCallback(
+    async (snapshotId: string | null) => {
+      if (!snapshotId) {
+        setClientLines(null);
+        setViewingVersion(null);
+        return;
+      }
+      if (snapshotId === currentSnapshotId) return;
+      try {
+        const res = await fetch(`/api/snapshots/${snapshotId}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          lines: DocLineData[];
+          version: number;
+        };
+        setClientLines(data.lines);
+        setViewingVersion(data.version ?? null);
+        setCurrentSnapshotId(snapshotId);
+      } catch {
+        // silently ignore
+      }
+    },
+    [currentSnapshotId],
+  );
 
   /* Soft client-side project switch. Cache hit -> swap state + replace URL
      silently (no Next.js routing -> no server roundtrip). Cached switches clear
@@ -619,6 +909,8 @@ export function EditorShell({
         setCurrentSnapshotId(null);
         setChatMessages([]);
         setSnapshots([]);
+        setComparisonTabs([]);
+        setActiveWorkspaceTab(DRAFT_TAB_ID);
         if (typeof window !== "undefined") {
           window.history.replaceState({}, "", `/app?projectId=${id}`);
         }
@@ -638,7 +930,9 @@ export function EditorShell({
       const previousSourcesError = sourcesError;
       const previousProjects = projects;
       const previousProjectCache = new Map(projectCache);
-      const remainingProjects = previousProjects.filter((p) => p.id !== projectId);
+      const remainingProjects = previousProjects.filter(
+        (p) => p.id !== projectId,
+      );
 
       setProjects(remainingProjects);
       setProjectCache((prev) => {
@@ -702,8 +996,26 @@ export function EditorShell({
       ? [{ lineNum: 1, type: "h1" as const, text: session.title }]
       : [];
   const displayLines = clientLines ?? baseLines;
-  displayLinesRef.current = displayLines;
-  const displayHasSnapshot = usesServerSnapshot && hasSnapshot;
+  useEffect(() => { displayLinesRef.current = displayLines; });
+  const displayHasSnapshot = usesServerSnapshot ? hasSnapshot : currentSnapshotId !== null;
+
+  // After a client-side project switch, auto-load the latest snapshot's lines so
+  // the doc shows the actual brief instead of just the session title.
+  useEffect(() => {
+    if (usesServerSnapshot || clientLines !== null) return;
+    const latestSnapshot = snapshots.find((s) => s.id !== null && s.version !== null);
+    if (!latestSnapshot?.id) return;
+    const snapshotId = latestSnapshot.id;
+    fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { lines: DocLineData[]; version: number } | null) => {
+        if (!data) return;
+        setClientLines(data.lines);
+        setCurrentSnapshotId(snapshotId);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshots, usesServerSnapshot]);
 
   const baseAppState: AppState = session
     ? sources.length > 0 || displayHasSnapshot
@@ -722,10 +1034,24 @@ export function EditorShell({
     projects.find((p) => p.id === activeProjectId)?.name ?? null;
 
   const selectedReqText = selectedReq
-    ? (displayLines.find(
-        (l) => l.reqId === selectedReq && l.type === "body",
-      )?.text ?? null)
+    ? (displayLines.find((l) => l.reqId === selectedReq && l.type === "body")
+        ?.text ?? null)
     : null;
+  const activeComparisonTab =
+    activeWorkspaceTab === DRAFT_TAB_ID
+      ? null
+      : (comparisonTabs.find((tab) => tab.id === activeWorkspaceTab) ?? null);
+  const activeComparisonContent = activeComparisonTab ? (
+    <ComparisonView
+      oldVersion={activeComparisonTab.oldVersion}
+      newVersion={activeComparisonTab.newVersion}
+      rows={activeComparisonTab.rows}
+      loading={activeComparisonTab.status === "loading"}
+      error={activeComparisonTab.error}
+      onRetry={() => handleRetryComparison(activeComparisonTab.id)}
+      onClose={() => handleCloseComparisonTab(activeComparisonTab.id)}
+    />
+  ) : null;
 
   /* ⌘K → command palette · ⌘P → project search */
   useEffect(() => {
@@ -798,13 +1124,69 @@ export function EditorShell({
     setRightTab("sources");
   }
 
+  function handleExportPdf() {
+    const lines = displayLinesRef.current;
+    if (!lines.length) return;
+    const projectName = projects.find((p) => p.id === activeProjectId)?.name ?? "Brief";
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${projectName}</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 24px;color:#111;line-height:1.6}
+  h1{font-size:22px;font-weight:700;margin:0 0 4px}
+  h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#666;margin:24px 0 8px}
+  .meta{font-size:11px;color:#999;font-family:monospace;margin:0 0 16px}
+  .body{font-size:14px;margin:0 0 8px}
+  .body.small{font-size:12px;color:#666}
+  .blank{height:8px}
+  @media print{body{margin:20px}}
+</style></head><body>
+${lines.map((l) => {
+  if (l.type === "h1") return `<h1>${escapeHtml(l.text ?? "")}</h1>`;
+  if (l.type === "h2") return `<h2>${escapeHtml(l.text ?? "")}</h2>`;
+  if (l.type === "meta") return `<div class="meta">${escapeHtml(l.text ?? "")}</div>`;
+  if (l.type === "body") return `<p class="body${l.small ? " small" : ""}">${escapeHtml(l.text ?? "")}</p>`;
+  if (l.type === "blank") return `<div class="blank"></div>`;
+  return "";
+}).join("\n")}
+</body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+    if (!doc) { document.body.removeChild(iframe); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 250);
+  }
+
+  function handleProjectSaved(name: string, clientName: string) {
+    if (!activeProjectId) return;
+    setProjects((prev) =>
+      prev.map((p) => p.id === activeProjectId ? { ...p, name, clientName } : p),
+    );
+  }
+
   /* Reset snapshot state when session changes */
   useEffect(() => {
+    if (!sessionId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSnapshots([]);
     setViewingVersion(null);
     setClientLines(null);
     setChatMessages([]);
+    setComparisonTabs([]);
+    setActiveWorkspaceTab(DRAFT_TAB_ID);
   }, [sessionId]);
+
+  // Clean up any in-flight job poll when the component unmounts
+  useEffect(() => () => { stopJobPoll(); }, [stopJobPoll]);
 
   const colTemplate = [
     sidebarOpen ? `${sidebarWidth}px` : "0px",
@@ -871,15 +1253,28 @@ export function EditorShell({
           onAttachFiles={sessionId ? handleUploadFiles : undefined}
           onGenerateBrief={sessionId ? handleGenerateBrief : undefined}
           generating={generating}
+          hasSnapshot={displayHasSnapshot}
+          generationError={generationError}
+          onRetry={sessionId ? handleGenerateBrief : undefined}
           streamingLines={streamingLines}
           lines={displayLines}
           selectedReqText={selectedReqText}
           onClearSelection={() => setSelectedReq(null)}
-          onSendMessage={sessionId && currentSnapshotId ? handleSendMessage : undefined}
+          onSendMessage={
+            sessionId && currentSnapshotId ? handleSendMessage : undefined
+          }
           revising={revising}
           onUpdateLine={currentSnapshotId ? handleUpdateLine : undefined}
           viewingVersion={viewingVersion}
           onExitVersionView={() => void handleSelectRevision(null)}
+          comparisonTabs={comparisonTabs.map((tab) => ({
+            id: tab.id,
+            title: tab.title,
+          }))}
+          activeWorkspaceTab={activeWorkspaceTab}
+          activeComparisonContent={activeComparisonContent}
+          onSelectWorkspaceTab={setActiveWorkspaceTab}
+          onCloseComparisonTab={handleCloseComparisonTab}
           onOpenSource={(id) => {
             const s = sources.find((src) => src.id === id);
             if (s) setPreviewItem(s);
@@ -918,6 +1313,7 @@ export function EditorShell({
               snapshotsLoading={revisionsLoading}
               viewingSnapshotId={currentSnapshotId}
               onViewSnapshot={handleSelectRevision}
+              onCompareSnapshots={handleOpenComparison}
             />
           )}
         </div>
@@ -926,12 +1322,34 @@ export function EditorShell({
       <StatusBar
         selectedReq={selectedReq}
         sessionName={session?.title ?? null}
+        extractStatus={extractStatus}
       />
 
       {previewItem && (
-        <SourcePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+        <SourcePreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+        />
       )}
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => setPaletteOpen(false)}
+          onAddSource={() => { setRightOpen(true); setRightTab("sources"); }}
+          onRegenerate={!generating ? handleGenerateBrief : undefined}
+          onViewRevisions={() => { setRightOpen(true); setRightTab("revisions"); }}
+          onExportPdf={displayLinesRef.current.length > 0 ? handleExportPdf : undefined}
+          onOpenSettings={activeProjectId ? () => setSettingsOpen(true) : undefined}
+        />
+      )}
+      {settingsOpen && activeProjectId && (
+        <ProjectSettingsModal
+          projectId={activeProjectId}
+          initialName={projects.find((p) => p.id === activeProjectId)?.name ?? ""}
+          initialClientName={projects.find((p) => p.id === activeProjectId)?.clientName ?? ""}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={handleProjectSaved}
+        />
+      )}
       {projectSearchOpen && (
         <ProjectSearchPalette
           projects={projects}

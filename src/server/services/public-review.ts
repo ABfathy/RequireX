@@ -9,8 +9,12 @@ import {
 
 import {
   ActorType,
+  type BriefClaimSection,
+  type BriefConfidence,
+  type BriefQuestionSection,
   BriefQuestionStatus,
   BriefSnapshotStatus,
+  type RevisionEventType,
   ShareLinkStatus,
 } from "../../../generated/prisma/client";
 
@@ -335,6 +339,118 @@ export async function createPublicFollowUpAnswer(
 
     return answer;
   });
+}
+
+export type PublicBriefViewData = {
+  shareToken: string;
+  snapshot: {
+    id: string;
+    version: number;
+    status: BriefSnapshotStatus;
+    createdAt: Date;
+  };
+  project: {
+    id: string;
+    name: string;
+    clientName: string;
+  };
+  claims: Array<{
+    id: string;
+    section: BriefClaimSection;
+    orderIndex: number;
+    text: string;
+    confidence: BriefConfidence;
+  }>;
+  questions: Array<{
+    id: string;
+    section: BriefQuestionSection;
+    orderIndex: number;
+    text: string;
+    reason: string;
+    status: BriefQuestionStatus;
+  }>;
+  revisions: Array<{
+    id: string;
+    type: RevisionEventType;
+    summary: string;
+    createdAt: Date;
+    snapshotVersion: number | null;
+  }>;
+};
+
+export async function loadPublicBriefView(
+  shareToken: string,
+): Promise<PublicBriefViewData> {
+  const access = await getPublicReviewAccessContext(prisma, shareToken);
+
+  const [snapshot, revisions] = await Promise.all([
+    prisma.briefSnapshot.findUnique({
+      where: { id: access.snapshotId },
+      select: {
+        id: true,
+        version: true,
+        status: true,
+        createdAt: true,
+        project: {
+          select: { id: true, name: true, clientName: true },
+        },
+        claims: {
+          orderBy: [{ section: "asc" }, { orderIndex: "asc" }],
+          select: {
+            id: true,
+            section: true,
+            orderIndex: true,
+            text: true,
+            confidence: true,
+          },
+        },
+        questions: {
+          orderBy: [{ section: "asc" }, { orderIndex: "asc" }],
+          select: {
+            id: true,
+            section: true,
+            orderIndex: true,
+            text: true,
+            reason: true,
+            status: true,
+          },
+        },
+      },
+    }),
+    prisma.revisionEvent.findMany({
+      where: { sessionId: access.sessionId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        type: true,
+        summary: true,
+        createdAt: true,
+        snapshot: { select: { version: true } },
+      },
+    }),
+  ]);
+
+  if (!snapshot) throw new PublicShareLinkNotFoundError();
+
+  return {
+    shareToken,
+    snapshot: {
+      id: snapshot.id,
+      version: snapshot.version,
+      status: snapshot.status,
+      createdAt: snapshot.createdAt,
+    },
+    project: snapshot.project,
+    claims: snapshot.claims,
+    questions: snapshot.questions,
+    revisions: revisions.map((rev) => ({
+      id: rev.id,
+      type: rev.type,
+      summary: rev.summary,
+      createdAt: rev.createdAt,
+      snapshotVersion: rev.snapshot?.version ?? null,
+    })),
+  };
 }
 
 export async function confirmPublicBrief(

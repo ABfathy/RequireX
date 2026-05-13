@@ -286,9 +286,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
           {/* Keyboard shortcuts */}
           <Section label="Keyboard shortcuts">
-            <KbdRow keys={[mod, "K"]} label="Open command palette" />
+            <KbdRow keys={[mod, "K"]} label="Open command menu" />
+            <KbdRow keys={[mod, "P"]} label="Switch project" />
             <KbdRow keys={["Esc"]} label="Close overlay" />
-            <KbdRow keys={[mod, "/"]} label="Focus search" />
+            <KbdRow keys={["↵"]} label="Send message" />
           </Section>
 
           {/* Coming soon */}

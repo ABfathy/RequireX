@@ -45,7 +45,7 @@ export function snapshotToDocLines(
 
   if (sessionTitle) {
     lines.push({ lineNum: lineNum++, type: "h1", text: sessionTitle });
-    lines.push({ lineNum: lineNum++, type: "blank" });
+    lines.push({ lineNum: 0, type: "blank" });
   }
 
   if (!snapshot) return lines;
@@ -58,7 +58,7 @@ export function snapshotToDocLines(
     text: `v${snapshot.version} - ${snapshot.status.toLowerCase()}`,
     small: true,
   });
-  lines.push({ lineNum: lineNum++, type: "blank" });
+  lines.push({ lineNum: 0, type: "blank" });
 
   function pushClaims(section: "SUMMARY" | "GOALS") {
     const claims = snapshot!.claims.filter((claim) => claim.section === section);
@@ -76,7 +76,7 @@ export function snapshotToDocLines(
         evidence: claim.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
       });
     }
-    lines.push({ lineNum: lineNum++, type: "blank" });
+    lines.push({ lineNum: 0, type: "blank" });
   }
 
   function pushQuestions(section: "AMBIGUITIES" | "FOLLOW_UP_QUESTIONS") {
@@ -103,7 +103,7 @@ export function snapshotToDocLines(
         small: true,
       });
     }
-    lines.push({ lineNum: lineNum++, type: "blank" });
+    lines.push({ lineNum: 0, type: "blank" });
   }
 
   pushClaims("SUMMARY");
