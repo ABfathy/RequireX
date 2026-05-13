@@ -8,6 +8,7 @@ import {
   Eye,
   FileText,
   Filter,
+  GitCompareArrows,
   History,
   type LucideProps,
   MessageSquare,
@@ -39,36 +40,43 @@ function icon(Icon: FC<LucideProps>) {
 }
 
 export const Icons = {
-  Search:       icon(Search),
-  Sidebar:      icon(PanelLeft),
-  PanelRight:   icon(PanelRight),
-  Sun:          icon(Sun),
-  Moon:         icon(Moon),
+  Search: icon(Search),
+  Sidebar: icon(PanelLeft),
+  PanelRight: icon(PanelRight),
+  Sun: icon(Sun),
+  Moon: icon(Moon),
   ChevronRight: icon(ChevronRight),
-  Plus:         icon(Plus),
-  Settings:     icon(Settings),
+  Plus: icon(Plus),
+  Settings: icon(Settings),
   MessageSquare: icon(MessageSquare),
-  Upload:       icon(Upload),
-  Send:         icon(Send),
-  Filter:       icon(Filter),
-  Eye:          icon(Eye),
-  Download:     icon(Download),
-  Share:        icon(Share2),
-  History:      icon(History),
-  FileText:     icon(FileText),
-  Mic:          icon(Mic),
-  Ticket:       icon(Ticket),
-  Code:         icon(Code),
-  Refresh:      icon(RefreshCw),
-  Trash:        icon(Trash2),
-  Check:        icon(Check),
-  X:            icon(X),
-  ArrowLeft:    icon(ArrowLeft),
-  ArrowRight:   icon(ArrowRight),
-  Pencil:       icon(Pencil),
+  Upload: icon(Upload),
+  Send: icon(Send),
+  Filter: icon(Filter),
+  Eye: icon(Eye),
+  Download: icon(Download),
+  Share: icon(Share2),
+  History: icon(History),
+  GitCompare: icon(GitCompareArrows),
+  FileText: icon(FileText),
+  Mic: icon(Mic),
+  Ticket: icon(Ticket),
+  Code: icon(Code),
+  Refresh: icon(RefreshCw),
+  Trash: icon(Trash2),
+  Check: icon(Check),
+  X: icon(X),
+  ArrowLeft: icon(ArrowLeft),
+  ArrowRight: icon(ArrowRight),
+  Pencil: icon(Pencil),
 } as const;
 
-export function RxLogo({ size = 16, className }: { size?: number; className?: string }) {
+export function RxLogo({
+  size = 16,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
   return (
     <svg
       width={size}

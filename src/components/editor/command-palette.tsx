@@ -9,25 +9,37 @@ interface Command {
   icon: React.ReactNode;
   label: string;
   shortcut?: string;
+  onExecute?: () => void;
+  disabled?: boolean;
+  disabledLabel?: string;
 }
-
-const COMMANDS: Command[] = [
-  { icon: <Icons.Upload size={14} />, label: "Add source" },
-  { icon: <Icons.Refresh size={14} />, label: "Re-extract requirements" },
-  { icon: <Icons.Download size={14} />, label: "Export as PDF" },
-  { icon: <Icons.Share size={14} />, label: "Share with client" },
-  { icon: <Icons.History size={14} />, label: "View revision history" },
-  { icon: <Icons.Settings size={14} />, label: "Project settings" },
-];
 
 interface CommandPaletteProps {
   onClose: () => void;
+  onAddSource?: () => void;
+  onRegenerate?: () => void;
+  onViewRevisions?: () => void;
+  onExportPdf?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export function CommandPalette({ onClose }: CommandPaletteProps) {
+function makeCommands(handlers: Omit<CommandPaletteProps, "onClose">): Command[] {
+  return [
+    { icon: <Icons.Upload size={14} />, label: "Add source", onExecute: handlers.onAddSource },
+    { icon: <Icons.Refresh size={14} />, label: "Re-extract requirements", onExecute: handlers.onRegenerate },
+    { icon: <Icons.Download size={14} />, label: "Export as PDF", onExecute: handlers.onExportPdf, disabled: !handlers.onExportPdf, disabledLabel: "generate brief first" },
+    { icon: <Icons.Share size={14} />, label: "Share with client", disabled: true, disabledLabel: "coming soon" },
+    { icon: <Icons.History size={14} />, label: "View revision history", onExecute: handlers.onViewRevisions },
+    { icon: <Icons.Settings size={14} />, label: "Project settings", onExecute: handlers.onOpenSettings },
+  ];
+}
+
+export function CommandPalette({ onClose, onAddSource, onRegenerate, onViewRevisions, onExportPdf, onOpenSettings }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const COMMANDS = makeCommands({ onAddSource, onRegenerate, onViewRevisions, onExportPdf, onOpenSettings });
 
   const filtered = COMMANDS.filter(
     (cmd) => !query || cmd.label.toLowerCase().includes(query.toLowerCase()),
@@ -52,7 +64,10 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
       e.preventDefault();
       setActiveIdx((i) => Math.max(i - 1, 0));
     }
-    if (e.key === "Enter") { onClose(); }
+    if (e.key === "Enter") {
+      const cmd = filtered[activeIdx];
+      if (cmd && !cmd.disabled) { cmd.onExecute?.(); onClose(); }
+    }
   }
 
   return (
@@ -111,18 +126,30 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                 <button
                   key={cmd.label}
                   type="button"
-                  onClick={onClose}
-                  className="flex items-center gap-2.5 w-full h-[34px] px-3 text-[13px] transition-colors duration-[80ms] cursor-pointer text-left"
-                  style={{
-                    color: i === activeIdx ? "var(--fg-primary)" : "var(--fg-secondary)",
-                    background: i === activeIdx ? "var(--accent-subtle)" : "transparent",
+                  disabled={cmd.disabled}
+                  onClick={() => {
+                    if (cmd.disabled) return;
+                    cmd.onExecute?.();
+                    onClose();
                   }}
-                  onMouseEnter={() => setActiveIdx(i)}
+                  className="flex items-center gap-2.5 w-full h-[34px] px-3 text-[13px] transition-colors duration-[80ms] text-left"
+                  style={{
+                    color: cmd.disabled ? "var(--fg-disabled)" : i === activeIdx ? "var(--fg-primary)" : "var(--fg-secondary)",
+                    background: !cmd.disabled && i === activeIdx ? "var(--accent-subtle)" : "transparent",
+                    cursor: cmd.disabled ? "not-allowed" : "pointer",
+                    opacity: cmd.disabled ? 0.5 : 1,
+                  }}
+                  onMouseEnter={() => { if (!cmd.disabled) setActiveIdx(i); }}
                 >
-                  <span style={{ color: i === activeIdx ? "var(--accent)" : "var(--fg-muted)" }}>
+                  <span style={{ color: cmd.disabled ? "var(--fg-disabled)" : i === activeIdx ? "var(--accent)" : "var(--fg-muted)" }}>
                     {cmd.icon}
                   </span>
                   <span>{cmd.label}</span>
+                  {cmd.disabled && cmd.disabledLabel && (
+                    <span className="ml-auto text-[10px]" style={{ color: "var(--fg-disabled)" }}>
+                      {cmd.disabledLabel}
+                    </span>
+                  )}
                 </button>
               ))}
             </>

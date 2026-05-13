@@ -6,12 +6,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { usePersistentState } from "@/lib/hooks/use-persistent-state";
+import { diffLines, type LineDiffRow } from "@/lib/line-diff";
 import { StreamingBriefParser } from "@/lib/streaming-brief-parser";
 import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
+import { ComparisonView } from "./comparison-view";
 import { type AppState, type DocLineData, DocView } from "./doc-view";
 import { ProjectSearchPalette } from "./project-search-palette";
+import { ProjectSettingsModal } from "./project-settings-modal";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
 import { ResizeHandle } from "./resize-handle";
 import { RightPane, type SourceItem, type SourceType } from "./right-pane";
@@ -45,6 +48,7 @@ export interface SnapshotSummary {
 }
 
 type SessionRef = { id: string; title: string } | null;
+const DRAFT_TAB_ID = "draft";
 const SIDEBAR_STORAGE_KEY = "rx-sidebar-width-v2";
 const SIDEBAR_DEFAULT = 196;
 const SIDEBAR_MIN = 196;
@@ -73,6 +77,23 @@ interface CacheEntry {
 }
 
 type SerializableProjectCache = Record<string, CacheEntry>;
+
+type ComparableSnapshot = {
+  id: string;
+  version: number;
+};
+
+type ComparisonTab = {
+  id: string;
+  title: string;
+  oldSnapshotId: string;
+  newSnapshotId: string;
+  oldVersion: number;
+  newVersion: number;
+  status: "loading" | "ready" | "error";
+  rows: LineDiffRow[] | null;
+  error: string | null;
+};
 
 function mapSourceType(dbType: string): SourceType {
   if (dbType === "AUDIO") return "AUDIO";
@@ -111,6 +132,10 @@ function assetToSource(a: ApiAsset): SourceItem {
     fileUrl: a.ufsUrl ?? undefined,
     mimeType: a.mimeType ?? undefined,
   };
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 type SseEvent =
@@ -177,8 +202,33 @@ async function readSseStream(
   const snapshot = parser.getSnapshot();
   if (snapshot.length > 0) onLines(snapshot);
 
-  if (!completeResult) throw new Error("Stream ended without a complete event.");
+  if (!completeResult)
+    throw new Error("Stream ended without a complete event.");
   return completeResult;
+}
+
+function comparisonTabId(oldSnapshotId: string, newSnapshotId: string) {
+  return `comparison-${oldSnapshotId}-${newSnapshotId}`;
+}
+
+function linesToComparisonText(lines: DocLineData[]) {
+  return lines
+    .filter((line) => line.type !== "meta")
+    .map((line) => (line.type === "blank" ? "" : (line.text ?? "")));
+}
+
+async function fetchSnapshotForComparison(snapshotId: string) {
+  const res = await fetch(`/api/snapshots/${snapshotId}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      res.status === 404
+        ? "One of the selected versions no longer exists."
+        : "Could not load one of the selected versions.",
+    );
+  }
+  return (await res.json()) as { lines: DocLineData[]; version: number };
 }
 
 export function EditorShell({
@@ -206,6 +256,7 @@ export function EditorShell({
   const [resizing, setResizing] = useState<null | "left" | "right">(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [projectSearchOpen, setProjectSearchOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
@@ -215,11 +266,15 @@ export function EditorShell({
   const jobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(null);
   const [revising, setRevising] = useState(false);
-  const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(initialSnapshotId);
+  const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(
+    initialSnapshotId,
+  );
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [clientLines, setClientLines] = useState<DocLineData[] | null>(null);
+  const [comparisonTabs, setComparisonTabs] = useState<ComparisonTab[]>([]);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState(DRAFT_TAB_ID);
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     initialActiveProjectId,
@@ -502,8 +557,39 @@ export function EditorShell({
 
     setGenerating(true);
     setGenerationError(null);
-    setStreamingLines(null);
     setExtractStatus("idle");
+
+    // Seed streaming view with header lines matching what the server will return,
+    // preventing layout shift when router.refresh() prepends them.
+    const PHASE_LABELS = [
+      "Collecting sources…",
+      "Processing content…",
+      "Drafting brief…",
+    ];
+    let phaseIdx = 0;
+    const makeHeaderLines = (phaseLabel: string): DocLineData[] => {
+      if (!session?.title) return [];
+      return [
+        { lineNum: 1, type: "h1", text: session.title },
+        { lineNum: 0, type: "blank" },
+        { lineNum: 2, type: "meta", text: phaseLabel, small: true },
+        { lineNum: 0, type: "blank" },
+      ];
+    };
+    const initialHeader = makeHeaderLines(PHASE_LABELS[0]!);
+    setStreamingLines(initialHeader);
+
+    const phaseInterval = setInterval(() => {
+      phaseIdx = Math.min(phaseIdx + 1, PHASE_LABELS.length - 1);
+      const nextLabel = PHASE_LABELS[phaseIdx];
+      setStreamingLines((prev) => {
+        if (!prev || prev.length < 3) return prev;
+        const updated = [...prev];
+        updated[2] = { lineNum: 2, type: "meta", text: nextLabel, small: true };
+        return updated;
+      });
+    }, 3000);
+
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -512,6 +598,7 @@ export function EditorShell({
       });
 
       if (!res.ok) {
+        clearInterval(phaseInterval);
         const payload = (await res.json().catch(() => null)) as
           | { error?: string; message?: string }
           | null;
@@ -521,13 +608,25 @@ export function EditorShell({
       }
 
       let newSnapshotId: string | null = null;
+      const lineOffset = initialHeader.length;
+      let firstToken = true;
+
+      const onStreamLines = (parserLines: DocLineData[]) => {
+        if (firstToken) { clearInterval(phaseInterval); firstToken = false; }
+        const shifted = lineOffset
+          ? parserLines.map((l) => ({ ...l, lineNum: l.lineNum > 0 ? l.lineNum + lineOffset : 0 }))
+          : parserLines;
+        const header = makeHeaderLines("Drafting brief…");
+        setStreamingLines([...header, ...shifted]);
+      };
 
       if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
-        const result = await readSseStream(res.body, setStreamingLines, (jobId) => {
+        const result = await readSseStream(res.body, onStreamLines, (jobId) => {
           startJobPoll(jobId);
         });
         newSnapshotId = result.snapshotId;
       } else {
+        clearInterval(phaseInterval);
         const result = await res.json() as { snapshotId: string; version: number };
         newSnapshotId = result.snapshotId;
       }
@@ -540,6 +639,7 @@ export function EditorShell({
 
       router.refresh();
     } catch (error) {
+      clearInterval(phaseInterval);
       stopJobPoll();
       setExtractStatus("failed");
       setGenerationError(
@@ -549,7 +649,7 @@ export function EditorShell({
     } finally {
       setGenerating(false);
     }
-  }, [sessionId, generating, router, loadRevisions, refreshSources, startJobPoll, stopJobPoll]);
+  }, [sessionId, generating, session, router, loadRevisions, refreshSources, startJobPoll, stopJobPoll]);
 
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {
@@ -574,18 +674,27 @@ export function EditorShell({
         });
 
         if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as
-            | { error?: string; message?: string }
-            | null;
-          throw new Error(payload?.message ?? payload?.error ?? "Failed to revise brief.");
+          const payload = (await res.json().catch(() => null)) as {
+            error?: string;
+            message?: string;
+          } | null;
+          throw new Error(
+            payload?.message ?? payload?.error ?? "Failed to revise brief.",
+          );
         }
 
         let newSnapshotId: string;
-        if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+        if (
+          res.headers.get("content-type")?.includes("text/event-stream") &&
+          res.body
+        ) {
           const result = await readSseStream(res.body, setStreamingLines);
           newSnapshotId = result.snapshotId;
         } else {
-          const result = await res.json() as { snapshotId: string; version: number };
+          const result = (await res.json()) as {
+            snapshotId: string;
+            version: number;
+          };
           newSnapshotId = result.snapshotId;
         }
 
@@ -602,7 +711,14 @@ export function EditorShell({
         setRevising(false);
       }
     },
-    [sessionId, currentSnapshotId, revising, selectedReq, loadRevisions, router],
+    [
+      sessionId,
+      currentSnapshotId,
+      revising,
+      selectedReq,
+      loadRevisions,
+      router,
+    ],
   );
 
   useEffect(() => {
@@ -620,22 +736,124 @@ export function EditorShell({
     }
   }, [lines]);
 
+  const loadComparisonTab = useCallback(async (tab: ComparisonTab) => {
+    setComparisonTabs((prev) =>
+      prev.map((item) =>
+        item.id === tab.id
+          ? { ...item, status: "loading", rows: null, error: null }
+          : item,
+      ),
+    );
+
+    try {
+      const [oldSnapshot, newSnapshot] = await Promise.all([
+        fetchSnapshotForComparison(tab.oldSnapshotId),
+        fetchSnapshotForComparison(tab.newSnapshotId),
+      ]);
+      const rows = diffLines(
+        linesToComparisonText(oldSnapshot.lines),
+        linesToComparisonText(newSnapshot.lines),
+      );
+
+      setComparisonTabs((prev) =>
+        prev.map((item) =>
+          item.id === tab.id
+            ? { ...item, status: "ready", rows, error: null }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setComparisonTabs((prev) =>
+        prev.map((item) =>
+          item.id === tab.id
+            ? {
+                ...item,
+                status: "error",
+                rows: null,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Could not load comparison.",
+              }
+            : item,
+        ),
+      );
+    }
+  }, []);
+
+  const handleOpenComparison = useCallback(
+    (first: ComparableSnapshot, second: ComparableSnapshot) => {
+      if (first.id === second.id || first.version === second.version) return;
+
+      const [older, newer] =
+        first.version < second.version ? [first, second] : [second, first];
+      const id = comparisonTabId(older.id, newer.id);
+      const existing = comparisonTabs.find((tab) => tab.id === id);
+
+      if (existing) {
+        setActiveWorkspaceTab(id);
+        return;
+      }
+
+      const tab: ComparisonTab = {
+        id,
+        title: `Comparison: Version ${older.version} vs Version ${newer.version}`,
+        oldSnapshotId: older.id,
+        newSnapshotId: newer.id,
+        oldVersion: older.version,
+        newVersion: newer.version,
+        status: "loading",
+        rows: null,
+        error: null,
+      };
+
+      setComparisonTabs((prev) => [...prev, tab]);
+      setActiveWorkspaceTab(id);
+      void loadComparisonTab(tab);
+    },
+    [comparisonTabs, loadComparisonTab],
+  );
+
+  const handleCloseComparisonTab = useCallback(
+    (id: string) => {
+      setComparisonTabs((prev) => {
+        const next = prev.filter((tab) => tab.id !== id);
+        if (activeWorkspaceTab === id) {
+          setActiveWorkspaceTab(next[next.length - 1]?.id ?? DRAFT_TAB_ID);
+        }
+        return next;
+      });
+    },
+    [activeWorkspaceTab],
+  );
+
+  const handleRetryComparison = useCallback(
+    (id: string) => {
+      const tab = comparisonTabs.find((item) => item.id === id);
+      if (tab) void loadComparisonTab(tab);
+    },
+    [comparisonTabs, loadComparisonTab],
+  );
+
   // Ref keeps the latest displayLines accessible inside callbacks without
   // causing the callback to re-create every time lines change.
   const displayLinesRef = useRef<DocLineData[]>([]);
 
   const handleUpdateLine = useCallback(
     async (reqId: string, reqType: "claim" | "question", newText: string) => {
-      const endpoint = reqType === "claim"
-        ? `/api/claims/${reqId}`
-        : `/api/questions/${reqId}`;
+      const endpoint =
+        reqType === "claim"
+          ? `/api/claims/${reqId}`
+          : `/api/questions/${reqId}`;
       const res = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: newText }),
       });
       if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { message?: string } | null;
+        const payload = (await res.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         throw new Error(payload?.message ?? "Failed to save edit.");
       }
       // Optimistic update: patch the text in the current display lines
@@ -648,24 +866,32 @@ export function EditorShell({
     [],
   );
 
-  const handleSelectRevision = useCallback(async (snapshotId: string | null) => {
-    if (!snapshotId) {
-      setClientLines(null);
-      setViewingVersion(null);
-      return;
-    }
-    if (snapshotId === currentSnapshotId) return;
-    try {
-      const res = await fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" });
-      if (!res.ok) return;
-      const data = await res.json() as { lines: DocLineData[]; version: number };
-      setClientLines(data.lines);
-      setViewingVersion(data.version ?? null);
-      setCurrentSnapshotId(snapshotId);
-    } catch {
-      // silently ignore
-    }
-  }, [currentSnapshotId]);
+  const handleSelectRevision = useCallback(
+    async (snapshotId: string | null) => {
+      if (!snapshotId) {
+        setClientLines(null);
+        setViewingVersion(null);
+        return;
+      }
+      if (snapshotId === currentSnapshotId) return;
+      try {
+        const res = await fetch(`/api/snapshots/${snapshotId}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          lines: DocLineData[];
+          version: number;
+        };
+        setClientLines(data.lines);
+        setViewingVersion(data.version ?? null);
+        setCurrentSnapshotId(snapshotId);
+      } catch {
+        // silently ignore
+      }
+    },
+    [currentSnapshotId],
+  );
 
   /* Soft client-side project switch. Cache hit -> swap state + replace URL
      silently (no Next.js routing -> no server roundtrip). Cached switches clear
@@ -683,6 +909,8 @@ export function EditorShell({
         setCurrentSnapshotId(null);
         setChatMessages([]);
         setSnapshots([]);
+        setComparisonTabs([]);
+        setActiveWorkspaceTab(DRAFT_TAB_ID);
         if (typeof window !== "undefined") {
           window.history.replaceState({}, "", `/app?projectId=${id}`);
         }
@@ -702,7 +930,9 @@ export function EditorShell({
       const previousSourcesError = sourcesError;
       const previousProjects = projects;
       const previousProjectCache = new Map(projectCache);
-      const remainingProjects = previousProjects.filter((p) => p.id !== projectId);
+      const remainingProjects = previousProjects.filter(
+        (p) => p.id !== projectId,
+      );
 
       setProjects(remainingProjects);
       setProjectCache((prev) => {
@@ -767,7 +997,25 @@ export function EditorShell({
       : [];
   const displayLines = clientLines ?? baseLines;
   useEffect(() => { displayLinesRef.current = displayLines; });
-  const displayHasSnapshot = usesServerSnapshot && hasSnapshot;
+  const displayHasSnapshot = usesServerSnapshot ? hasSnapshot : currentSnapshotId !== null;
+
+  // After a client-side project switch, auto-load the latest snapshot's lines so
+  // the doc shows the actual brief instead of just the session title.
+  useEffect(() => {
+    if (usesServerSnapshot || clientLines !== null) return;
+    const latestSnapshot = snapshots.find((s) => s.id !== null && s.version !== null);
+    if (!latestSnapshot?.id) return;
+    const snapshotId = latestSnapshot.id;
+    fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { lines: DocLineData[]; version: number } | null) => {
+        if (!data) return;
+        setClientLines(data.lines);
+        setCurrentSnapshotId(snapshotId);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshots, usesServerSnapshot]);
 
   const baseAppState: AppState = session
     ? sources.length > 0 || displayHasSnapshot
@@ -786,10 +1034,24 @@ export function EditorShell({
     projects.find((p) => p.id === activeProjectId)?.name ?? null;
 
   const selectedReqText = selectedReq
-    ? (displayLines.find(
-        (l) => l.reqId === selectedReq && l.type === "body",
-      )?.text ?? null)
+    ? (displayLines.find((l) => l.reqId === selectedReq && l.type === "body")
+        ?.text ?? null)
     : null;
+  const activeComparisonTab =
+    activeWorkspaceTab === DRAFT_TAB_ID
+      ? null
+      : (comparisonTabs.find((tab) => tab.id === activeWorkspaceTab) ?? null);
+  const activeComparisonContent = activeComparisonTab ? (
+    <ComparisonView
+      oldVersion={activeComparisonTab.oldVersion}
+      newVersion={activeComparisonTab.newVersion}
+      rows={activeComparisonTab.rows}
+      loading={activeComparisonTab.status === "loading"}
+      error={activeComparisonTab.error}
+      onRetry={() => handleRetryComparison(activeComparisonTab.id)}
+      onClose={() => handleCloseComparisonTab(activeComparisonTab.id)}
+    />
+  ) : null;
 
   /* ⌘K → command palette · ⌘P → project search */
   useEffect(() => {
@@ -862,6 +1124,55 @@ export function EditorShell({
     setRightTab("sources");
   }
 
+  function handleExportPdf() {
+    const lines = displayLinesRef.current;
+    if (!lines.length) return;
+    const projectName = projects.find((p) => p.id === activeProjectId)?.name ?? "Brief";
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${projectName}</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 24px;color:#111;line-height:1.6}
+  h1{font-size:22px;font-weight:700;margin:0 0 4px}
+  h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#666;margin:24px 0 8px}
+  .meta{font-size:11px;color:#999;font-family:monospace;margin:0 0 16px}
+  .body{font-size:14px;margin:0 0 8px}
+  .body.small{font-size:12px;color:#666}
+  .blank{height:8px}
+  @media print{body{margin:20px}}
+</style></head><body>
+${lines.map((l) => {
+  if (l.type === "h1") return `<h1>${escapeHtml(l.text ?? "")}</h1>`;
+  if (l.type === "h2") return `<h2>${escapeHtml(l.text ?? "")}</h2>`;
+  if (l.type === "meta") return `<div class="meta">${escapeHtml(l.text ?? "")}</div>`;
+  if (l.type === "body") return `<p class="body${l.small ? " small" : ""}">${escapeHtml(l.text ?? "")}</p>`;
+  if (l.type === "blank") return `<div class="blank"></div>`;
+  return "";
+}).join("\n")}
+</body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+    if (!doc) { document.body.removeChild(iframe); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 250);
+  }
+
+  function handleProjectSaved(name: string, clientName: string) {
+    if (!activeProjectId) return;
+    setProjects((prev) =>
+      prev.map((p) => p.id === activeProjectId ? { ...p, name, clientName } : p),
+    );
+  }
+
   /* Reset snapshot state when session changes */
   useEffect(() => {
     if (!sessionId) return;
@@ -870,6 +1181,8 @@ export function EditorShell({
     setViewingVersion(null);
     setClientLines(null);
     setChatMessages([]);
+    setComparisonTabs([]);
+    setActiveWorkspaceTab(DRAFT_TAB_ID);
   }, [sessionId]);
 
   // Clean up any in-flight job poll when the component unmounts
@@ -947,11 +1260,21 @@ export function EditorShell({
           lines={displayLines}
           selectedReqText={selectedReqText}
           onClearSelection={() => setSelectedReq(null)}
-          onSendMessage={sessionId && currentSnapshotId ? handleSendMessage : undefined}
+          onSendMessage={
+            sessionId && currentSnapshotId ? handleSendMessage : undefined
+          }
           revising={revising}
           onUpdateLine={currentSnapshotId ? handleUpdateLine : undefined}
           viewingVersion={viewingVersion}
           onExitVersionView={() => void handleSelectRevision(null)}
+          comparisonTabs={comparisonTabs.map((tab) => ({
+            id: tab.id,
+            title: tab.title,
+          }))}
+          activeWorkspaceTab={activeWorkspaceTab}
+          activeComparisonContent={activeComparisonContent}
+          onSelectWorkspaceTab={setActiveWorkspaceTab}
+          onCloseComparisonTab={handleCloseComparisonTab}
           onOpenSource={(id) => {
             const s = sources.find((src) => src.id === id);
             if (s) setPreviewItem(s);
@@ -990,6 +1313,7 @@ export function EditorShell({
               snapshotsLoading={revisionsLoading}
               viewingSnapshotId={currentSnapshotId}
               onViewSnapshot={handleSelectRevision}
+              onCompareSnapshots={handleOpenComparison}
             />
           )}
         </div>
@@ -1002,9 +1326,30 @@ export function EditorShell({
       />
 
       {previewItem && (
-        <SourcePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
+        <SourcePreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+        />
       )}
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => setPaletteOpen(false)}
+          onAddSource={() => { setRightOpen(true); setRightTab("sources"); }}
+          onRegenerate={!generating ? handleGenerateBrief : undefined}
+          onViewRevisions={() => { setRightOpen(true); setRightTab("revisions"); }}
+          onExportPdf={displayLinesRef.current.length > 0 ? handleExportPdf : undefined}
+          onOpenSettings={activeProjectId ? () => setSettingsOpen(true) : undefined}
+        />
+      )}
+      {settingsOpen && activeProjectId && (
+        <ProjectSettingsModal
+          projectId={activeProjectId}
+          initialName={projects.find((p) => p.id === activeProjectId)?.name ?? ""}
+          initialClientName={projects.find((p) => p.id === activeProjectId)?.clientName ?? ""}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={handleProjectSaved}
+        />
+      )}
       {projectSearchOpen && (
         <ProjectSearchPalette
           projects={projects}

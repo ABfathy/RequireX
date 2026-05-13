@@ -51,28 +51,30 @@ export function TitleBar({
         </span>
       </Link>
 
-      {/* Center search trigger */}
-      <div className="flex-1 flex justify-center px-4">
-        <button
-          type="button"
-          onClick={onOpenPalette}
-          className="flex items-center gap-2 h-[22px] px-3 rounded-[5px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-          style={{
-            background: "var(--surface-2)",
-            borderColor: "var(--border-strong)",
-            color: "var(--fg-muted)",
-            minWidth: 200,
-            maxWidth: 380,
-            width: "100%",
-          }}
-        >
-          <Icons.Search size={12} />
-          <span className="flex-1 text-left text-[12px]">
-            Search requirements…
-          </span>
-          <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>
-        </button>
-      </div>
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Menu trigger */}
+      <button
+        type="button"
+        onClick={onOpenPalette}
+        className="flex items-center gap-2.5 h-[26px] px-3 rounded-[6px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
+        style={{
+          background: "var(--surface-2)",
+          borderColor: "var(--border-strong)",
+          color: "var(--fg-muted)",
+          minWidth: 160,
+        }}
+      >
+        <Icons.Search size={12} aria-hidden="true" style={{ color: "var(--fg-tertiary)" }} />
+        <span className="flex-1 text-left text-[12px]" style={{ color: "var(--fg-muted)" }}>
+          Commands &amp; actions
+        </span>
+        <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>
+      </button>
+
+      {/* Spacer */}
+      <div className="flex-1" />
 
       {/* Right tools */}
       <div className="flex items-center gap-1 shrink-0">
