@@ -34,15 +34,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "FORBIDDEN", message: "Not your brief." }, { status: 403 });
     }
 
-    // Shift all claims in this section at or after the target orderIndex up by 1
-    await prisma.briefClaim.updateMany({
-      where: {
-        snapshotId: body.snapshotId,
-        section: body.section,
-        orderIndex: { gte: body.orderIndex },
-      },
-      data: { orderIndex: { increment: 1 } },
-    });
+    // Shift claims up in descending order so we never create a transient duplicate
+    // that would violate the (snapshotId, section, orderIndex) unique constraint.
+    await prisma.$executeRaw`
+      UPDATE "BriefClaim"
+      SET "orderIndex" = "orderIndex" + 1
+      WHERE "snapshotId" = ${body.snapshotId}
+        AND "section" = ${body.section}::"BriefClaimSection"
+        AND "orderIndex" >= ${body.orderIndex}
+      ORDER BY "orderIndex" DESC
+    `;
 
     const claim = await prisma.briefClaim.create({
       data: {
