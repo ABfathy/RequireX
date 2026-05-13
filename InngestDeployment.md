@@ -12,6 +12,39 @@ https://your-vercel-domain.vercel.app/api/inngest
 
 Inngest Cloud uses that endpoint to discover and run the registered background functions.
 
+For the current app architecture, Inngest should only run source-file preprocessing.
+The Next.js server is responsible for building the prompt, calling the AI model,
+streaming the response, and saving the generated brief.
+
+Only these Inngest functions are needed:
+
+```txt
+Process PDF source asset
+Process audio source asset
+```
+
+These functions should not be deployed for the current flow:
+
+```txt
+Generate brief from text
+Generate brief snapshot
+Regenerate brief snapshot
+```
+
+They are legacy or placeholder generation paths. Keeping them registered can make
+the Inngest dashboard look like generation is handled by Inngest, but in the
+current app generation is handled by the server.
+
+Inngest discovers whatever is exported from `src/server/inngest/functions.ts`.
+For this deployment, the registered function list should be:
+
+```ts
+export const inngestFunctions = [
+  processPdfSourceAsset,
+  processAudioSourceAsset,
+];
+```
+
 ## Required Environment Variables
 
 In Vercel, the Production environment needs:
@@ -95,14 +128,11 @@ After the Vercel deployment finishes, sync the deployed endpoint in Inngest Clou
 https://your-vercel-domain.vercel.app/api/inngest
 ```
 
-Inngest should discover 5 functions:
+Inngest should discover 2 functions:
 
 ```txt
-Generate brief from text
 Process PDF source asset
 Process audio source asset
-Generate brief snapshot
-Regenerate brief snapshot
 ```
 
 ## Test With Browser Or Postman
@@ -119,7 +149,7 @@ Expected successful response:
 {
   "has_event_key": true,
   "has_signing_key": true,
-  "function_count": 5,
+  "function_count": 2,
   "mode": "cloud"
 }
 ```
@@ -142,7 +172,7 @@ Local development may show:
 {
   "has_event_key": false,
   "has_signing_key": false,
-  "function_count": 5,
+  "function_count": 2,
   "mode": "dev"
 }
 ```
@@ -152,16 +182,29 @@ That is okay locally when using the Inngest Dev Server. Production should show b
 ## Verify A Real Run
 
 1. Open the deployed app.
-2. Trigger a brief generation flow from the UI.
-3. Open Inngest Cloud.
-4. Go to Events or Runs.
-5. Confirm that Inngest receives the event and starts a function run.
+2. Upload a PDF or audio source.
+3. Trigger the brief generation flow from the UI.
+4. Open Inngest Cloud.
+5. Go to Events or Runs.
+6. Confirm that Inngest receives only file-processing events:
+
+```txt
+source/pdf.process.requested
+source/audio.process.requested
+```
+
+7. Confirm that brief generation itself is handled by the Next.js server, not by
+   an Inngest generation function.
 
 ## Troubleshooting
 
 If `/api/inngest` returns `404`, the app deployment does not include the Inngest route or the URL is wrong.
 
 If `function_count` is `0`, the route is reachable but no functions were registered.
+
+If `function_count` is `5`, the legacy generation functions are still exported
+from `src/server/inngest/functions.ts`. Export only `processPdfSourceAsset` and
+`processAudioSourceAsset` for the current deployment.
 
 If `has_event_key` is `false` in Production, `INNGEST_EVENT_KEY` is missing from Vercel.
 
