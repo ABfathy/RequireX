@@ -1,81 +1,89 @@
 # Current State
 
-Last refreshed: 2026-05-11
+Last refreshed: 2026-05-13
 
 ## Summary
 
-The app has crossed from scaffold into usable internal shell. Auth, project bootstrap, project creation, source ingestion, internal brief generation, and public review mutation infrastructure are implemented. The main unfinished layer is the public share/review rendering path.
+The internal workspace is end-to-end functional: auth → source upload → brief generation (text, PDF, audio, image) → streaming editor view → AI chat revision → revision history. The public review mutation surface is fully wired. The two remaining gaps before the full public loop closes are **share-link creation** and **binding the public brief page to real snapshot data**.
 
-## Internal App
+---
 
-Implemented:
+## Internal Workspace
 
-- `/app` requires Clerk auth
-- the server page ensures a workspace exists for the current user
-- projects are loaded from Prisma
-- the active project is chosen from `?projectId=` or the newest updated project
-- the earliest intake session for the active project is loaded
-- source assets are preloaded into the editor
-- the sidebar supports project switching and creating a new project
-- the right pane supports pasted text, uploads, rename, delete, refresh, and loading/error states
+**Working end-to-end:**
 
-Generation/rendering:
+- Clerk auth with custom sign-in / sign-up pages; middleware enforces protection
+- Workspace bootstrap, project listing, project creation, active-project switching
+- Source panel: pasted text, file uploads (PDF, audio, image), rename, delete, preview
+- Generate / Regenerate: unified button shows "Generate Brief" before the first snapshot, "Regenerate" after; downloads file sources, processes PDF/audio/image, builds prompt bundle, calls Gemini 2.5 Flash, streams tokens to editor with character animation
+- AI chat revision: user sends a message from the right pane or selection, Gemini streams a revised brief, revision is persisted and navigable
+- Revision history tab: full `RevisionEvent` list with type colouring; client feedback bodies and authors shown inline for `CLIENT_COMMENT_ADDED` / `CLIENT_ANSWER_ADDED` events
 
-- the central document view renders the latest `BriefSnapshot` for the active session
-- the Generate Brief button runs the text-first sync Vertex AI flow and refreshes the editor
+**Not wired:**
 
-## Uploads And Sources
+- No share-link creation button — `ShareLink` model is ready but no creation path exists
+- Chat tab "send" input is display-only; send action only triggers from document text selection
 
-Implemented:
+---
 
-- UploadThing route handler is live
-- mixed uploads accept image, PDF, and audio-compatible source files
-- pasted text persists directly to `SourceAsset`
-- asset deletion is restricted to `UPLOADED` and `FAILED`
+## Source Processing
 
-Current limitation:
+**Working:**
 
-- file assets stop at `SourceAsset`; the live generation path is text-first
+- PDF: assets downloaded from UploadThing, parsed with built-in stream extractor (`pdf-text.ts`), chunked into `SourceChunk` rows, included in generation prompt
+- Audio: downloaded, transcribed to English via Gemini (`transcribeAudioToEnglish()`), chunked
+- Image: passed directly as base64 to Gemini vision API without pre-processing
+- Text: normalised and chunked inline during generation
+
+**Known limits:**
+
+- PDF parser uses a pure-JS stream reader — non-ASCII (UTF-8) PDFs may lose characters; `latin1` encoding assumption
+- No concurrency lock on asset processing — two Inngest workers could double-process the same asset
+- Audio processor has no parser-version field; stale transcripts will not re-process when the transcription model changes
+
+---
 
 ## Generation
 
-Implemented:
+**Working:**
 
-- `/api/generate` creates generation jobs and runs sync brief generation by default
-- `/api/regenerate` creates regeneration jobs
-- text sources are normalized into `SourceChunk` rows when generation runs
-- `@google/genai` calls Vertex AI Gemini 2.5 Flash in Vertex mode
-- successful runs persist `BriefSnapshot`, claims, questions, evidence refs, and a `GENERATED` revision event
-- Inngest generation dispatch remains available behind `BRIEF_GENERATION_ASYNC=1`
-- job-dispatch failures are written back onto the `ProcessingJob`
+- Sync path (default): full pipeline runs inside the HTTP request; SSE stream returned to client
+- Async path (`BRIEF_GENERATION_ASYNC=1`): Inngest event dispatched; `ProcessingJob` status polled via `GET /api/jobs/[jobId]` and shown in the status bar (queued → running → idle/failed)
+- Generation failure surfaces error message in the document view with a Retry button
+- Unified generate / regenerate button — shows "Generate Brief" before first snapshot, "Regenerate" after
+- Source bundle allocation distributes a 30 000-char budget across all sources
+- Gemini output validated against JSON schema; retried once on parse failure
+- `BriefSnapshot`, `BriefClaim`, `BriefQuestion`, `EvidenceRef` persisted in a single Prisma transaction
+- `GENERATED` revision event written per run
 
-Current limitation:
+**Known limits:**
 
-- generation only includes text sources in the prompt
-- regeneration UI is not wired yet
+- No server-side timeout on the streaming Gemini call — a stalled request hangs the worker
+- SSE stream controller not explicitly closed after error events
+- `PROMPT_BUNDLE_MAX_CHARS = 30_000` is a hardcoded constant
+
+---
 
 ## Public Review
 
-Implemented:
+**Working:**
 
-- comment submission route and service
-- follow-up answer route and service
-- confirmation route and service
-- share-link expiry/inactive checks
-- snapshot mutability checks
-- basic in-memory rate limiting by action + share token + IP
-- revision event creation for public mutations
+- Comment, answer, and confirm mutation routes fully implemented and tested
+- Share-link validation (token lookup, expiry, status)
+- Snapshot mutability guard (only `SHARED` snapshots accept mutations)
+- In-memory rate limiting per action + share token + IP
+- Revision events written for every public mutation
+- Public brief page shell is responsive and themed; submission handlers wired to real APIs
 
-Current limitation:
+**Not working:**
 
-- `/brief/[shareToken]` still renders mock requirements and revisions instead of database-backed snapshot data
+- `/brief/[shareToken]` renders `MOCK_REQUIREMENTS` and `MOCK_REVISIONS` — no code reads the real `BriefSnapshot` from the database for display
+- No share-link creation path; tokens cannot be generated from the internal workspace
+
+---
 
 ## Tests
 
-Implemented:
-
-- Vitest suite for service and route logic
-
-Current limitation:
-
-- no e2e, no accessibility automation, no live UI integration tests
+- 11 Vitest unit test files, 93 tests — all passing
+- Covered: validators, asset CRUD, brief pipeline, PDF extraction, source processing, public auth, public review services and routes
+- `pnpm test:e2e` and `pnpm test:a11y` — placeholder scripts only; no real coverage
