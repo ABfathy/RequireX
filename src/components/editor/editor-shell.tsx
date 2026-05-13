@@ -127,6 +127,7 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 async function readSseStream(
   body: ReadableStream<Uint8Array>,
   onLines: (lines: DocLineData[]) => void,
+  onJobId?: (jobId: string) => void,
 ): Promise<{ snapshotId: string; version: number }> {
   const parser = new StreamingBriefParser();
   const reader = body.getReader();
@@ -153,7 +154,9 @@ async function readSseStream(
     for (const part of parts) {
       if (!part.startsWith("data: ")) continue;
       const evt = JSON.parse(part.slice(6)) as SseEvent;
-      if (evt.type === "token") {
+      if (evt.type === "start") {
+        if (evt.jobId) onJobId?.(evt.jobId);
+      } else if (evt.type === "token") {
         for (const ch of evt.text) {
           parser.feed(ch);
           flushIfDue();
@@ -208,6 +211,8 @@ export function EditorShell({
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [extractStatus, setExtractStatus] = useState<"idle" | "queued" | "running" | "failed">("idle");
+  const jobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(null);
   const [revising, setRevising] = useState(false);
   const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(initialSnapshotId);
@@ -462,12 +467,46 @@ export function EditorShell({
     }
   }, []);
 
+  const stopJobPoll = useCallback(() => {
+    if (jobPollRef.current !== null) {
+      clearInterval(jobPollRef.current);
+      jobPollRef.current = null;
+    }
+  }, []);
+
+  const startJobPoll = useCallback((jobId: string) => {
+    stopJobPoll();
+    setExtractStatus("queued");
+    jobPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const job = await res.json() as { status: string; errorCode?: string | null };
+        if (job.status === "RUNNING") {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setExtractStatus("running");
+        } else if (job.status === "SUCCEEDED") {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setExtractStatus("idle");
+          stopJobPoll();
+        } else if (job.status === "FAILED" || job.status === "CANCELED") {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setExtractStatus("failed");
+          stopJobPoll();
+        }
+      } catch {
+        // silently ignore transient fetch errors
+      }
+    }, 2000);
+  }, [stopJobPoll]);
+
   const handleGenerateBrief = useCallback(async () => {
     if (!sessionId || generating) return;
 
     setGenerating(true);
     setGenerationError(null);
     setStreamingLines(null);
+    setExtractStatus("idle");
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -487,19 +526,25 @@ export function EditorShell({
       let newSnapshotId: string | null = null;
 
       if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
-        const result = await readSseStream(res.body, setStreamingLines);
+        const result = await readSseStream(res.body, setStreamingLines, (jobId) => {
+          startJobPoll(jobId);
+        });
         newSnapshotId = result.snapshotId;
       } else {
         const result = await res.json() as { snapshotId: string; version: number };
         newSnapshotId = result.snapshotId;
       }
 
+      stopJobPoll();
+      setExtractStatus("idle");
       if (newSnapshotId) setCurrentSnapshotId(newSnapshotId);
       if (sessionId) await loadRevisions(sessionId);
       await refreshSources();
 
       router.refresh();
     } catch (error) {
+      stopJobPoll();
+      setExtractStatus("failed");
       setGenerationError(
         error instanceof Error ? error.message : "Failed to generate brief.",
       );
@@ -507,7 +552,7 @@ export function EditorShell({
     } finally {
       setGenerating(false);
     }
-  }, [sessionId, generating, router, loadRevisions, refreshSources]);
+  }, [sessionId, generating, router, loadRevisions, refreshSources, startJobPoll, stopJobPoll]);
 
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {
@@ -830,6 +875,9 @@ export function EditorShell({
     setChatMessages([]);
   }, [sessionId]);
 
+  // Clean up any in-flight job poll when the component unmounts
+  useEffect(() => () => { stopJobPoll(); }, [stopJobPoll]);
+
   const colTemplate = [
     sidebarOpen ? `${sidebarWidth}px` : "0px",
     "1fr",
@@ -895,6 +943,9 @@ export function EditorShell({
           onAttachFiles={sessionId ? handleUploadFiles : undefined}
           onGenerateBrief={sessionId ? handleGenerateBrief : undefined}
           generating={generating}
+          hasSnapshot={displayHasSnapshot}
+          generationError={generationError}
+          onRetry={sessionId ? handleGenerateBrief : undefined}
           streamingLines={streamingLines}
           lines={displayLines}
           selectedReqText={selectedReqText}
@@ -950,6 +1001,7 @@ export function EditorShell({
       <StatusBar
         selectedReq={selectedReq}
         sessionName={session?.title ?? null}
+        extractStatus={extractStatus}
       />
 
       {previewItem && (
