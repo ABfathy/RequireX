@@ -80,6 +80,7 @@ export function RxLogo({
   className?: string;
 }) {
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/rx-logo.png"
       width={size}

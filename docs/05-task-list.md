@@ -25,7 +25,7 @@
 - [x] Audio source processing — download, transcribe via Gemini, chunk
 - [x] Image source support — base64 passed directly to Gemini vision API
 - [x] `SourceChunk` creation for all source types during generation
-- [x] Source bundle budget allocation across all sources
+- [x] Source bundle assembly — each asset's full text sent to Gemini independently, capped per-asset at `PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE` (default 750 000 chars); no shared budget split across sources
 - [x] `BriefSnapshot`, `BriefClaim`, `BriefQuestion`, and `EvidenceRef` persistence
 - [x] `RevisionEvent` creation for generated snapshots
 - [x] Streaming SSE generation with character-by-character animation in the editor
@@ -81,7 +81,7 @@
 - [ ] Audio processor: add parser-version tracking to `providerMetadata` (like PDF uses `PDF_TEXT_PARSER_VERSION`)
 - [ ] Add 10-minute `AbortSignal` timeout to streaming Gemini call in generation pipeline
 - [ ] Call `controller.close()` after error event in `api/generate/route.ts` SSE stream
-- [ ] Move `PROMPT_BUNDLE_MAX_CHARS = 30_000` to an env-configurable value
+- [x] Move `PROMPT_BUNDLE_MAX_CHARS = 30_000` to an env-configurable value (`PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE`, default 750 000 — full-source mode, no budget splitting)
 
 ### P2 — Test Coverage
 

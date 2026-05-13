@@ -32,7 +32,7 @@ Non-blocking but should be done before the next production push:
 - **Audio version tracking** — add `transcriptionProvider` / version field to `providerMetadata` like PDF does
 - **Generation timeout** — wrap the Gemini streaming call in a 10-minute `AbortSignal`
 - **SSE stream close on error** — call `controller.close()` after writing an error event in `api/generate/route.ts`
-- **Configurable bundle size** — move `PROMPT_BUNDLE_MAX_CHARS = 30_000` to an env var
+- ~~**Configurable bundle size**~~ — ✅ done: `PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE` (default 750 000); each source now contributes full text, no shared budget split
 
 ---
 

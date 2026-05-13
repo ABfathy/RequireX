@@ -76,7 +76,7 @@ export default async function InternalWorkspacePage({
     }));
   }
 
-  const lines = snapshotToDocLines(latestSnapshot, session?.title ?? null);
+  const lines = snapshotToDocLines(latestSnapshot);
 
   const initialProjectCache: Record<
     string,

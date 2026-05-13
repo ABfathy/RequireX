@@ -185,14 +185,18 @@ describe("runBriefGeneration", () => {
     });
 
     expect(mockPrisma.sourceChunk.createMany).toHaveBeenCalled();
-    expect(mockGenerateBriefFromBundle).toHaveBeenCalledWith({
-      assets: [
-        expect.objectContaining({
-          id: "asset_1",
-          label: "Pasted text",
-        }),
-      ],
-    });
+    expect(mockGenerateBriefFromBundle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assets: [
+          expect.objectContaining({
+            id: "asset_1",
+            label: "Pasted text",
+            // Full source text must reach the model — no budget-split truncation.
+            text: "Client needs a portal.\n\nThey also need approvals.",
+          }),
+        ],
+      }),
+    );
     expect(tx.briefSnapshot.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         projectId: "project_1",

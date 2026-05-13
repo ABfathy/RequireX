@@ -51,7 +51,7 @@ The internal workspace is end-to-end functional: auth → source upload → brie
 - Async path (`BRIEF_GENERATION_ASYNC=1`): Inngest event dispatched; `ProcessingJob` status polled via `GET /api/jobs/[jobId]` and shown in the status bar (queued → running → idle/failed)
 - Generation failure surfaces error message in the document view with a Retry button
 - Unified generate / regenerate button — shows "Generate Brief" before first snapshot, "Regenerate" after
-- Source bundle allocation distributes a 30 000-char budget across all sources
+- Source bundle assembly passes each source's full text to the model; each asset is independently capped at `PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE` (default 750 000 chars — well within Gemini 2.5 Flash's 1 M-token context window)
 - Gemini output validated against JSON schema; retried once on parse failure
 - `BriefSnapshot`, `BriefClaim`, `BriefQuestion`, `EvidenceRef` persisted in a single Prisma transaction
 - `GENERATED` revision event written per run
@@ -60,7 +60,7 @@ The internal workspace is end-to-end functional: auth → source upload → brie
 
 - No server-side timeout on the streaming Gemini call — a stalled request hangs the worker
 - SSE stream controller not explicitly closed after error events
-- `PROMPT_BUNDLE_MAX_CHARS = 30_000` is a hardcoded constant
+- Per-source prompt ceiling is env-configurable (`PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE`, default 750 000); no truncation expected for any realistic source
 
 ---
 

@@ -32,7 +32,7 @@ vi.mock("@/lib/prisma", () => ({
 // Lazily import the mocked prisma so we can control its return values per-test.
 async function getPrisma() {
   const { prisma } = await import("@/lib/prisma");
-  return prisma as {
+  return prisma as unknown as {
     briefSnapshot: { findUnique: ReturnType<typeof vi.fn> };
     shareLink: {
       findUnique: ReturnType<typeof vi.fn>;

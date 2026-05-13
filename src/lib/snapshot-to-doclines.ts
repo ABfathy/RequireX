@@ -38,7 +38,6 @@ function evidenceLine(row: EvidenceRow, sourceIndex: Map<string, number>) {
 
 export function snapshotToDocLines(
   snapshot: SnapshotWithDetails | null,
-  sessionTitle: string | null,
 ): DocLineData[] {
   const lines: DocLineData[] = [];
   let lineNum = 1;

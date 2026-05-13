@@ -161,6 +161,9 @@ function DocLine({
   autoFocus,
   onAutoFocusConsumed,
   onOpenSource,
+  isEditing,
+  onStartEdit,
+  onStopEdit,
 }: {
   line: DocLineData;
   selectedReq: string | null;
@@ -174,13 +177,24 @@ function DocLine({
   autoFocus?: boolean;
   onAutoFocusConsumed?: () => void;
   onOpenSource?: (sourceId: string) => void;
+  /** Controlled: true when this specific row is the active editor (singleton). */
+  isEditing: boolean;
+  /** Ask DocView to make this row the active editor, closing any other open editor. */
+  onStartEdit: () => void;
+  /** Ask DocView to close the active editor. */
+  onStopEdit: () => void;
 }) {
   const isReq = !!line.reqId && !!line.reqType;
   const isActive = isReq && line.reqId === selectedReq;
-  const [editing, setEditing] = useState(false);
+  // `isEditing` is now a controlled prop from DocView — only one row across
+  // the entire document can have isEditing=true at once (singleton invariant).
+  const editing = isEditing;
   const [editVal, setEditVal] = useState(line.text ?? "");
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Guard: prevents the gutter + button from firing more than once per click
+  // (double-click would otherwise call onInsertLineAfter twice).
+  const insertingRef = useRef(false);
 
   const heights: Partial<Record<LineType, string>> = {
     h1: "min-h-[32px] py-1",
@@ -190,11 +204,13 @@ function DocLine({
   };
   const heightCls = heights[line.type] ?? "min-h-[21px]";
 
-  // Auto-enter edit mode when this line is the newly inserted one
+  // Auto-enter edit mode when this line is the newly inserted one.
+  // Uses onStartEdit so that any already-open editor is closed first.
   useEffect(() => {
     if (autoFocus && isReq && onUpdateLine) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditVal(line.text ?? "");
-      setEditing(true);
+      onStartEdit();
       onAutoFocusConsumed?.();
       setTimeout(() => {
         textareaRef.current?.focus();
@@ -209,7 +225,9 @@ function DocLine({
   function startEdit() {
     if (!isReq || !onUpdateLine) return;
     setEditVal(line.text ?? "");
-    setEditing(true);
+    // Calling onStartEdit sets activeEditReqId in DocView, which closes any
+    // currently open editor and opens this one — the singleton invariant.
+    onStartEdit();
     setTimeout(() => {
       textareaRef.current?.focus();
       textareaRef.current?.select();
@@ -219,17 +237,17 @@ function DocLine({
   async function commitEdit() {
     const trimmed = editVal.trim();
     if (!trimmed || !line.reqId || !line.reqType || !onUpdateLine) {
-      setEditing(false);
+      onStopEdit();
       return;
     }
     if (trimmed === line.text) {
-      setEditing(false);
+      onStopEdit();
       return;
     }
     setSaving(true);
     try {
       await onUpdateLine(line.reqId, line.reqType, trimmed);
-      setEditing(false);
+      onStopEdit();
     } finally {
       setSaving(false);
     }
@@ -237,7 +255,7 @@ function DocLine({
 
   function handleEditKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Escape") {
-      setEditing(false);
+      onStopEdit();
       return;
     }
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.altKey) {
@@ -276,7 +294,7 @@ function DocLine({
             setSaving(false);
           }
         }
-        setEditing(false);
+        onStopEdit();
         await onInsertLineAfter(section, orderIndex);
       })();
     }
@@ -299,7 +317,7 @@ function DocLine({
       tabIndex={isReq && !editing ? 0 : undefined}
       aria-pressed={isReq && !editing ? isActive : undefined}
       onClick={isReq && !editing ? () => onSelectReq(line.reqId!) : undefined}
-      onDoubleClick={isReq && !editing && onUpdateLine ? startEdit : undefined}
+      onDoubleClick={isReq && !editing && !insertingRef.current && onUpdateLine ? startEdit : undefined}
       onKeyDown={isReq && !editing ? handleKeyDown : undefined}
     >
       {/* Gutter */}
@@ -314,7 +332,7 @@ function DocLine({
         aria-hidden="true"
       >
         {isReq && line.reqType === "claim" && !editing && onInsertLineAfter &&
-         line.section != null && line.orderIndex != null ? (
+          line.section != null && line.orderIndex != null ? (
           <span className="relative inline-flex items-center justify-end w-full">
             <span className="group-hover:opacity-0 transition-opacity duration-[80ms]">
               {line.lineNum > 0 ? line.lineNum : ""}
@@ -323,8 +341,18 @@ function DocLine({
               type="button"
               aria-label="Insert line below"
               onClick={(e) => {
+                // stopPropagation: prevents the row's onClick/onDoubleClick from also firing.
+                // preventDefault: suppresses the browser synthetic dblclick that would
+                // trigger startEdit on this line when the user double-clicks the + button.
                 e.stopPropagation();
-                void onInsertLineAfter(line.section!, line.orderIndex!);
+                e.preventDefault();
+                // Guard: if an insert is already in-flight (e.g. from a rapid double-click),
+                // discard the second call so we never append twice.
+                if (insertingRef.current) return;
+                insertingRef.current = true;
+                void onInsertLineAfter(line.section!, line.orderIndex!).finally(() => {
+                  insertingRef.current = false;
+                });
               }}
               className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-60 hover:!opacity-100 rounded-[3px] transition-opacity duration-[80ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
               style={{ color: "var(--accent)" }}
@@ -479,7 +507,7 @@ function DocLine({
               </button>
               <button
                 type="button"
-                onClick={() => setEditing(false)}
+                onClick={() => onStopEdit()}
                 disabled={saving}
                 className="inline-flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[100ms] hover:bg-[var(--surface-3)] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
                 style={{ color: "var(--fg-muted)" }}
@@ -944,6 +972,10 @@ export function DocView({
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
   const filterInputRef = useRef<HTMLInputElement>(null);
+  // Singleton edit guard: at most one DocLine can be in edit mode at a time.
+  // Storing the reqId (instead of a boolean) lets us derive isEditing per-row
+  // without any per-row state mutation.
+  const [activeEditReqId, setActiveEditReqId] = useState<string | null>(null);
 
   useEffect(() => {
     if (filterOpen) filterInputRef.current?.focus();
@@ -1108,15 +1140,15 @@ export function DocView({
             style={
               activeWorkspaceTab === "draft"
                 ? {
-                    background: "var(--surface-3)",
-                    borderColor: "var(--border-strong)",
-                    color: "var(--fg-primary)",
-                  }
+                  background: "var(--surface-3)",
+                  borderColor: "var(--border-strong)",
+                  color: "var(--fg-primary)",
+                }
                 : {
-                    background: "transparent",
-                    borderColor: "transparent",
-                    color: "var(--fg-tertiary)",
-                  }
+                  background: "transparent",
+                  borderColor: "transparent",
+                  color: "var(--fg-tertiary)",
+                }
             }
           >
             Draft
@@ -1130,15 +1162,15 @@ export function DocView({
                 style={
                   active
                     ? {
-                        background: "var(--surface-3)",
-                        borderColor: "var(--border-strong)",
-                        color: "var(--fg-primary)",
-                      }
+                      background: "var(--surface-3)",
+                      borderColor: "var(--border-strong)",
+                      color: "var(--fg-primary)",
+                    }
                     : {
-                        background: "transparent",
-                        borderColor: "transparent",
-                        color: "var(--fg-tertiary)",
-                      }
+                      background: "transparent",
+                      borderColor: "transparent",
+                      color: "var(--fg-tertiary)",
+                    }
                 }
               >
                 <button
@@ -1210,6 +1242,10 @@ export function DocView({
               line={line}
               selectedReq={null}
               onSelectReq={() => undefined}
+              // Streaming lines are read-only — editing is never active here.
+              isEditing={false}
+              onStartEdit={() => undefined}
+              onStopEdit={() => undefined}
             />
           ))
         ) : (appState === "generating" || appState === "revising") ? (
@@ -1230,6 +1266,9 @@ export function DocView({
               autoFocus={!!autoFocusReqId && line.reqId === autoFocusReqId}
               onAutoFocusConsumed={onAutoFocusConsumed}
               onOpenSource={onOpenSource}
+              isEditing={!!line.reqId && line.reqId === activeEditReqId}
+              onStartEdit={() => line.reqId && setActiveEditReqId(line.reqId)}
+              onStopEdit={() => setActiveEditReqId(null)}
             />
           ))
         )}

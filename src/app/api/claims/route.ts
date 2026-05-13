@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { BriefClaimSection } from "../../../../generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   isInternalAuthorizationError,
   requireInternalAuth,
 } from "@/server/auth/internal";
+
+import { BriefClaimSection } from "../../../../generated/prisma/client";
 
 const postSchema = z.object({
   snapshotId: z.string(),

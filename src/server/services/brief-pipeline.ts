@@ -29,7 +29,22 @@ import type {
   SourceChunk,
 } from "../../../generated/prisma/client";
 
-const PROMPT_BUNDLE_MAX_CHARS = 30_000;
+/**
+ * Maximum characters taken from a single source asset when building the
+ * prompt bundle.  Defaults to 750 000 — comfortably inside Gemini 2.5
+ * Flash's 1 M-token context window — so the full content of every source
+ * is sent and no requirements are silently dropped.
+ *
+ * Override via env var when needed:
+ *   PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE=500000
+ */
+const parsedEnv = process.env.PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE
+  ? parseInt(process.env.PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE, 10)
+  : NaN;
+
+const PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE = isNaN(parsedEnv)
+  ? 750_000
+  : Math.max(1_000, parsedEnv);
 
 function logBriefPipeline(
   level: "info" | "warn" | "error",
@@ -244,38 +259,16 @@ export function buildSourceBundle(
 
   if (bodies.length === 0) return { assets: [] };
 
-  // First pass: give each source an equal share of the budget.
-  const perSource = Math.floor(PROMPT_BUNDLE_MAX_CHARS / bodies.length);
-  const allocations = bodies.map(({ body }) =>
-    Math.min(body.length, perSource),
-  );
-
-  // Second pass: redistribute unused budget from short sources to longer ones.
-  const surplus = allocations.reduce(
-    (acc, alloc) => acc + (perSource - alloc),
-    0,
-  );
-  if (surplus > 0) {
-    const needMoreCount = bodies.filter(
-      (e, i) => e.body.length > (allocations[i] ?? 0),
-    ).length;
-    if (needMoreCount > 0) {
-      const extra = Math.floor(surplus / needMoreCount);
-      for (let i = 0; i < bodies.length; i++) {
-        const body = bodies[i]?.body ?? "";
-        const current = allocations[i] ?? 0;
-        if (body.length > current) {
-          allocations[i] = Math.min(body.length, current + extra);
-        }
-      }
-    }
-  }
-
+  // Each source contributes its full text up to the per-source ceiling.
+  // The ceiling is intentionally large (750 k chars by default) so that no
+  // requirements are silently dropped.  A shared budget is NOT used — that
+  // approach divided the allowance equally across sources and discarded
+  // content from longer ones.
   return {
-    assets: bodies.map(({ asset, body, label }, i) => ({
+    assets: bodies.map(({ asset, body, label }) => ({
       id: asset.id,
       label,
-      text: body.slice(0, allocations[i]),
+      text: body.slice(0, PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE),
       sourceType: asset.sourceType,
       mimeType: asset.mimeType,
       fileUrl: asset.appUrl ?? asset.ufsUrl,

@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       select: { title: true },
     });
 
-    const lines = snapshotToDocLines(snapshot, session?.title ?? null);
+    const lines = snapshotToDocLines(snapshot);
     return NextResponse.json({ lines, version: snapshot.version, status: snapshot.status });
   } catch (err) {
     if (isInternalAuthorizationError(err)) {
