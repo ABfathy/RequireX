@@ -290,11 +290,10 @@ function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
           <>
             {/* Status dot — sits in place, cross-fades with action buttons */}
             <span
-              className={`absolute inset-0 m-auto size-[6px] rounded-full transition-opacity duration-[150ms] pointer-events-none ${
-                (onPreview ?? onDelete)
+              className={`absolute inset-0 m-auto size-[6px] rounded-full transition-opacity duration-[150ms] pointer-events-none ${(onPreview ?? onDelete)
                   ? "opacity-60 group-hover:opacity-0"
                   : "opacity-60"
-              }`}
+                }`}
               style={{ background: STATUS_DOT[item.status] }}
               aria-label={STATUS_LABEL[item.status]}
               role="img"
@@ -781,7 +780,7 @@ function RevisionsTab({
                     >
                       {isChatRevision && snap.userMessage
                         ? snap.userMessage.slice(0, 60) +
-                          (snap.userMessage.length > 60 ? "…" : "")
+                        (snap.userMessage.length > 60 ? "…" : "")
                         : snap.summary}
                     </span>
                   </div>
@@ -810,8 +809,6 @@ function RevisionsTab({
                     {snap.feedbackBody}
                   </div>
                 )}
-<<<<<<< HEAD
-=======
                 {canCompare && (
                   <button
                     type="button"
@@ -834,7 +831,6 @@ function RevisionsTab({
                     <span>Compare</span>
                   </button>
                 )}
->>>>>>> a99b19634693caa4ba2dcc566f61acdbd0f5b794
               </div>
               {compareOpen && (
                 <div
