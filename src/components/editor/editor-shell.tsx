@@ -176,6 +176,8 @@ const SMOOTH_CHAR_DELAY_MS = 5; // ~200 chars/sec — matches typical model gene
 const SMOOTH_RENDER_INTERVAL_MS = 16; // cap React re-renders at ~60fps
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const shouldSmoothStream = () =>
+  typeof document === "undefined" || document.visibilityState === "visible";
 
 async function readSseStream(
   body: ReadableStream<Uint8Array>,
@@ -218,10 +220,16 @@ async function readSseStream(
       if (evt.type === "start") {
         if (evt.jobId) onJobId?.(evt.jobId);
       } else if (evt.type === "token") {
-        for (const ch of evt.text) {
-          parser.feed(ch);
-          flushIfDue();
-          await delay(SMOOTH_CHAR_DELAY_MS);
+        if (!shouldSmoothStream()) {
+          parser.feed(evt.text);
+        } else {
+          for (const ch of evt.text) {
+            parser.feed(ch);
+            flushIfDue();
+
+            if (!shouldSmoothStream()) continue;
+            await delay(SMOOTH_CHAR_DELAY_MS);
+          }
         }
         // Ensure final state of this token is always rendered
         const snapshot = parser.getSnapshot();
