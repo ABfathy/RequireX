@@ -88,7 +88,7 @@ function ClientDoc({
               .filter((r) => r.section === section)
               .map((req) => (
                 <RequirementCard
-                  key={req.id}
+                  key={`${meta.version}:${req.id}`}
                   req={req}
                   onSubmitComment={onSubmitComment}
                   onSubmitAnswer={onSubmitAnswer}
