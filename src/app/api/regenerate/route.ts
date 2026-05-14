@@ -6,9 +6,9 @@ import {
 } from "@/server/auth/internal";
 
 const legacyRegenerationDisabled = {
-  error: "LEGACY_GENERATION_FLOW_DISABLED",
+  error: "REGENERATION_NOT_IMPLEMENTED",
   message:
-    "Submit text through the Sources panel to run the single text brief Inngest event.",
+    "Brief regeneration is not implemented. Generate a new brief from the workspace instead.",
 };
 
 export async function POST() {

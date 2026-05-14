@@ -16,14 +16,14 @@ For the current app architecture, Inngest should only run source-file preprocess
 The Next.js server is responsible for building the prompt, calling the AI model,
 streaming the response, and saving the generated brief.
 
-Only these Inngest functions are needed:
+Only these Inngest functions should be registered:
 
 ```txt
 Process PDF source asset
 Process audio source asset
 ```
 
-These functions should not be deployed for the current flow:
+These legacy generation functions should not be registered:
 
 ```txt
 Generate brief from text
@@ -31,9 +31,9 @@ Generate brief snapshot
 Regenerate brief snapshot
 ```
 
-They are legacy or placeholder generation paths. Keeping them registered can make
-the Inngest dashboard look like generation is handled by Inngest, but in the
-current app generation is handled by the server.
+They are legacy or placeholder generation paths. Keeping them registered makes
+the Inngest dashboard misleading and can create failing legacy runs, while the
+current app handles generation in the Next.js server.
 
 Inngest discovers whatever is exported from `src/server/inngest/functions.ts`.
 For this deployment, the registered function list should be:
@@ -195,6 +195,8 @@ source/audio.process.requested
 
 7. Confirm that brief generation itself is handled by the Next.js server, not by
    an Inngest generation function.
+8. Confirm that text and image sources are handled by the normal brief
+   generation flow and do not create Inngest generation runs.
 
 ## Troubleshooting
 
@@ -202,9 +204,9 @@ If `/api/inngest` returns `404`, the app deployment does not include the Inngest
 
 If `function_count` is `0`, the route is reachable but no functions were registered.
 
-If `function_count` is `5`, the legacy generation functions are still exported
-from `src/server/inngest/functions.ts`. Export only `processPdfSourceAsset` and
-`processAudioSourceAsset` for the current deployment.
+If `function_count` is `5`, the deployed endpoint is still registering the
+legacy generation functions. Export only `processPdfSourceAsset` and
+`processAudioSourceAsset` from `src/server/inngest/functions.ts`.
 
 If `has_event_key` is `false` in Production, `INNGEST_EVENT_KEY` is missing from Vercel.
 
@@ -213,3 +215,14 @@ If `has_signing_key` is `false` in Production, `INNGEST_SIGNING_KEY` is missing 
 If the route works but no jobs run, make sure the endpoint was synced in Inngest Cloud and that `BRIEF_GENERATION_ASYNC=1` is set in Vercel.
 
 If Production shows `mode: "dev"`, remove `INNGEST_DEV=1` from the Vercel Production environment and redeploy.
+
+## Production Checklist
+
+- `INNGEST_EVENT_KEY` is set in Vercel Production.
+- `INNGEST_SIGNING_KEY` is set in Vercel Production.
+- `BRIEF_GENERATION_ASYNC=1` is set if Production should preprocess PDF/audio sources through Inngest before streaming.
+- `INNGEST_DEV` is not set in Vercel Production.
+- The deployed `/api/inngest` endpoint is synced in Inngest Cloud after each relevant deploy.
+- The Inngest dashboard shows only:
+  - `Process PDF source asset`
+  - `Process audio source asset`

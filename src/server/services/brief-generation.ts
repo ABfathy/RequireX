@@ -1,9 +1,5 @@
 import { inngest } from "@/server/inngest/client";
-import {
-  type BriefGenerationRequestedEvent,
-  type BriefRegenerationRequestedEvent,
-  INNGEST_EVENTS,
-} from "@/server/inngest/events";
+import { INNGEST_EVENTS } from "@/server/inngest/events";
 import {
   loadProcessableFileSources,
   PDF_TEXT_PARSER_VERSION,
@@ -29,31 +25,12 @@ export class BriefGenerationRequestError extends Error {
 type RequestBriefGenerationInput = {
   sessionId: string;
   requestedBy: string;
-  runMode?: "sync" | "async" | "async-stream";
+  runMode?: "sync" | "async-stream";
 };
 
 type RequestBriefRegenerationInput = RequestBriefGenerationInput & {
   sourceSnapshotId: string;
 };
-
-async function markDispatchFailure(jobId: string, error: unknown) {
-  const { prisma } = await import("@/lib/prisma");
-
-  await prisma.processingJob.update({
-    where: {
-      id: jobId,
-    },
-    data: {
-      status: "FAILED",
-      completedAt: new Date(),
-      errorCode: "INNGEST_EVENT_SEND_FAILED",
-      errorMessage:
-        error instanceof Error
-          ? error.message
-          : "Failed to dispatch Inngest event.",
-    },
-  });
-}
 
 function asMetadataObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -208,97 +185,16 @@ export async function requestBriefGeneration({
     },
   });
 
-  if (runMode === "async") {
-    const event: BriefGenerationRequestedEvent = {
-      name: INNGEST_EVENTS.BRIEF_GENERATION_REQUESTED,
-      data: {
-        jobId: job.id,
-        sessionId,
-        requestedBy,
-        requestedAt,
-      },
-    };
-
-    try {
-      await inngest.send(event);
-    } catch (error) {
-      await markDispatchFailure(job.id, error);
-      throw new BriefGenerationRequestError(
-        "Failed to dispatch the generation job.",
-        502,
-        "INNGEST_EVENT_SEND_FAILED",
-      );
-    }
-  }
-
   return job;
 }
 
 export async function requestBriefRegeneration({
   sessionId,
   sourceSnapshotId,
-  requestedBy,
-  runMode = "async",
 }: RequestBriefRegenerationInput) {
-  const { prisma } = await import("@/lib/prisma");
-
-  const sourceSnapshot = await prisma.briefSnapshot.findFirst({
-    where: {
-      id: sourceSnapshotId,
-      sessionId,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!sourceSnapshot) {
-    throw new BriefGenerationRequestError(
-      "Source brief snapshot was not found for this intake session.",
-      404,
-      "SOURCE_SNAPSHOT_NOT_FOUND",
-    );
-  }
-
-  const requestedAt = new Date().toISOString();
-  const job = await prisma.processingJob.create({
-    data: {
-      sessionId,
-      sourceSnapshotId,
-      type: "REGENERATION",
-      status: "QUEUED",
-      payload: {
-        requestedBy,
-        requestedAt,
-        sourceSnapshotId,
-        runMode,
-      },
-    },
-  });
-
-  if (runMode === "async") {
-    const event: BriefRegenerationRequestedEvent = {
-      name: INNGEST_EVENTS.BRIEF_REGENERATION_REQUESTED,
-      data: {
-        jobId: job.id,
-        sessionId,
-        sourceSnapshotId,
-        requestedBy,
-        requestedAt,
-      },
-    };
-
-    try {
-      await inngest.send(event);
-    } catch (error) {
-      await markDispatchFailure(job.id, error);
-      throw new BriefGenerationRequestError(
-        "Failed to dispatch the regeneration job.",
-        502,
-        "INNGEST_EVENT_SEND_FAILED",
-      );
-    }
-  }
-
-  return job;
+  throw new BriefGenerationRequestError(
+    `Brief regeneration is not implemented for source snapshot ${sourceSnapshotId} in session ${sessionId}.`,
+    410,
+    "REGENERATION_NOT_IMPLEMENTED",
+  );
 }

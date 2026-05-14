@@ -15,9 +15,8 @@
 
 ## Partially Wired
 
-- `Inngest` is wired far enough to accept generation and regeneration requests, create `ProcessingJob` records, and dispatch events.
-- The generation functions in [src/server/inngest/functions.ts](/Users/abdallah/repos/EUI-hackathon-2026/src/server/inngest/functions.ts) still end by marking jobs failed with `PIPELINE_NOT_IMPLEMENTED`.
-- `UploadThing` is live for source ingestion, but only for storing source files. Nothing downstream processes those files yet.
+- `Inngest` is used only for PDF/audio source preprocessing. Brief generation itself runs in the Next.js server.
+- `UploadThing` is live for source ingestion, and uploaded PDF/audio sources can be preprocessed before prompt assembly.
 
 ## Not Yet Present
 

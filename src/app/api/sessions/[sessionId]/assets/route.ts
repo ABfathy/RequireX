@@ -4,12 +4,6 @@ import {
   isInternalAuthorizationError,
   requireInternalAuth,
 } from "@/server/auth";
-import { inngest } from "@/server/inngest/client";
-import {
-  INNGEST_EVENTS,
-  TEXT_BRIEF_SYSTEM_PROMPT,
-  type TextBriefRequestedEvent,
-} from "@/server/inngest/events";
 import { getSessionAssets, persistTextAsset } from "@/server/services/assets";
 import { TextAssetInputSchema } from "@/server/validators/assets";
 
@@ -34,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
-    const auth = await requireInternalAuth();
+    await requireInternalAuth();
     const { sessionId } = await params;
 
     const body = await req.json();
@@ -52,26 +46,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       displayLabel: parsed.data.displayLabel,
     });
 
-    const event: TextBriefRequestedEvent = {
-      name: INNGEST_EVENTS.TEXT_BRIEF_REQUESTED,
-      data: {
-        assetId: asset.id,
-        sessionId,
-        requestedBy: auth.clerkUserId,
-        requestedAt: new Date().toISOString(),
-        systemPrompt: TEXT_BRIEF_SYSTEM_PROMPT,
-        textContent: parsed.data.textContent,
-      },
-    };
-
-    let inngestDispatch: "sent" | "failed" = "sent";
-    try {
-      await inngest.send(event);
-    } catch {
-      inngestDispatch = "failed";
-    }
-
-    return NextResponse.json({ asset, inngestDispatch }, { status: 201 });
+    return NextResponse.json({ asset }, { status: 201 });
   } catch (err) {
     if (isInternalAuthorizationError(err)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -11,7 +11,7 @@
 - `/api/assets/[assetId]`: rename or delete an asset
 - `/api/uploadthing`: UploadThing handler
 - `/api/generate`: request brief generation
-- `/api/regenerate`: request brief regeneration
+- `/api/regenerate`: legacy regeneration endpoint, currently returns `410`
 - `/api/public/briefs/[shareToken]/*`: public comment, answer, and confirm mutations
 - `/api/inngest`: Inngest endpoint
 
@@ -57,13 +57,13 @@ Those flows also:
 
 ## Async Generation Flow
 
-1. Internal client posts a `sessionId` to `/api/generate` or `/api/regenerate`.
-2. `requestBriefGeneration()` or `requestBriefRegeneration()` creates a `ProcessingJob`.
-3. An Inngest event is dispatched.
-4. The Inngest function marks the job `RUNNING`.
-5. The function then deliberately fails the job as unimplemented.
+1. Internal client posts a `sessionId` to `/api/generate`.
+2. `requestBriefGeneration()` creates a `ProcessingJob`.
+3. If `BRIEF_GENERATION_ASYNC=1`, the route dispatches only PDF/audio preprocessing work to Inngest and waits for those sources to become ready.
+4. The Next.js server assembles the prompt bundle from `TEXT`, `IMAGE`, `PDF`, and `AUDIO` sources and streams generation directly.
+5. The server validates the model output and persists a `BriefSnapshot`.
 
-This means job dispatch and failure handling are implemented, but no extraction or snapshot creation occurs yet.
+Regeneration is currently disabled at the route layer and does not create background work.
 
 ## Data Model
 
@@ -89,4 +89,6 @@ Audit chain:
 - Projects are currently listed by `createdBy`, not by broader workspace membership.
 - New projects automatically create one initial intake session.
 - The app currently assumes the earliest session for a project is the active one.
+- Text and image sources are handled by the normal brief-generation flow and do not use Inngest preprocessing.
+- Only PDF and audio sources are processed through Inngest.
 - The public brief page has not been connected to `ShareLink` + `BriefSnapshot` data yet.
