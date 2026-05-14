@@ -18,10 +18,7 @@ function Bone({
 function SectionHeader({ width }: { width: string }) {
   return (
     <>
-      <div
-        className="border-t mt-2"
-        style={{ borderColor: "var(--border)" }}
-      />
+      <div className="border-t mt-2" style={{ borderColor: "var(--border)" }} />
       <div className="py-5 pb-2">
         <Bone w={width} h={9} />
       </div>

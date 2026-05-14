@@ -12,7 +12,11 @@ export default function GlobalError({
   const digest = error.digest ?? "ERR_FATAL";
 
   return (
-    <html lang="en" data-theme="dark" style={{ colorScheme: "dark", background: "#141517" }}>
+    <html
+      lang="en"
+      data-theme="dark"
+      style={{ colorScheme: "dark", background: "#141517" }}
+    >
       <body
         style={{
           margin: 0,
@@ -34,7 +38,16 @@ export default function GlobalError({
           }
         `}</style>
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, maxWidth: 360, textAlign: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 20,
+            maxWidth: 360,
+            textAlign: "center",
+          }}
+        >
           <div
             style={{
               width: 48,
@@ -44,7 +57,8 @@ export default function GlobalError({
               alignItems: "center",
               justifyContent: "center",
               background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-              border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
+              border:
+                "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
               animation: "rx-error-pulse 3s ease-in-out infinite",
               fontSize: 20,
               color: "var(--danger)",
@@ -65,11 +79,27 @@ export default function GlobalError({
             >
               {digest}
             </span>
-            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg-primary)" }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 17,
+                fontWeight: 600,
+                letterSpacing: "-0.02em",
+                color: "var(--fg-primary)",
+              }}
+            >
               RequireX encountered a fatal error
             </h1>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: "var(--fg-muted)" }}>
-              {error.message?.slice(0, 200) ?? "The application could not recover. Please try again."}
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13,
+                lineHeight: 1.65,
+                color: "var(--fg-muted)",
+              }}
+            >
+              {error.message?.slice(0, 200) ??
+                "The application could not recover. Please try again."}
             </p>
           </div>
 

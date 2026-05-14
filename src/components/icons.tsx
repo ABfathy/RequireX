@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   Check,
   ChevronRight,
@@ -11,11 +12,14 @@ import {
   Filter,
   FolderOpen,
   GitCompareArrows,
+  GitFork,
   History,
   type LucideProps,
+  Map,
   MessageSquare,
   Mic,
   Moon,
+  Network,
   PanelLeft,
   PanelRight,
   Pencil,
@@ -29,6 +33,8 @@ import {
   Ticket,
   Trash2,
   Upload,
+  Workflow,
+  Wrench,
   X,
 } from "lucide-react";
 import type { FC } from "react";
@@ -72,6 +78,12 @@ export const Icons = {
   ArrowRight: icon(ArrowRight),
   Pencil: icon(Pencil),
   Folder: icon(FolderOpen),
+  Tools: icon(Wrench),
+  Flowchart: icon(GitFork),
+  Sequence: icon(ArrowLeftRight),
+  Architecture: icon(Network),
+  Activity: icon(Workflow),
+  UserJourney: icon(Map),
 } as const;
 
 export function RxLogo({

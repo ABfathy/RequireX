@@ -138,7 +138,10 @@ async function bundleProjects(projects: ProjectListItem[]) {
     select: { id: true, title: true, projectId: true },
   });
 
-  const earliestSessionByProject = new Map<string, NonNullable<ProjectSessionRef>>();
+  const earliestSessionByProject = new Map<
+    string,
+    NonNullable<ProjectSessionRef>
+  >();
   for (const session of sessions) {
     if (!earliestSessionByProject.has(session.projectId)) {
       earliestSessionByProject.set(session.projectId, {
@@ -192,7 +195,7 @@ async function bundleProjects(projects: ProjectListItem[]) {
     return {
       ...project,
       session,
-      assets: session ? assetsBySession.get(session.id) ?? [] : [],
+      assets: session ? (assetsBySession.get(session.id) ?? []) : [],
     };
   });
 }
@@ -296,7 +299,9 @@ export async function updateProject(
     where: { id: projectId },
     data: {
       ...(updates.name !== undefined ? { name: updates.name } : {}),
-      ...(updates.clientName !== undefined ? { clientName: updates.clientName } : {}),
+      ...(updates.clientName !== undefined
+        ? { clientName: updates.clientName }
+        : {}),
     },
     select: { id: true, name: true, clientName: true, updatedAt: true },
   });

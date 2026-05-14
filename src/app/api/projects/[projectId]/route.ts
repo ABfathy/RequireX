@@ -19,7 +19,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   try {
     const { clerkUserId } = await requireInternalAuth();
     const { projectId } = await params;
-    const body = (await request.json()) as { name?: string; clientName?: string };
+    const body = (await request.json()) as {
+      name?: string;
+      clientName?: string;
+    };
 
     const updated = await updateProject(projectId, clerkUserId, {
       name: body.name?.trim() || undefined,
@@ -29,12 +32,21 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return NextResponse.json(updated);
   } catch (error) {
     if (isInternalAuthorizationError(error)) {
-      return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { error: error.code, message: error.message },
+        { status: error.status },
+      );
     }
     if (error instanceof ProjectNotFoundError) {
-      return NextResponse.json({ error: "PROJECT_NOT_FOUND", message: error.message }, { status: 404 });
+      return NextResponse.json(
+        { error: "PROJECT_NOT_FOUND", message: error.message },
+        { status: 404 },
+      );
     }
-    return NextResponse.json({ error: "PROJECT_UPDATE_FAILED", message: "Failed to update project." }, { status: 500 });
+    return NextResponse.json(
+      { error: "PROJECT_UPDATE_FAILED", message: "Failed to update project." },
+      { status: 500 },
+    );
   }
 }
 

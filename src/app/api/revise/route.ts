@@ -24,7 +24,9 @@ export async function POST(request: Request) {
     const sseStream = new ReadableStream({
       async start(controller) {
         const send = (data: object) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+          );
 
         for await (const event of runBriefRevisionStream({
           sessionId: body.sessionId,
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
+        Connection: "keep-alive",
       },
     });
   } catch (error) {

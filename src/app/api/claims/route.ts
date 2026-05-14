@@ -27,11 +27,17 @@ export async function POST(request: Request) {
     });
 
     if (!snapshot) {
-      return NextResponse.json({ error: "NOT_FOUND", message: "Snapshot not found." }, { status: 404 });
+      return NextResponse.json(
+        { error: "NOT_FOUND", message: "Snapshot not found." },
+        { status: 404 },
+      );
     }
 
     if (snapshot.createdBy !== auth.clerkUserId) {
-      return NextResponse.json({ error: "FORBIDDEN", message: "Not your brief." }, { status: 403 });
+      return NextResponse.json(
+        { error: "FORBIDDEN", message: "Not your brief." },
+        { status: 403 },
+      );
     }
 
     const claim = await prisma.$transaction(async (tx) => {
@@ -40,28 +46,56 @@ export async function POST(request: Request) {
       // e.g. row 2→3 while row 3 still exists. Updating in DESC order (4→5, 3→4, 2→3)
       // ensures each increment lands on a free slot.
       const toShift = await tx.briefClaim.findMany({
-        where: { snapshotId: body.snapshotId, section: body.section, orderIndex: { gte: body.orderIndex } },
+        where: {
+          snapshotId: body.snapshotId,
+          section: body.section,
+          orderIndex: { gte: body.orderIndex },
+        },
         orderBy: { orderIndex: "desc" },
         select: { id: true, orderIndex: true },
       });
       for (const row of toShift) {
-        await tx.briefClaim.update({ where: { id: row.id }, data: { orderIndex: row.orderIndex + 1 } });
+        await tx.briefClaim.update({
+          where: { id: row.id },
+          data: { orderIndex: row.orderIndex + 1 },
+        });
       }
       return tx.briefClaim.create({
-        data: { snapshotId: body.snapshotId, section: body.section, orderIndex: body.orderIndex, text: body.text, confidence: "MEDIUM" },
-        select: { id: true, text: true, section: true, orderIndex: true, confidence: true },
+        data: {
+          snapshotId: body.snapshotId,
+          section: body.section,
+          orderIndex: body.orderIndex,
+          text: body.text,
+          confidence: "MEDIUM",
+        },
+        select: {
+          id: true,
+          text: true,
+          section: true,
+          orderIndex: true,
+          confidence: true,
+        },
       });
     });
 
     return NextResponse.json(claim, { status: 201 });
   } catch (error) {
     if (isInternalAuthorizationError(error)) {
-      return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { error: error.code, message: error.message },
+        { status: error.status },
+      );
     }
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "INVALID_REQUEST", message: "Invalid body." }, { status: 400 });
+      return NextResponse.json(
+        { error: "INVALID_REQUEST", message: "Invalid body." },
+        { status: 400 },
+      );
     }
     console.error({ scope: "api.claims.post", error });
-    return NextResponse.json({ error: "CREATE_FAILED", message: "Failed to create claim." }, { status: 500 });
+    return NextResponse.json(
+      { error: "CREATE_FAILED", message: "Failed to create claim." },
+      { status: 500 },
+    );
   }
 }

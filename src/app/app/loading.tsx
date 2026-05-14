@@ -41,7 +41,10 @@ export default function AppLoading() {
         {/* Sidebar */}
         <div
           className="flex flex-col h-full border-r overflow-hidden"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+          style={{
+            background: "var(--surface-1)",
+            borderColor: "var(--border)",
+          }}
         >
           <div className="flex flex-col px-2 pt-3 gap-2 flex-1">
             <Bone w="100%" h={26} />
@@ -50,7 +53,10 @@ export default function AppLoading() {
             <Bone w="85%" />
             <Bone w="60%" />
           </div>
-          <div className="h-9 border-t flex items-center px-2 gap-1" style={{ borderColor: "var(--border)" }}>
+          <div
+            className="h-9 border-t flex items-center px-2 gap-1"
+            style={{ borderColor: "var(--border)" }}
+          >
             <Bone w="100px" h={22} />
             <span className="flex-1" />
             <Bone w="24px" h={24} />
@@ -58,10 +64,16 @@ export default function AppLoading() {
         </div>
 
         {/* DocView */}
-        <div className="flex flex-col h-full overflow-hidden" style={{ background: "var(--background)" }}>
+        <div
+          className="flex flex-col h-full overflow-hidden"
+          style={{ background: "var(--background)" }}
+        >
           <div
             className="flex items-center h-8 px-4 gap-3 shrink-0 border-b"
-            style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+            style={{
+              background: "var(--surface-1)",
+              borderColor: "var(--border)",
+            }}
           >
             <Bone w="120px" />
             <span className="flex-1" />
@@ -80,7 +92,10 @@ export default function AppLoading() {
           </div>
           <div
             className="shrink-0 border-t h-[52px]"
-            style={{ borderColor: "var(--border)", background: "var(--background)" }}
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--background)",
+            }}
           />
         </div>
       </div>

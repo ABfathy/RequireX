@@ -105,7 +105,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       );
     }
 
-    return NextResponse.json({ snapshot: { id: snapshot.id, status: snapshot.status } });
+    return NextResponse.json({
+      snapshot: { id: snapshot.id, status: snapshot.status },
+    });
   } catch (error) {
     if (error instanceof PublicRateLimitError) {
       return NextResponse.json(

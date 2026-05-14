@@ -1,6 +1,7 @@
 # Docs Index
 
 This folder is the maintained documentation set for the current codebase.
+
 ## Read This First
 
 1. [09-current-state.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/09-current-state.md)

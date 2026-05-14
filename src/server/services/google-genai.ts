@@ -8,7 +8,7 @@ import { z } from "zod";
 import { serverEnv } from "@/lib/env/server";
 import { BriefOutputSchema } from "@/server/validators/brief-output";
 
-const MODEL = "gemini-2.5-flash";
+export const MODEL = "gemini-2.5-flash";
 const TEMP_CREDENTIALS_PATH = join(
   tmpdir(),
   "requirex-google-service-account.json",
@@ -286,7 +286,7 @@ function ensureGoogleCredentials() {
   return null;
 }
 
-function getClient() {
+export function getClient() {
   if (cachedClient) return cachedClient;
   const credentialsPath = ensureGoogleCredentials();
   if (!serverEnv.GOOGLE_CLOUD_PROJECT || !serverEnv.GOOGLE_CLOUD_LOCATION) {
@@ -351,7 +351,10 @@ function buildPromptText(bundle: SourceBundle, retryHint?: string) {
       bySect.set(c.section, bucket);
     }
     const sections = [...bySect.entries()]
-      .map(([sec, texts]) => `[${sec}]\n${texts.map((t, i) => `${i + 1}. ${t}`).join("\n")}`)
+      .map(
+        ([sec, texts]) =>
+          `[${sec}]\n${texts.map((t, i) => `${i + 1}. ${t}`).join("\n")}`,
+      )
       .join("\n\n");
     existingClaimsText = `\n\nEXISTING REQUIREMENTS (preserve and build upon these — they include both AI-generated and manually added lines; update, refine, or extend them based on the sources above):\n\n${sections}`;
   }

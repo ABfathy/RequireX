@@ -13,12 +13,24 @@ import type {
 const CLAIM_SECTION_LABEL: Record<BriefClaimSection, string> = {
   SUMMARY: "Summary",
   GOALS: "Goals",
+  PROJECT_OVERVIEW: "Project Overview",
+  PROJECT_GOALS: "Project Goals",
+  MAIN_FEATURES: "Main Features",
+  FUNCTIONAL_REQUIREMENTS: "Functional Requirements",
+  NON_FUNCTIONAL_REQUIREMENTS: "Non-Functional Requirements",
+  USER_FLOWS: "User Flows",
 };
 
 const CLAIM_SECTION_TO_COMMENT: Record<BriefClaimSection, BriefCommentSection> =
   {
     SUMMARY: "SUMMARY",
     GOALS: "GOALS",
+    PROJECT_OVERVIEW: "PROJECT_OVERVIEW",
+    PROJECT_GOALS: "PROJECT_GOALS",
+    MAIN_FEATURES: "MAIN_FEATURES",
+    FUNCTIONAL_REQUIREMENTS: "FUNCTIONAL_REQUIREMENTS",
+    NON_FUNCTIONAL_REQUIREMENTS: "NON_FUNCTIONAL_REQUIREMENTS",
+    USER_FLOWS: "USER_FLOWS",
   };
 
 const QUESTION_SECTION_LABEL: Record<BriefQuestionSection, string> = {
@@ -82,7 +94,8 @@ export function questionToRequirement(question: {
     question: question.text,
     status: QUESTION_STATUS_TO_STATUS[question.status],
     tags: [],
-    questionId: question.section === "FOLLOW_UP_QUESTIONS" ? question.id : undefined,
+    questionId:
+      question.section === "FOLLOW_UP_QUESTIONS" ? question.id : undefined,
   };
 }
 

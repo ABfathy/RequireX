@@ -8,9 +8,9 @@ async function main() {
   if (userId === "user_demo_admin") {
     console.warn(
       "⚠  SEED_USER_ID is not set — seeding with placeholder ID.\n" +
-      "   The editor will show 'No project selected'.\n" +
-      "   Set SEED_USER_ID=<your Clerk user ID> in .env and re-run pnpm prisma:seed.\n" +
-      "   Find your ID in the Clerk dashboard under Users, or from the network tab after signing in.",
+        "   The editor will show 'No project selected'.\n" +
+        "   Set SEED_USER_ID=<your Clerk user ID> in .env and re-run pnpm prisma:seed.\n" +
+        "   Find your ID in the Clerk dashboard under Users, or from the network tab after signing in.",
     );
   } else {
     console.log(`Seeding as user: ${userId}`);
@@ -243,7 +243,8 @@ async function main() {
       section: "AMBIGUITIES",
       orderIndex: 0,
       text: "Is the first release expected to integrate with an existing ERP or operate standalone?",
-      reason: "The uploaded material implies inventory sync but does not confirm the upstream system boundary.",
+      reason:
+        "The uploaded material implies inventory sync but does not confirm the upstream system boundary.",
       status: "OPEN",
     },
   });
@@ -254,7 +255,8 @@ async function main() {
       section: "FOLLOW_UP_QUESTIONS",
       orderIndex: 0,
       text: "Which manager roles need mobile access in the MVP?",
-      reason: "The voice note emphasizes mobile usability but does not identify the exact user roles.",
+      reason:
+        "The voice note emphasizes mobile usability but does not identify the exact user roles.",
       status: "OPEN",
     },
   });
@@ -361,7 +363,8 @@ async function main() {
         type: "CLIENT_COMMENT_ADDED",
         actorType: "CLIENT",
         actorId: "client@example.com",
-        summary: "Client added an inline summary comment about Arabic support priority.",
+        summary:
+          "Client added an inline summary comment about Arabic support priority.",
       },
       {
         projectId: project.id,
@@ -412,7 +415,8 @@ async function main() {
       section: "FOLLOW_UP_QUESTIONS",
       orderIndex: 0,
       text: "Which reports are required in the admin panel for the first release?",
-      reason: "The PDF requires reporting, but the exact MVP report set is still incomplete.",
+      reason:
+        "The PDF requires reporting, but the exact MVP report set is still incomplete.",
       status: "OPEN",
     },
   });
@@ -493,7 +497,12 @@ async function main() {
         startedAt: new Date("2026-05-08T09:00:00.000Z"),
         completedAt: new Date("2026-05-08T09:02:00.000Z"),
         payload: {
-          inputSources: [textAsset.id, pdfAsset.id, audioAsset.id, imageAsset.id],
+          inputSources: [
+            textAsset.id,
+            pdfAsset.id,
+            audioAsset.id,
+            imageAsset.id,
+          ],
         },
       },
       {

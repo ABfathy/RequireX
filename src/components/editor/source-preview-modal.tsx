@@ -39,7 +39,9 @@ function TextPreview({ assetId }: { assetId: string }) {
       .catch(() => {
         if (!cancelled) setState("error");
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [assetId]);
 
   if (state === "loading") {
@@ -62,7 +64,10 @@ function TextPreview({ assetId }: { assetId: string }) {
 
   if (state === "error") {
     return (
-      <p className="text-[12px] py-4 text-center" style={{ color: "var(--danger)" }}>
+      <p
+        className="text-[12px] py-4 text-center"
+        style={{ color: "var(--danger)" }}
+      >
         Failed to load text content.
       </p>
     );
@@ -91,7 +96,10 @@ function ImagePreview({ url, label }: { url: string; label: string }) {
   }
 
   return (
-    <div className="relative flex items-center justify-center" style={{ minHeight: "65vh" }}>
+    <div
+      className="relative flex items-center justify-center"
+      style={{ minHeight: "65vh" }}
+    >
       {state === "loading" && (
         <div className="absolute inset-0">
           <SkeletonPreview height="100%" />
@@ -166,7 +174,11 @@ function PdfPreview({ url, label }: { url: string; label: string }) {
 function FallbackPreview({ url, label }: { url?: string; label: string }) {
   return (
     <div className="flex flex-col items-center gap-3 py-12">
-      <Icons.FileText size={28} aria-hidden="true" style={{ color: "var(--fg-disabled)" }} />
+      <Icons.FileText
+        size={28}
+        aria-hidden="true"
+        style={{ color: "var(--fg-disabled)" }}
+      />
       <p className="text-[12px]" style={{ color: "var(--fg-muted)" }}>
         No preview available for this file type.
       </p>
@@ -243,7 +255,9 @@ export function SourcePreviewModal({ item, onClose }: SourcePreviewModalProps) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.55)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       role="presentation"
     >
       {/* Panel */}
@@ -293,9 +307,7 @@ export function SourcePreviewModal({ item, onClose }: SourcePreviewModalProps) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {renderContent()}
-        </div>
+        <div className="flex-1 overflow-y-auto p-4">{renderContent()}</div>
       </div>
     </div>
   );

@@ -57,9 +57,7 @@ export function ResizeHandle({
 
   // Position: hit area straddles the panel edge by 3px on each side.
   const edgeStyle =
-    side === "right"
-      ? { right: -3 as number }
-      : { left: -3 as number };
+    side === "right" ? { right: -3 as number } : { left: -3 as number };
 
   return (
     <div
@@ -76,9 +74,7 @@ export function ResizeHandle({
       className="group absolute top-0 bottom-0 z-10 w-[6px] cursor-col-resize select-none focus-visible:outline-none"
       style={edgeStyle}
     >
-      <div
-        className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors duration-[120ms] group-hover:bg-[var(--accent)] group-focus-visible:bg-[var(--accent)] group-active:bg-[var(--accent)]"
-      />
+      <div className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors duration-[120ms] group-hover:bg-[var(--accent)] group-focus-visible:bg-[var(--accent)] group-active:bg-[var(--accent)]" />
     </div>
   );
 }

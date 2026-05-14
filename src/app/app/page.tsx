@@ -37,7 +37,8 @@ export default async function InternalWorkspacePage({
     projects.find((p) => p.id === requestedProjectId) ?? projects[0] ?? null;
 
   const activeBundledProject = activeProject
-    ? bundledProjects.find((project) => project.id === activeProject.id) ?? null
+    ? (bundledProjects.find((project) => project.id === activeProject.id) ??
+      null)
     : null;
 
   const session =

@@ -28,6 +28,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error({ scope: "api.jobs.get", err });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

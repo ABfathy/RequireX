@@ -14,9 +14,18 @@ interface SettingsPanelProps {
 }
 
 /* ── Section wrapper ─────────────────────────────────── */
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="border-b last:border-b-0" style={{ borderColor: "var(--border)" }}>
+    <div
+      className="border-b last:border-b-0"
+      style={{ borderColor: "var(--border)" }}
+    >
       <div
         className="px-5 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em]"
         style={{ color: "var(--fg-muted)" }}
@@ -106,7 +115,15 @@ function KbdRow({ keys, label }: { keys: string[]; label: string }) {
 }
 
 /* ── Toggle switch ───────────────────────────────────── */
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}) {
   return (
     <button
       type="button"
@@ -115,7 +132,10 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () =
       aria-label={label}
       onClick={onChange}
       className="relative w-8 h-[18px] rounded-full transition-colors duration-[200ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] shrink-0 cursor-pointer"
-      style={{ background: checked ? "var(--accent)" : "var(--surface-3)", border: "1px solid var(--border-strong)" }}
+      style={{
+        background: checked ? "var(--accent)" : "var(--surface-3)",
+        border: "1px solid var(--border-strong)",
+      }}
     >
       <span
         className="absolute top-[2px] size-[12px] rounded-full transition-transform duration-[200ms]"
@@ -161,7 +181,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   }
 
   const initials = user
-    ? ((user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")).toUpperCase() ||
+    ? (
+        (user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")
+      ).toUpperCase() ||
       user.emailAddresses[0]?.emailAddress[0]?.toUpperCase() ||
       "?"
     : "?";
@@ -214,11 +236,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1">
-
           {/* Account */}
           <Section label="Account">
             {/* Avatar + identity */}
-            <div className="flex items-center gap-3 mb-3 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
+            <div
+              className="flex items-center gap-3 mb-3 pb-3 border-b"
+              style={{ borderColor: "var(--border)" }}
+            >
               {user?.imageUrl ? (
                 <Image
                   src={user.imageUrl}
@@ -251,7 +275,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 </span>
                 <span
                   className="text-[11px] truncate"
-                  style={{ color: "var(--fg-muted)", fontFamily: "var(--font-mono)" }}
+                  style={{
+                    color: "var(--fg-muted)",
+                    fontFamily: "var(--font-mono)",
+                  }}
                 >
                   {email}
                 </span>
@@ -261,7 +288,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <Row icon={<Icons.Settings size={13} />} label="Manage account">
               <button
                 type="button"
-                onClick={() => { onClose(); openUserProfile(); }}
+                onClick={() => {
+                  onClose();
+                  openUserProfile();
+                }}
                 className="text-[11px] transition-colors duration-[120ms] hover:text-[var(--fg-secondary)] focus-visible:outline-none focus-visible:underline cursor-pointer"
                 style={{ color: "var(--fg-muted)" }}
               >
@@ -273,7 +303,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           {/* Appearance */}
           <Section label="Appearance">
             <Row
-              icon={theme === "dark" ? <Icons.Moon size={13} /> : <Icons.Sun size={13} />}
+              icon={
+                theme === "dark" ? (
+                  <Icons.Moon size={13} />
+                ) : (
+                  <Icons.Sun size={13} />
+                )
+              }
               label="Dark mode"
             >
               <Toggle
@@ -294,13 +330,25 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
           {/* Coming soon */}
           <Section label="Workspace">
-            <Row icon={<Icons.FileText size={13} />} label="Workspace settings" muted>
+            <Row
+              icon={<Icons.FileText size={13} />}
+              label="Workspace settings"
+              muted
+            >
               <Soon />
             </Row>
-            <Row icon={<Icons.Send size={13} />} label="Email notifications" muted>
+            <Row
+              icon={<Icons.Send size={13} />}
+              label="Email notifications"
+              muted
+            >
               <Soon />
             </Row>
-            <Row icon={<Icons.Share size={13} />} label="Share & permissions" muted>
+            <Row
+              icon={<Icons.Share size={13} />}
+              label="Share & permissions"
+              muted
+            >
               <Soon />
             </Row>
           </Section>
@@ -313,7 +361,6 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               <Soon />
             </Row>
           </Section>
-
         </div>
 
         {/* Footer — sign out */}

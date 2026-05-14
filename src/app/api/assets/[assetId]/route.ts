@@ -37,7 +37,10 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     if (isInternalAuthorizationError(err)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -57,7 +60,10 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     if (err instanceof AssetDeleteForbiddenError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -84,6 +90,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     if (err instanceof AssetNotFoundError) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

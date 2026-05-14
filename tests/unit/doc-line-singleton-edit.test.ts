@@ -130,7 +130,9 @@ function makeInsertGuard(onInsert: () => Promise<void>) {
 describe("Gutter + button insert guard", () => {
   it("discards a second click while an insert is already in-flight", async () => {
     let resolveFirst!: () => void;
-    const firstPromise = new Promise<void>((res) => { resolveFirst = res; });
+    const firstPromise = new Promise<void>((res) => {
+      resolveFirst = res;
+    });
 
     const onInsert = vi.fn().mockReturnValueOnce(firstPromise);
 
@@ -171,7 +173,9 @@ describe("Gutter + button insert guard", () => {
     });
 
     // First call rejects but guard must still reset
-    await handleClick().catch(() => {/* intentionally ignored */});
+    await handleClick().catch(() => {
+      /* intentionally ignored */
+    });
 
     // Second call should proceed
     await handleClick();

@@ -55,10 +55,16 @@ export function snapshotToDocLines(
   lines.push({ lineNum: 0, type: "blank" });
 
   function pushClaims(section: "SUMMARY" | "GOALS") {
-    const claims = snapshot!.claims.filter((claim) => claim.section === section);
+    const claims = snapshot!.claims.filter(
+      (claim) => claim.section === section,
+    );
     if (claims.length === 0) return;
 
-    lines.push({ lineNum: lineNum++, type: "h2", text: SECTION_LABELS[section] });
+    lines.push({
+      lineNum: lineNum++,
+      type: "h2",
+      text: SECTION_LABELS[section],
+    });
     for (const claim of claims) {
       lines.push({
         lineNum: lineNum++,
@@ -69,7 +75,9 @@ export function snapshotToDocLines(
         section: claim.section,
         orderIndex: claim.orderIndex,
         tags: [claim.confidence.toLowerCase()],
-        evidence: claim.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
+        evidence: claim.evidenceRefs.map((row) =>
+          evidenceLine(row, sourceIndex),
+        ),
       });
     }
     lines.push({ lineNum: 0, type: "blank" });
@@ -81,7 +89,11 @@ export function snapshotToDocLines(
     );
     if (questions.length === 0) return;
 
-    lines.push({ lineNum: lineNum++, type: "h2", text: SECTION_LABELS[section] });
+    lines.push({
+      lineNum: lineNum++,
+      type: "h2",
+      text: SECTION_LABELS[section],
+    });
     for (const question of questions) {
       lines.push({
         lineNum: lineNum++,
@@ -90,7 +102,9 @@ export function snapshotToDocLines(
         reqId: question.id,
         reqType: "question",
         tags: [question.status.toLowerCase()],
-        evidence: question.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
+        evidence: question.evidenceRefs.map((row) =>
+          evidenceLine(row, sourceIndex),
+        ),
       });
       lines.push({
         lineNum: lineNum++,

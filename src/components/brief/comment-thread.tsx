@@ -11,7 +11,11 @@ interface CommentThreadProps {
   onSubmitComment?: (body: string) => Promise<void>;
 }
 
-function CommentThread({ isOpen, onClose, onSubmitComment }: CommentThreadProps) {
+function CommentThread({
+  isOpen,
+  onClose,
+  onSubmitComment,
+}: CommentThreadProps) {
   const textareaId = useId();
   const [commentText, setCommentText] = useState("");
   const [submitted, setSubmitted] = useState(false);

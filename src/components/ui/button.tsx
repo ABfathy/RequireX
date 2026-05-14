@@ -20,8 +20,7 @@ const buttonVariants = cva(
           "border border-border bg-transparent text-fg-1 hover:bg-surface-2",
       },
       size: {
-        default:
-          "h-[26px] px-[11px] text-[12.5px] rounded-md",
+        default: "h-[26px] px-[11px] text-[12.5px] rounded-md",
         sm: "h-[22px] px-2 text-[11.5px] rounded-sm",
         lg: "h-[30px] px-[14px] text-[13px] rounded-md",
         icon: "h-6 w-6 rounded-sm",
@@ -39,8 +38,7 @@ function Button({
   variant,
   size,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants>) {
+}: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants>) {
   return (
     <button
       className={cn(buttonVariants({ variant, size, className }))}

@@ -160,7 +160,9 @@ describe("buildSourceBundle — full-source assembly", () => {
     } as Partial<PromptAssetWithChunks>);
 
     const bundle = buildSourceBundle([asset]);
-    expect(bundle.assets[0]!.text).toBe("Chunk one content.\n\nChunk two content.");
+    expect(bundle.assets[0]!.text).toBe(
+      "Chunk one content.\n\nChunk two content.",
+    );
   });
 });
 
@@ -284,28 +286,26 @@ describe("buildSourceBundle — env parsing and clamping", () => {
   it("uses default 750 000 when env var is not set", async () => {
     vi.resetModules();
     vi.stubEnv("PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE", "");
-    
-    const { buildSourceBundle: dynamicBuildSourceBundle } = await import(
-      "@/server/services/brief-pipeline"
-    );
+
+    const { buildSourceBundle: dynamicBuildSourceBundle } =
+      await import("@/server/services/brief-pipeline");
 
     const body = "A".repeat(800_000);
     const bundle = dynamicBuildSourceBundle([makeTextAsset("a1", body)]);
-    
+
     expect(bundle.assets[0]!.text.length).toBe(750_000);
   });
 
   it("uses default 750 000 when env var is a non-numeric string (NaN fallback)", async () => {
     vi.resetModules();
     vi.stubEnv("PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE", "invalid_string");
-    
-    const { buildSourceBundle: dynamicBuildSourceBundle } = await import(
-      "@/server/services/brief-pipeline"
-    );
+
+    const { buildSourceBundle: dynamicBuildSourceBundle } =
+      await import("@/server/services/brief-pipeline");
 
     const body = "A".repeat(800_000);
     const bundle = dynamicBuildSourceBundle([makeTextAsset("a1", body)]);
-    
+
     // Fallback to 750 000 if parseInt returns NaN
     expect(bundle.assets[0]!.text.length).toBe(750_000);
   });
@@ -313,14 +313,13 @@ describe("buildSourceBundle — env parsing and clamping", () => {
   it("clamps the value to a minimum of 1 000 when env var is too small", async () => {
     vi.resetModules();
     vi.stubEnv("PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE", "50"); // too small
-    
-    const { buildSourceBundle: dynamicBuildSourceBundle } = await import(
-      "@/server/services/brief-pipeline"
-    );
+
+    const { buildSourceBundle: dynamicBuildSourceBundle } =
+      await import("@/server/services/brief-pipeline");
 
     const body = "A".repeat(2_000);
     const bundle = dynamicBuildSourceBundle([makeTextAsset("a1", body)]);
-    
+
     // Clamped to 1000
     expect(bundle.assets[0]!.text.length).toBe(1_000);
   });
@@ -328,14 +327,13 @@ describe("buildSourceBundle — env parsing and clamping", () => {
   it("honors a valid env override", async () => {
     vi.resetModules();
     vi.stubEnv("PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE", "500000");
-    
-    const { buildSourceBundle: dynamicBuildSourceBundle } = await import(
-      "@/server/services/brief-pipeline"
-    );
+
+    const { buildSourceBundle: dynamicBuildSourceBundle } =
+      await import("@/server/services/brief-pipeline");
 
     const body = "A".repeat(800_000);
     const bundle = dynamicBuildSourceBundle([makeTextAsset("a1", body)]);
-    
+
     expect(bundle.assets[0]!.text.length).toBe(500_000);
   });
 });

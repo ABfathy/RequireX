@@ -66,8 +66,15 @@ export function TitleBar({
           minWidth: 160,
         }}
       >
-        <Icons.Search size={12} aria-hidden="true" style={{ color: "var(--fg-tertiary)" }} />
-        <span className="flex-1 text-left text-[12px]" style={{ color: "var(--fg-muted)" }}>
+        <Icons.Search
+          size={12}
+          aria-hidden="true"
+          style={{ color: "var(--fg-tertiary)" }}
+        />
+        <span
+          className="flex-1 text-left text-[12px]"
+          style={{ color: "var(--fg-muted)" }}
+        >
           Commands &amp; actions
         </span>
         <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>

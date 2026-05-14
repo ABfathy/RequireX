@@ -14,16 +14,22 @@ export function StatusBar({
   currentVersion,
 }: StatusBarProps) {
   const dotColor =
-    extractStatus === "running"  ? "var(--warning)"
-    : extractStatus === "queued" ? "var(--info)"
-    : extractStatus === "failed" ? "var(--danger)"
-    : "var(--success)";
+    extractStatus === "running"
+      ? "var(--warning)"
+      : extractStatus === "queued"
+        ? "var(--info)"
+        : extractStatus === "failed"
+          ? "var(--danger)"
+          : "var(--success)";
 
   const statusLabel =
-    extractStatus === "running"  ? "generating"
-    : extractStatus === "queued" ? "queued"
-    : extractStatus === "failed" ? "failed"
-    : "idle";
+    extractStatus === "running"
+      ? "generating"
+      : extractStatus === "queued"
+        ? "queued"
+        : extractStatus === "failed"
+          ? "failed"
+          : "idle";
 
   return (
     <div
@@ -48,7 +54,9 @@ export function StatusBar({
       {currentVersion != null && (
         <>
           <Sep />
-          <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
+          <span
+            style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}
+          >
             v{currentVersion}
           </span>
         </>
@@ -69,6 +77,11 @@ export function StatusBar({
 
 function Sep() {
   return (
-    <span style={{ color: "var(--border-focus)", userSelect: "none" }} aria-hidden="true">·</span>
+    <span
+      style={{ color: "var(--border-focus)", userSelect: "none" }}
+      aria-hidden="true"
+    >
+      ·
+    </span>
   );
 }

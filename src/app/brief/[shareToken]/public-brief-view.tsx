@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ClientDoc } from "@/components/brief/client-doc";
 import { ClientHeader } from "@/components/brief/client-header";
 import { RevisionPanel } from "@/components/brief/revision-panel";
+import { MermaidDiagram } from "@/components/diagram/mermaid-diagram";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { cn } from "@/lib/utils";
 import type { PublicBriefViewData } from "@/server/services/public-review";
@@ -35,7 +36,16 @@ interface PublicBriefViewProps {
 }
 
 export function PublicBriefView({ data }: PublicBriefViewProps) {
-  const { shareToken, snapshot, project, claims, questions, revisions, comments } = data;
+  const {
+    shareToken,
+    snapshot,
+    project,
+    claims,
+    questions,
+    revisions,
+    comments,
+    diagrams,
+  } = data;
 
   const requirements = [
     ...claims.map(claimToRequirement),
@@ -48,7 +58,9 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
 
   const [revOpen, setRevOpen] = useState(false);
   const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
-  const [answeredTexts, setAnsweredTexts] = useState<Map<string, string>>(new Map());
+  const [answeredTexts, setAnsweredTexts] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(
     snapshot.status === "CONFIRMED",
@@ -150,7 +162,9 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
     }
 
     const ambiguities = questions.filter((q) => q.section === "AMBIGUITIES");
-    const followUps = questions.filter((q) => q.section === "FOLLOW_UP_QUESTIONS");
+    const followUps = questions.filter(
+      (q) => q.section === "FOLLOW_UP_QUESTIONS",
+    );
 
     const renderQuestionSection = (
       label: string,
@@ -166,11 +180,13 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
   <div class="question-block">
     <div class="question-label">Question</div>
     <p class="question-text">${escape(q.text)}</p>
-    ${canAnswer
-      ? answerText
-        ? `<div class="answer-label">Answer</div><p class="answer-text">${escape(answerText)}</p>`
-        : `<p class="answer-empty">No answer provided</p>`
-      : ""}
+    ${
+      canAnswer
+        ? answerText
+          ? `<div class="answer-label">Answer</div><p class="answer-text">${escape(answerText)}</p>`
+          : `<p class="answer-empty">No answer provided</p>`
+        : ""
+    }
   </div>
 </div>`;
         })
@@ -188,7 +204,9 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
 
     const claimsHtml = Array.from(claimSectionMap.entries())
       .map(([section, reqs]) => {
-        const rows = reqs.map((r) => `<p class="req">${escape(r.body)}</p>`).join("\n");
+        const rows = reqs
+          .map((r) => `<p class="req">${escape(r.body)}</p>`)
+          .join("\n");
         return `<h2>${escape(section)}</h2>\n${rows}`;
       })
       .join("\n");
@@ -215,7 +233,9 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
       return `<h2>Client Comments</h2>\n${rows}`;
     })();
 
-    const bodyHtml = [claimsHtml, questionsHtml, commentsHtml].filter(Boolean).join("\n");
+    const bodyHtml = [claimsHtml, questionsHtml, commentsHtml]
+      .filter(Boolean)
+      .join("\n");
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>${escape(projectTitle)} — Brief v${snapshot.version}</title>
@@ -244,10 +264,14 @@ ${bodyHtml}
 </body></html>`;
 
     const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    iframe.style.cssText =
+      "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-    if (!doc) { document.body.removeChild(iframe); return; }
+    if (!doc) {
+      document.body.removeChild(iframe);
+      return;
+    }
     doc.open();
     doc.write(html);
     doc.close();
@@ -319,23 +343,95 @@ ${bodyHtml}
           revOpen ? "sm:grid-cols-[1fr_240px]" : "grid-cols-[1fr]",
         )}
       >
-        <ClientDoc
-          title={docTitle}
-          meta={{
-            project: project.name,
-            version: specVersion,
-            reqCount: requirements.length,
-            label: "shared for review",
-          }}
-          requirements={requirements}
-          onSubmitComment={submitComment}
-          onSubmitAnswer={submitAnswer}
-          onDownloadPdf={handleDownloadPdf}
-          isConfirming={isConfirming}
-          isConfirmed={isConfirmed}
-          confirmError={confirmError}
-          onSubmitConfirmation={submitConfirmation}
-        />
+        <div className="min-w-0 overflow-y-auto">
+          <ClientDoc
+            title={docTitle}
+            meta={{
+              project: project.name,
+              version: specVersion,
+              reqCount: requirements.length,
+              label: "shared for review",
+            }}
+            requirements={requirements}
+            onSubmitComment={submitComment}
+            onSubmitAnswer={submitAnswer}
+            onDownloadPdf={handleDownloadPdf}
+            isConfirming={isConfirming}
+            isConfirmed={isConfirmed}
+            confirmError={confirmError}
+            onSubmitConfirmation={submitConfirmation}
+          />
+
+          {diagrams.length > 0 && (
+            <div className="max-w-[720px] mx-auto px-4 sm:px-6 pb-12">
+              <details className="group mt-8">
+                <summary className="flex cursor-pointer select-none list-none items-center gap-2 py-2 text-sm font-semibold">
+                  <svg
+                    className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-90"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                    />
+                  </svg>
+                  Diagrams
+                  <span
+                    className="inline-flex items-center justify-center h-[16px] min-w-[16px] px-1 rounded-[3px] text-[10px] font-medium tabular-nums"
+                    style={{
+                      background: "var(--surface-2)",
+                      color: "var(--fg-muted)",
+                    }}
+                  >
+                    {diagrams.length}
+                  </span>
+                </summary>
+                <div className="mt-4 flex flex-col gap-8">
+                  {diagrams.map((d) => (
+                    <div key={d.id}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span
+                          className="inline-flex items-center h-[18px] px-[7px] text-[10.5px] font-medium rounded-sm border whitespace-nowrap"
+                          style={{
+                            background: "var(--surface-2)",
+                            color: "var(--fg-tertiary)",
+                            borderColor: "var(--border)",
+                          }}
+                        >
+                          {d.diagramType.charAt(0) +
+                            d.diagramType
+                              .slice(1)
+                              .toLowerCase()
+                              .replace(/_/g, " ")}
+                        </span>
+                        <span className="text-sm font-medium">{d.title}</span>
+                      </div>
+                      {d.description && (
+                        <p
+                          className="text-xs mb-3"
+                          style={{ color: "var(--fg-muted)" }}
+                        >
+                          {d.description}
+                        </p>
+                      )}
+                      <MermaidDiagram
+                        id={d.id}
+                        code={d.mermaidCode}
+                        className="rounded-[8px] border overflow-auto p-3"
+                        style={{ borderColor: "var(--border)" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          )}
+        </div>
 
         {revOpen && (
           <div className="absolute inset-0 z-20 sm:relative sm:inset-auto sm:z-auto">

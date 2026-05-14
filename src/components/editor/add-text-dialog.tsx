@@ -87,7 +87,10 @@ export function AddTextDialog({ onSubmit, onClose }: AddTextDialogProps) {
           style={{ borderColor: "var(--border)" }}
         >
           <div className="flex items-center gap-2">
-            <Icons.FileText size={14} className="text-[var(--fg-muted)] shrink-0" />
+            <Icons.FileText
+              size={14}
+              className="text-[var(--fg-muted)] shrink-0"
+            />
             <h2
               id="add-text-title"
               className="text-[13px] font-medium"

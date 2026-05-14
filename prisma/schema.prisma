@@ -50,6 +50,7 @@ model IntakeSession {
   snapshots      BriefSnapshot[]
   revisionEvents RevisionEvent[]
   processingJobs ProcessingJob[]
+  diagrams       BriefDiagram[]
 
   @@index([projectId, createdAt])
   @@index([projectId, updatedAt])
@@ -108,29 +109,32 @@ model SourceChunk {
 }
 
 model BriefSnapshot {
-  id                  String              @id @default(uuid()) @db.Uuid
-  projectId           String              @db.Uuid
-  sessionId           String              @db.Uuid
+  id                  String               @id @default(uuid()) @db.Uuid
+  projectId           String               @db.Uuid
+  sessionId           String               @db.Uuid
   version             Int
-  status              BriefSnapshotStatus @default(DRAFT)
+  status              BriefSnapshotStatus  @default(DRAFT)
+  documentType        BriefDocumentType    @default(GENERATED_BRIEF)
   sourceBundleVersion Int
   createdBy           String
-  createdAt           DateTime            @default(now())
-  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  session             IntakeSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt           DateTime             @default(now())
+  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session             IntakeSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   claims              BriefClaim[]
   questions           BriefQuestion[]
   evidenceRefs        EvidenceRef[]
   comments            BriefComment[]
   answers             FollowUpAnswer[]
-  revisionEvents      RevisionEvent[]     @relation("SnapshotRevisionEvents")
+  revisionEvents      RevisionEvent[]      @relation("SnapshotRevisionEvents")
   shareLinks          ShareLink[]
-  sourceJobs          ProcessingJob[]     @relation("SourceSnapshotJobs")
-  resultJobs          ProcessingJob[]     @relation("ResultSnapshotJobs")
+  sourceJobs          ProcessingJob[]      @relation("SourceSnapshotJobs")
+  resultJobs          ProcessingJob[]      @relation("ResultSnapshotJobs")
+  diagrams            BriefDiagram[]
 
-  @@unique([sessionId, version])
+  @@unique([sessionId, documentType, version])
   @@index([projectId, createdAt])
   @@index([sessionId, createdAt])
+  @@index([sessionId, documentType, createdAt])
 }
 
 model BriefClaim {
@@ -205,6 +209,7 @@ model BriefComment {
   authorEmail   String?
   body          String                 @db.Text
   status        BriefCommentStatus     @default(OPEN)
+  reviewStatus  FeedbackReviewStatus?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   snapshot      BriefSnapshot          @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
@@ -219,13 +224,14 @@ model FollowUpAnswer {
   id          String        @id @default(uuid()) @db.Uuid
   snapshotId  String        @db.Uuid
   questionId  String        @db.Uuid
-  body        String        @db.Text
-  authorName  String?
-  authorEmail String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  snapshot    BriefSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  question    BriefQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  body         String               @db.Text
+  authorName   String?
+  authorEmail  String?
+  reviewStatus FeedbackReviewStatus?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  snapshot     BriefSnapshot        @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  question     BriefQuestion        @relation(fields: [questionId], references: [id], onDelete: Restrict)
 
   @@index([snapshotId, createdAt])
   @@index([questionId, createdAt])
@@ -289,6 +295,22 @@ model ProcessingJob {
   @@index([type, status])
 }
 
+model BriefDiagram {
+  id          String        @id @default(uuid()) @db.Uuid
+  snapshotId  String        @db.Uuid
+  sessionId   String        @db.Uuid
+  diagramType DiagramType
+  title       String
+  mermaidCode String        @db.Text
+  description String?       @db.Text
+  createdAt   DateTime      @default(now())
+  snapshot    BriefSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  session     IntakeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, createdAt])
+  @@index([sessionId, createdAt])
+}
+
 enum ProjectStatus {
   ACTIVE
   ARCHIVED
@@ -332,9 +354,26 @@ enum BriefSnapshotStatus {
   SUPERSEDED
 }
 
+enum BriefDocumentType {
+  GENERATED_BRIEF
+  FINALIZED_DOCUMENT
+}
+
+enum FeedbackReviewStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
 enum BriefClaimSection {
   SUMMARY
   GOALS
+  PROJECT_OVERVIEW
+  PROJECT_GOALS
+  MAIN_FEATURES
+  FUNCTIONAL_REQUIREMENTS
+  NON_FUNCTIONAL_REQUIREMENTS
+  USER_FLOWS
 }
 
 enum BriefQuestionSection {
@@ -353,6 +392,12 @@ enum BriefCommentSection {
   GOALS
   AMBIGUITIES
   FOLLOW_UP_QUESTIONS
+  PROJECT_OVERVIEW
+  PROJECT_GOALS
+  MAIN_FEATURES
+  FUNCTIONAL_REQUIREMENTS
+  NON_FUNCTIONAL_REQUIREMENTS
+  USER_FLOWS
 }
 
 enum BriefCommentAnchorType {
@@ -402,6 +447,14 @@ enum ActorType {
   INTERNAL_USER
   CLIENT
   SYSTEM
+}
+
+enum DiagramType {
+  FLOWCHART
+  SEQUENCE
+  ARCHITECTURE
+  ACTIVITY
+  USER_JOURNEY
 }
 
 enum BriefConfidence {

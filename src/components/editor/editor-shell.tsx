@@ -12,7 +12,12 @@ import { useUploadThing } from "@/lib/uploadthing-client";
 
 import { CommandPalette } from "./command-palette";
 import { ComparisonView } from "./comparison-view";
-import { type AppState, type DocLineData, DocView } from "./doc-view";
+import {
+  type AppState,
+  DIAGRAMS_TAB_ID,
+  type DocLineData,
+  DocView,
+} from "./doc-view";
 import { ProjectSearchPalette } from "./project-search-palette";
 import { ProjectSettingsModal } from "./project-settings-modal";
 import { type ProjectListItem, ProjectSidebar } from "./project-sidebar";
@@ -265,23 +270,37 @@ export function EditorShell({
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [extractStatus, setExtractStatus] = useState<"idle" | "queued" | "running" | "failed">("idle");
+  const [extractStatus, setExtractStatus] = useState<
+    "idle" | "queued" | "running" | "failed"
+  >("idle");
   const jobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const feedbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFeedbackCountRef = useRef(0);
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
   const shouldPollFeedbackRef = useRef(false);
   const latestSnapshotIdRef = useRef<string | null>(initialSnapshotId ?? null);
-  const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(null);
+  const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(
+    null,
+  );
   const [revising, setRevising] = useState(false);
   const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(
     initialSnapshotId,
   );
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
+  const [selectedDiagramType, setSelectedDiagramType] = useState<string | null>(
+    null,
+  );
+  const [diagramError, setDiagramError] = useState<string | null>(null);
+  const [diagrams, setDiagrams] = useState<
+    import("./diagrams-shell").DiagramItem[]
+  >([]);
+  const [diagramsLoading, setDiagramsLoading] = useState(false);
   const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [clientLines, setClientLines] = useState<DocLineData[] | null>(null);
-  const [pendingFocusClaimId, setPendingFocusClaimId] = useState<string | null>(null);
+  const [pendingFocusClaimId, setPendingFocusClaimId] = useState<string | null>(
+    null,
+  );
   const [comparisonTabs, setComparisonTabs] = useState<ComparisonTab[]>([]);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState(DRAFT_TAB_ID);
 
@@ -460,7 +479,9 @@ export function EditorShell({
       setSourcesLoading(true);
       try {
         const isTxt = (f: File) =>
-          f.type === "text/plain" || f.name.endsWith(".txt") || f.name.endsWith(".rtf");
+          f.type === "text/plain" ||
+          f.name.endsWith(".txt") ||
+          f.name.endsWith(".rtf");
         const txtFiles = files.filter(isTxt);
         const uploadable = files.filter((f) => !isTxt(f));
 
@@ -550,7 +571,11 @@ export function EditorShell({
       // Track the latest generated snapshot so Return-to-latest can reset correctly
       const latestGenerated = [...allRevisions]
         .reverse()
-        .find((r) => (r.type === "GENERATED" || r.type === "REGENERATED") && r.snapshotId);
+        .find(
+          (r) =>
+            (r.type === "GENERATED" || r.type === "REGENERATED") &&
+            r.snapshotId,
+        );
       if (latestGenerated?.snapshotId) {
         latestSnapshotIdRef.current = latestGenerated.snapshotId;
       }
@@ -563,7 +588,9 @@ export function EditorShell({
           r.type === "BRIEF_CONFIRMED",
       ).length;
       if (feedbackCount > lastFeedbackCountRef.current) {
-        setNewFeedbackCount((prev) => prev + (feedbackCount - lastFeedbackCountRef.current));
+        setNewFeedbackCount(
+          (prev) => prev + (feedbackCount - lastFeedbackCountRef.current),
+        );
       }
       lastFeedbackCountRef.current = feedbackCount;
     } catch {
@@ -587,28 +614,34 @@ export function EditorShell({
     }
   }, []);
 
-  const startJobPoll = useCallback((jobId: string) => {
-    stopJobPoll();
-    setExtractStatus("queued");
-    jobPollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/jobs/${jobId}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const job = await res.json() as { status: string; errorCode?: string | null };
-        if (job.status === "RUNNING") {
-          setExtractStatus("running");
-        } else if (job.status === "SUCCEEDED") {
-          setExtractStatus("idle");
-          stopJobPoll();
-        } else if (job.status === "FAILED" || job.status === "CANCELED") {
-          setExtractStatus("failed");
-          stopJobPoll();
+  const startJobPoll = useCallback(
+    (jobId: string) => {
+      stopJobPoll();
+      setExtractStatus("queued");
+      jobPollRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/jobs/${jobId}`, { cache: "no-store" });
+          if (!res.ok) return;
+          const job = (await res.json()) as {
+            status: string;
+            errorCode?: string | null;
+          };
+          if (job.status === "RUNNING") {
+            setExtractStatus("running");
+          } else if (job.status === "SUCCEEDED") {
+            setExtractStatus("idle");
+            stopJobPoll();
+          } else if (job.status === "FAILED" || job.status === "CANCELED") {
+            setExtractStatus("failed");
+            stopJobPoll();
+          }
+        } catch {
+          // silently ignore transient fetch errors
         }
-      } catch {
-        // silently ignore transient fetch errors
-      }
-    }, 2000);
-  }, [stopJobPoll]);
+      }, 2000);
+    },
+    [stopJobPoll],
+  );
 
   const handleGenerateBrief = useCallback(async () => {
     if (!sessionId || generating) return;
@@ -654,9 +687,10 @@ export function EditorShell({
 
       if (!res.ok) {
         clearInterval(phaseInterval);
-        const payload = (await res.json().catch(() => null)) as
-          | { error?: string; message?: string }
-          | null;
+        const payload = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
         throw new Error(
           payload?.message ?? payload?.error ?? "Failed to generate brief.",
         );
@@ -667,22 +701,34 @@ export function EditorShell({
       let firstToken = true;
 
       const onStreamLines = (parserLines: DocLineData[]) => {
-        if (firstToken) { clearInterval(phaseInterval); firstToken = false; }
+        if (firstToken) {
+          clearInterval(phaseInterval);
+          firstToken = false;
+        }
         const shifted = lineOffset
-          ? parserLines.map((l) => ({ ...l, lineNum: l.lineNum > 0 ? l.lineNum + lineOffset : 0 }))
+          ? parserLines.map((l) => ({
+              ...l,
+              lineNum: l.lineNum > 0 ? l.lineNum + lineOffset : 0,
+            }))
           : parserLines;
         const header = makeHeaderLines("Drafting brief…");
         setStreamingLines([...header, ...shifted]);
       };
 
-      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+      if (
+        res.headers.get("content-type")?.includes("text/event-stream") &&
+        res.body
+      ) {
         const result = await readSseStream(res.body, onStreamLines, (jobId) => {
           startJobPoll(jobId);
         });
         newSnapshotId = result.snapshotId;
       } else {
         clearInterval(phaseInterval);
-        const result = await res.json() as { snapshotId: string; version: number };
+        const result = (await res.json()) as {
+          snapshotId: string;
+          version: number;
+        };
         newSnapshotId = result.snapshotId;
       }
 
@@ -707,7 +753,15 @@ export function EditorShell({
     } finally {
       setGenerating(false);
     }
-  }, [sessionId, generating, router, loadRevisions, refreshSources, startJobPoll, stopJobPoll]);
+  }, [
+    sessionId,
+    generating,
+    router,
+    loadRevisions,
+    refreshSources,
+    startJobPoll,
+    stopJobPoll,
+  ]);
 
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {
@@ -780,9 +834,76 @@ export function EditorShell({
     ],
   );
 
+  const handleGenerateDiagram = useCallback(
+    async (userMessage: string) => {
+      if (!sessionId || !currentSnapshotId || !selectedDiagramType || revising)
+        return;
+      setRevising(true);
+      setDiagramError(null);
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/diagrams`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            snapshotId: currentSnapshotId,
+            diagramType: selectedDiagramType,
+            userContext: userMessage || undefined,
+          }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as {
+            message?: string;
+          } | null;
+          throw new Error(payload?.message ?? "Failed to generate diagram.");
+        }
+        const diagram =
+          (await res.json()) as import("./diagrams-shell").DiagramItem;
+        setDiagrams((prev) => [diagram, ...prev]);
+        setSelectedDiagramType(null);
+        setActiveWorkspaceTab(DIAGRAMS_TAB_ID);
+      } catch (error) {
+        setDiagramError(
+          error instanceof Error
+            ? error.message
+            : "Failed to generate diagram.",
+        );
+      } finally {
+        setRevising(false);
+      }
+    },
+    [sessionId, currentSnapshotId, selectedDiagramType, revising],
+  );
+
+  const handleSendOrDiagram = useCallback(
+    async (userMessage: string, selectionText?: string) => {
+      if (selectedDiagramType) {
+        await handleGenerateDiagram(userMessage);
+      } else {
+        await handleSendMessage(userMessage, selectionText);
+      }
+    },
+    [selectedDiagramType, handleGenerateDiagram, handleSendMessage],
+  );
+
   useEffect(() => {
     if (sessionId) void loadRevisions(sessionId);
   }, [sessionId, loadRevisions]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    setDiagramsLoading(true);
+    fetch(`/api/sessions/${sessionId}/diagrams`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (
+          data: { diagrams: import("./diagrams-shell").DiagramItem[] } | null,
+        ) => {
+          setDiagrams(data?.diagrams ?? []);
+        },
+      )
+      .catch(() => {})
+      .finally(() => setDiagramsLoading(false));
+  }, [sessionId]);
 
   // Reset feedback badge and counter when session changes
   useEffect(() => {
@@ -793,7 +914,9 @@ export function EditorShell({
 
   // Keep shouldPollFeedbackRef in sync with snapshot SHARED status (no interval restart needed)
   useEffect(() => {
-    shouldPollFeedbackRef.current = snapshots.some((s) => s.snapshotStatus === "SHARED");
+    shouldPollFeedbackRef.current = snapshots.some(
+      (s) => s.snapshotStatus === "SHARED",
+    );
   }, [snapshots]);
 
   // One stable 30s interval per session — only fires loadRevisions when SHARED
@@ -810,7 +933,9 @@ export function EditorShell({
   // Clear streaming lines once the server-refreshed lines arrive, preventing
   // the flash from streamed content → empty state → server content.
   const streamingLinesRef = useRef(streamingLines);
-  useEffect(() => { streamingLinesRef.current = streamingLines; }, [streamingLines]);
+  useEffect(() => {
+    streamingLinesRef.current = streamingLines;
+  }, [streamingLines]);
   useEffect(() => {
     if (streamingLinesRef.current && lines.length > 0) {
       setStreamingLines(null);
@@ -965,7 +1090,9 @@ export function EditorShell({
       // Re-fetch snapshot lines to get the renumbered state
       const data = await fetch(`/api/snapshots/${currentSnapshotId}`, {
         cache: "no-store",
-      }).then((r) => (r.ok ? (r.json() as Promise<{ lines: DocLineData[] }>) : null));
+      }).then((r) =>
+        r.ok ? (r.json() as Promise<{ lines: DocLineData[] }>) : null,
+      );
       if (data?.lines) {
         setClientLines(data.lines);
         setPendingFocusClaimId(newClaim.id);
@@ -1103,19 +1230,24 @@ export function EditorShell({
   );
 
   const usesServerSnapshot = activeProjectId === initialActiveProjectId;
-  const baseLines = usesServerSnapshot
-    ? lines
-    : [];
+  const baseLines = usesServerSnapshot ? lines : [];
   const displayLines = clientLines ?? baseLines;
-  useEffect(() => { displayLinesRef.current = displayLines; });
-  const currentVersion = snapshots.find((s) => s.id === currentSnapshotId)?.version ?? null;
-  const displayHasSnapshot = usesServerSnapshot ? hasSnapshot : currentSnapshotId !== null;
+  useEffect(() => {
+    displayLinesRef.current = displayLines;
+  });
+  const currentVersion =
+    snapshots.find((s) => s.id === currentSnapshotId)?.version ?? null;
+  const displayHasSnapshot = usesServerSnapshot
+    ? hasSnapshot
+    : currentSnapshotId !== null;
 
   // After a client-side project switch, auto-load the latest snapshot's lines so
   // the doc shows the actual brief instead of just the session title.
   useEffect(() => {
     if (usesServerSnapshot || clientLines !== null) return;
-    const latestSnapshot = snapshots.find((s) => s.id !== null && s.version !== null);
+    const latestSnapshot = snapshots.find(
+      (s) => s.id !== null && s.version !== null,
+    );
     if (!latestSnapshot?.id) return;
     const snapshotId = latestSnapshot.id;
     fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" })
@@ -1126,7 +1258,7 @@ export function EditorShell({
         setCurrentSnapshotId(snapshotId);
       })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshots, usesServerSnapshot]);
 
   const baseAppState: AppState = session
@@ -1241,7 +1373,8 @@ export function EditorShell({
   function handleExportPdf() {
     const lines = displayLinesRef.current;
     if (!lines.length) return;
-    const projectName = projects.find((p) => p.id === activeProjectId)?.name ?? "Brief";
+    const projectName =
+      projects.find((p) => p.id === activeProjectId)?.name ?? "Brief";
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>${projectName}</title>
@@ -1255,21 +1388,29 @@ export function EditorShell({
   .blank{height:8px}
   @media print{body{margin:20px}}
 </style></head><body>
-${lines.map((l) => {
-  if (l.type === "h1") return `<h1>${escapeHtml(l.text ?? "")}</h1>`;
-  if (l.type === "h2") return `<h2>${escapeHtml(l.text ?? "")}</h2>`;
-  if (l.type === "meta") return `<div class="meta">${escapeHtml(l.text ?? "")}</div>`;
-  if (l.type === "body") return `<p class="body${l.small ? " small" : ""}">${escapeHtml(l.text ?? "")}</p>`;
-  if (l.type === "blank") return `<div class="blank"></div>`;
-  return "";
-}).join("\n")}
+${lines
+  .map((l) => {
+    if (l.type === "h1") return `<h1>${escapeHtml(l.text ?? "")}</h1>`;
+    if (l.type === "h2") return `<h2>${escapeHtml(l.text ?? "")}</h2>`;
+    if (l.type === "meta")
+      return `<div class="meta">${escapeHtml(l.text ?? "")}</div>`;
+    if (l.type === "body")
+      return `<p class="body${l.small ? " small" : ""}">${escapeHtml(l.text ?? "")}</p>`;
+    if (l.type === "blank") return `<div class="blank"></div>`;
+    return "";
+  })
+  .join("\n")}
 </body></html>`;
 
     const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    iframe.style.cssText =
+      "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-    if (!doc) { document.body.removeChild(iframe); return; }
+    if (!doc) {
+      document.body.removeChild(iframe);
+      return;
+    }
     doc.open();
     doc.write(html);
     doc.close();
@@ -1283,7 +1424,9 @@ ${lines.map((l) => {
   function handleProjectSaved(name: string, clientName: string) {
     if (!activeProjectId) return;
     setProjects((prev) =>
-      prev.map((p) => p.id === activeProjectId ? { ...p, name, clientName } : p),
+      prev.map((p) =>
+        p.id === activeProjectId ? { ...p, name, clientName } : p,
+      ),
     );
   }
 
@@ -1299,7 +1442,13 @@ ${lines.map((l) => {
   }, [sessionId]);
 
   // Clean up polls when the component unmounts
-  useEffect(() => () => { stopJobPoll(); stopFeedbackPoll(); }, [stopJobPoll, stopFeedbackPoll]);
+  useEffect(
+    () => () => {
+      stopJobPoll();
+      stopFeedbackPoll();
+    },
+    [stopJobPoll, stopFeedbackPoll],
+  );
 
   const colTemplate = [
     sidebarOpen ? `${sidebarWidth}px` : "0px",
@@ -1374,13 +1523,27 @@ ${lines.map((l) => {
           selectedReqText={selectedReqText}
           onClearSelection={() => setSelectedReq(null)}
           onSendMessage={
-            sessionId && currentSnapshotId ? handleSendMessage : undefined
+            sessionId && currentSnapshotId ? handleSendOrDiagram : undefined
           }
           revising={revising}
+          selectedDiagramType={selectedDiagramType}
+          onClearDiagramType={() => {
+            setSelectedDiagramType(null);
+            setDiagramError(null);
+          }}
+          onSelectDiagramType={(type) => {
+            setSelectedDiagramType(type);
+            setDiagramError(null);
+          }}
+          diagramError={diagramError}
+          diagrams={diagrams}
+          diagramsLoading={diagramsLoading}
           onUpdateLine={currentSnapshotId ? handleUpdateLine : undefined}
           snapshotId={currentSnapshotId}
           onShareBrief={currentSnapshotId ? handleShareBrief : undefined}
-          onInsertLineAfter={currentSnapshotId ? handleInsertLineAfter : undefined}
+          onInsertLineAfter={
+            currentSnapshotId ? handleInsertLineAfter : undefined
+          }
           autoFocusReqId={pendingFocusClaimId}
           onAutoFocusConsumed={() => setPendingFocusClaimId(null)}
           viewingVersion={viewingVersion}
@@ -1454,11 +1617,21 @@ ${lines.map((l) => {
       {paletteOpen && (
         <CommandPalette
           onClose={() => setPaletteOpen(false)}
-          onAddSource={() => { setRightOpen(true); setRightTab("sources"); }}
+          onAddSource={() => {
+            setRightOpen(true);
+            setRightTab("sources");
+          }}
           onRegenerate={!generating ? handleGenerateBrief : undefined}
-          onViewRevisions={() => { setRightOpen(true); setRightTab("revisions"); }}
-          onExportPdf={displayLinesRef.current.length > 0 ? handleExportPdf : undefined}
-          onOpenSettings={activeProjectId ? () => setSettingsOpen(true) : undefined}
+          onViewRevisions={() => {
+            setRightOpen(true);
+            setRightTab("revisions");
+          }}
+          onExportPdf={
+            displayLinesRef.current.length > 0 ? handleExportPdf : undefined
+          }
+          onOpenSettings={
+            activeProjectId ? () => setSettingsOpen(true) : undefined
+          }
           onShare={currentSnapshotId ? handleShareBrief : undefined}
         />
       )}
@@ -1471,8 +1644,12 @@ ${lines.map((l) => {
       {settingsOpen && activeProjectId && (
         <ProjectSettingsModal
           projectId={activeProjectId}
-          initialName={projects.find((p) => p.id === activeProjectId)?.name ?? ""}
-          initialClientName={projects.find((p) => p.id === activeProjectId)?.clientName ?? ""}
+          initialName={
+            projects.find((p) => p.id === activeProjectId)?.name ?? ""
+          }
+          initialClientName={
+            projects.find((p) => p.id === activeProjectId)?.clientName ?? ""
+          }
           onClose={() => setSettingsOpen(false)}
           onSaved={handleProjectSaved}
         />

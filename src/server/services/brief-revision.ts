@@ -28,7 +28,7 @@ export type RunBriefRevisionInput = {
   requestedBy: string;
 };
 
-function serializeCurrentBrief(snapshot: {
+export function serializeCurrentBrief(snapshot: {
   claims: Array<{ section: string; text: string; confidence: string }>;
   questions: Array<{ section: string; text: string; reason: string }>;
 }): string {

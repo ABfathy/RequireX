@@ -122,7 +122,3 @@ The deck does **not** lock you into:
 - Any project management, task tracking, or post-brief workflow
 
 Those are implementation choices you can make yourself, as long as the core flow works.
-
-
-
-

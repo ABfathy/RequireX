@@ -14,13 +14,22 @@ function relativeTime(dateStr: string): string {
     );
     if (Math.abs(diffMinutes) >= 60 * 24) {
       const days = Math.round(diffMinutes / (60 * 24));
-      return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(days, "day");
+      return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
+        days,
+        "day",
+      );
     }
     if (Math.abs(diffMinutes) >= 60) {
       const hours = Math.round(diffMinutes / 60);
-      return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(hours, "hour");
+      return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
+        hours,
+        "hour",
+      );
     }
-    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(diffMinutes, "minute");
+    return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
+      diffMinutes,
+      "minute",
+    );
   } catch {
     return "";
   }
@@ -55,7 +64,10 @@ export function ProjectSearchPalette({
   }, []);
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === "Escape") { onClose(); return; }
+    if (e.key === "Escape") {
+      onClose();
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIdx((i) => Math.min(i + 1, filtered.length - 1));
@@ -132,11 +144,16 @@ export function ProjectSearchPalette({
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => { onSelect(p.id); onClose(); }}
+                    onClick={() => {
+                      onSelect(p.id);
+                      onClose();
+                    }}
                     onMouseEnter={() => setActiveIdx(i)}
                     className="flex items-center gap-2.5 w-full h-[38px] px-3.5 text-left transition-colors duration-[80ms] cursor-pointer"
                     style={{
-                      background: isActive ? "var(--accent-subtle)" : "transparent",
+                      background: isActive
+                        ? "var(--accent-subtle)"
+                        : "transparent",
                     }}
                   >
                     <div className="flex flex-col flex-1 min-w-0">
@@ -144,7 +161,9 @@ export function ProjectSearchPalette({
                         <span
                           className="text-[12px] truncate"
                           style={{
-                            color: isActive ? "var(--fg-primary)" : "var(--fg-secondary)",
+                            color: isActive
+                              ? "var(--fg-primary)"
+                              : "var(--fg-secondary)",
                             fontWeight: isCurrent ? 500 : 400,
                           }}
                         >
@@ -154,7 +173,8 @@ export function ProjectSearchPalette({
                           <span
                             className="text-[9px] font-semibold uppercase tracking-[0.06em] px-1 py-px rounded-[3px] shrink-0"
                             style={{
-                              background: "color-mix(in srgb, var(--accent) 15%, transparent)",
+                              background:
+                                "color-mix(in srgb, var(--accent) 15%, transparent)",
                               color: "var(--accent)",
                             }}
                           >
@@ -169,7 +189,9 @@ export function ProjectSearchPalette({
                           fontFamily: "var(--font-mono)",
                         }}
                       >
-                        {p.clientName}{p.clientName && " · "}{relativeTime(p.updatedAt)}
+                        {p.clientName}
+                        {p.clientName && " · "}
+                        {relativeTime(p.updatedAt)}
                       </span>
                     </div>
                     {isActive && (

@@ -42,10 +42,15 @@ export function ProjectSettingsModal({
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmedName, clientName: trimmedClient || trimmedName }),
+        body: JSON.stringify({
+          name: trimmedName,
+          clientName: trimmedClient || trimmedName,
+        }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
+        const data = (await res.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         throw new Error(data?.message ?? "Failed to save.");
       }
       onSaved(trimmedName, trimmedClient || trimmedName);
@@ -77,7 +82,10 @@ export function ProjectSettingsModal({
           className="flex items-center justify-between px-4 h-11 border-b"
           style={{ borderColor: "var(--border)" }}
         >
-          <span className="text-[13px] font-medium" style={{ color: "var(--fg-primary)" }}>
+          <span
+            className="text-[13px] font-medium"
+            style={{ color: "var(--fg-primary)" }}
+          >
             Project settings
           </span>
           <button
@@ -91,7 +99,10 @@ export function ProjectSettingsModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={(e) => void handleSave(e)} className="p-4 flex flex-col gap-4">
+        <form
+          onSubmit={(e) => void handleSave(e)}
+          className="p-4 flex flex-col gap-4"
+        >
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="proj-name"
@@ -142,7 +153,9 @@ export function ProjectSettingsModal({
           </div>
 
           {error && (
-            <p className="text-[11px]" style={{ color: "var(--danger)" }}>{error}</p>
+            <p className="text-[11px]" style={{ color: "var(--danger)" }}>
+              {error}
+            </p>
           )}
 
           <div className="flex items-center justify-end gap-2 pt-1">

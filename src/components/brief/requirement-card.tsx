@@ -61,7 +61,11 @@ interface RequirementCardProps {
   onSubmitAnswer?: (questionId: string, body: string) => Promise<void>;
 }
 
-function RequirementCard({ req, onSubmitComment, onSubmitAnswer }: RequirementCardProps) {
+function RequirementCard({
+  req,
+  onSubmitComment,
+  onSubmitAnswer,
+}: RequirementCardProps) {
   const [commentOpen, setCommentOpen] = useState(false);
   const [hasComment, setHasComment] = useState(false);
   const hasQuestion = !!req.question;

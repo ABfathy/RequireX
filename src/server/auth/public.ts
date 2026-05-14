@@ -12,7 +12,10 @@ type PublicRateLimitEntry = {
 
 const rateLimitStore = new Map<string, PublicRateLimitEntry>();
 
-const RATE_LIMIT_CONFIG: Record<PublicMutationAction, PublicMutationRateLimitConfig> = {
+const RATE_LIMIT_CONFIG: Record<
+  PublicMutationAction,
+  PublicMutationRateLimitConfig
+> = {
   comment: { limit: 10, windowMs: 10 * 60 * 1000 },
   answer: { limit: 10, windowMs: 10 * 60 * 1000 },
   confirm: { limit: 3, windowMs: 10 * 60 * 1000 },

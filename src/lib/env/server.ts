@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 const serverEnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   NEXT_PUBLIC_APP_URL: z.url().optional(),
   DATABASE_URL: z.string().optional(),
   UPLOADTHING_TOKEN: z.string().optional(),

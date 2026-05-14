@@ -45,7 +45,15 @@ export default function RootError({
           </div>
 
           {/* Error icon */}
-          <div className="rx-err-2" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <div
+            className="rx-err-2"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
             <div
               style={{
                 width: 48,
@@ -54,8 +62,10 @@ export default function RootError({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
+                background:
+                  "color-mix(in srgb, var(--danger) 10%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--danger) 30%, transparent)",
                 animation: "rx-error-pulse 3s ease-in-out infinite",
               }}
             >
@@ -80,7 +90,10 @@ export default function RootError({
           </div>
 
           {/* Text */}
-          <div className="rx-err-3 flex flex-col items-center" style={{ gap: 8, textAlign: "center" }}>
+          <div
+            className="rx-err-3 flex flex-col items-center"
+            style={{ gap: 8, textAlign: "center" }}
+          >
             <h1
               style={{
                 fontSize: 17,
@@ -99,7 +112,8 @@ export default function RootError({
                 maxWidth: 320,
               }}
             >
-              {error.message?.slice(0, 200) ?? "An unexpected error occurred while rendering this page."}
+              {error.message?.slice(0, 200) ??
+                "An unexpected error occurred while rendering this page."}
             </p>
           </div>
 

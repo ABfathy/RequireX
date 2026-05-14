@@ -251,7 +251,10 @@ function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
         )}
         <span
           className="text-[10px] truncate tabular-nums"
-          style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+          style={{
+            color: "var(--fg-disabled)",
+            fontFamily: "var(--font-mono)",
+          }}
           suppressHydrationWarning
         >
           {relTime}
@@ -293,10 +296,11 @@ function SourceRow({ item, onDelete, onRename, onPreview }: SourceRowProps) {
           <>
             {/* Status dot — sits in place, cross-fades with action buttons */}
             <span
-              className={`absolute inset-0 m-auto size-[6px] rounded-full transition-opacity duration-[150ms] pointer-events-none ${(onPreview ?? onDelete)
+              className={`absolute inset-0 m-auto size-[6px] rounded-full transition-opacity duration-[150ms] pointer-events-none ${
+                (onPreview ?? onDelete)
                   ? "opacity-60 group-hover:opacity-0"
                   : "opacity-60"
-                }`}
+              }`}
               style={{ background: STATUS_DOT[item.status] }}
               aria-label={STATUS_LABEL[item.status]}
               role="img"
@@ -357,7 +361,8 @@ function SkeletonRow() {
 /* ── SourcesTab ─────────────────────────────────────────── */
 
 const ACCEPTED_MIME = /^(image\/|audio\/|application\/pdf|text\/plain)/;
-const isAccepted = (f: File) => ACCEPTED_MIME.test(f.type) || f.name.endsWith(".rtf");
+const isAccepted = (f: File) =>
+  ACCEPTED_MIME.test(f.type) || f.name.endsWith(".rtf");
 
 async function collectFolderFiles(entry: FileSystemEntry): Promise<File[]> {
   if (entry.isFile) {
@@ -475,7 +480,10 @@ function SourcesTab({
           }}
         >
           <Icons.FileText size={22} style={{ color: "var(--accent)" }} />
-          <span className="text-[12px] font-medium" style={{ color: "var(--accent)" }}>
+          <span
+            className="text-[12px] font-medium"
+            style={{ color: "var(--accent)" }}
+          >
             Drop files or folder
           </span>
         </div>
@@ -604,7 +612,10 @@ function SourcesTab({
             multiple
             className="hidden"
             onChange={handleFolderPick}
-            {...({ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
+            {...({
+              webkitdirectory: "",
+              directory: "",
+            } as React.InputHTMLAttributes<HTMLInputElement>)}
           />
         </div>
       </div>
@@ -729,7 +740,9 @@ function RevisionsTab({
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [compareBaseId, setCompareBaseId] = useState<string | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
-  const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
+  const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(
+    null,
+  );
 
   async function handleRevisionClick(id: string) {
     if (!onViewSnapshot || loadingId) return;
@@ -788,7 +801,8 @@ function RevisionsTab({
   const feedbackBySnapshot = new Map<string, SnapshotSummary[]>();
   for (const snap of snapshots) {
     if (
-      (snap.type === "CLIENT_COMMENT_ADDED" || snap.type === "CLIENT_ANSWER_ADDED") &&
+      (snap.type === "CLIENT_COMMENT_ADDED" ||
+        snap.type === "CLIENT_ANSWER_ADDED") &&
       snap.id
     ) {
       const list = feedbackBySnapshot.get(snap.id) ?? [];
@@ -799,7 +813,8 @@ function RevisionsTab({
 
   // Only show generation events + BRIEF_CONFIRMED in the timeline
   const displaySnapshots = snapshots.filter(
-    (s) => s.type !== "CLIENT_COMMENT_ADDED" && s.type !== "CLIENT_ANSWER_ADDED",
+    (s) =>
+      s.type !== "CLIENT_COMMENT_ADDED" && s.type !== "CLIENT_ANSWER_ADDED",
   );
 
   const comparableSnapshots = Array.from(
@@ -829,14 +844,23 @@ function RevisionsTab({
           const isConfirmed = snap.type === "BRIEF_CONFIRMED";
           const isLoadingThis = loadingId === snap.id;
           const isClickable =
-            !isConfirmed && !!snap.id && !!onViewSnapshot && !isActive && !loadingId;
+            !isConfirmed &&
+            !!snap.id &&
+            !!onViewSnapshot &&
+            !isActive &&
+            !loadingId;
           const canCompare =
-            !isConfirmed && !!snap.id && snap.version != null && !!onCompareSnapshots;
+            !isConfirmed &&
+            !!snap.id &&
+            snap.version != null &&
+            !!onCompareSnapshots;
           const compareOpen = canCompare && compareBaseId === snap.id;
           const compareOptions = comparableSnapshots.filter(
             (item) => item.id !== snap.id,
           );
-          const feedbackItems = snap.id ? (feedbackBySnapshot.get(snap.id) ?? []) : [];
+          const feedbackItems = snap.id
+            ? (feedbackBySnapshot.get(snap.id) ?? [])
+            : [];
           const feedbackExpanded = expandedFeedbackId === snap.eventId;
           return (
             <div key={snap.eventId ?? `rev-${idx}`}>
@@ -844,8 +868,21 @@ function RevisionsTab({
                 className={`flex items-start gap-3 mb-2 rounded-[5px] px-1 -mx-1 transition-colors duration-[100ms] ${isClickable ? "cursor-pointer hover:bg-[var(--surface-3)]" : ""} ${isLoadingThis ? "opacity-70" : ""}`}
                 role={isClickable ? "button" : undefined}
                 tabIndex={isClickable ? 0 : undefined}
-                onClick={isClickable ? () => void handleRevisionClick(snap.id!) : undefined}
-                onKeyDown={isClickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void handleRevisionClick(snap.id!); } } : undefined}
+                onClick={
+                  isClickable
+                    ? () => void handleRevisionClick(snap.id!)
+                    : undefined
+                }
+                onKeyDown={
+                  isClickable
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          void handleRevisionClick(snap.id!);
+                        }
+                      }
+                    : undefined
+                }
               >
                 {/* Timeline dot + line */}
                 <div className="flex flex-col items-center shrink-0 mt-[3px]">
@@ -882,7 +919,9 @@ function RevisionsTab({
                         className="text-[10px] font-medium shrink-0"
                         style={{
                           fontFamily: "var(--font-mono)",
-                          color: isActive ? "var(--accent)" : "var(--fg-tertiary)",
+                          color: isActive
+                            ? "var(--accent)"
+                            : "var(--fg-tertiary)",
                         }}
                       >
                         v{snap.version}
@@ -891,17 +930,23 @@ function RevisionsTab({
                     <span
                       className="text-[11px] truncate"
                       style={{
-                        color: isActive ? "var(--fg-primary)" : "var(--fg-secondary)",
+                        color: isActive
+                          ? "var(--fg-primary)"
+                          : "var(--fg-secondary)",
                       }}
                     >
                       {isChatRevision && snap.userMessage
-                        ? snap.userMessage.slice(0, 60) + (snap.userMessage.length > 60 ? "…" : "")
+                        ? snap.userMessage.slice(0, 60) +
+                          (snap.userMessage.length > 60 ? "…" : "")
                         : snap.summary}
                     </span>
                   </div>
                   <span
                     className="text-[10px] tabular-nums mt-0.5"
-                    style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+                    style={{
+                      color: "var(--fg-disabled)",
+                      fontFamily: "var(--font-mono)",
+                    }}
                   >
                     {relRevTime(snap.createdAt)}
                   </span>
@@ -911,14 +956,17 @@ function RevisionsTab({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setExpandedFeedbackId(feedbackExpanded ? null : snap.eventId);
+                        setExpandedFeedbackId(
+                          feedbackExpanded ? null : snap.eventId,
+                        );
                       }}
                       className="flex items-center gap-1 mt-1.5 text-[10px] font-medium transition-colors duration-[100ms] cursor-pointer hover:opacity-80 focus-visible:outline-none"
                       style={{ color: "var(--success)" }}
                     >
                       <Icons.MessageSquare size={10} aria-hidden="true" />
                       <span>
-                        {feedbackItems.length} feedback item{feedbackItems.length !== 1 ? "s" : ""}
+                        {feedbackItems.length} feedback item
+                        {feedbackItems.length !== 1 ? "s" : ""}
                         {feedbackExpanded ? " — hide" : " — view"}
                       </span>
                     </button>
@@ -932,12 +980,18 @@ function RevisionsTab({
                     onClick={(event) => {
                       event.stopPropagation();
                       setCompareError(null);
-                      setCompareBaseId((current) => current === snap.id ? null : snap.id!);
+                      setCompareBaseId((current) =>
+                        current === snap.id ? null : snap.id!,
+                      );
                     }}
                     className="inline-flex items-center gap-1 h-[22px] px-1.5 rounded-[4px] text-[10px] font-medium transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0 mt-0.5"
                     style={{
-                      color: compareOpen ? "var(--accent)" : "var(--fg-tertiary)",
-                      background: compareOpen ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
+                      color: compareOpen
+                        ? "var(--accent)"
+                        : "var(--fg-tertiary)",
+                      background: compareOpen
+                        ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+                        : "transparent",
                     }}
                   >
                     <Icons.GitCompare size={11} aria-hidden="true" />
@@ -954,17 +1008,27 @@ function RevisionsTab({
                       key={fb.eventId}
                       className="px-2 py-1.5 rounded-[5px] text-[11px] leading-snug border"
                       style={{
-                        background: "color-mix(in srgb, var(--success) 5%, var(--surface-1))",
-                        borderColor: "color-mix(in srgb, var(--success) 20%, transparent)",
+                        background:
+                          "color-mix(in srgb, var(--success) 5%, var(--surface-1))",
+                        borderColor:
+                          "color-mix(in srgb, var(--success) 20%, transparent)",
                         color: "var(--fg-secondary)",
                       }}
                     >
                       <div className="flex items-center gap-1 mb-0.5">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.06em]" style={{ color: "var(--success)" }}>
-                          {fb.type === "CLIENT_ANSWER_ADDED" ? "Answer" : "Comment"}
+                        <span
+                          className="text-[9px] font-semibold uppercase tracking-[0.06em]"
+                          style={{ color: "var(--success)" }}
+                        >
+                          {fb.type === "CLIENT_ANSWER_ADDED"
+                            ? "Answer"
+                            : "Comment"}
                         </span>
                         {fb.feedbackAuthor && (
-                          <span className="text-[9px]" style={{ color: "var(--fg-disabled)" }}>
+                          <span
+                            className="text-[9px]"
+                            style={{ color: "var(--fg-disabled)" }}
+                          >
                             · {fb.feedbackAuthor}
                           </span>
                         )}
@@ -978,16 +1042,25 @@ function RevisionsTab({
               {compareOpen && (
                 <div
                   className="ml-[22px] mr-0 mb-3 rounded-[6px] border p-2"
-                  style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+                  style={{
+                    background: "var(--surface-1)",
+                    borderColor: "var(--border)",
+                  }}
                 >
                   <div
                     className="text-[10px] font-medium mb-1.5"
-                    style={{ color: "var(--fg-muted)", fontFamily: "var(--font-mono)" }}
+                    style={{
+                      color: "var(--fg-muted)",
+                      fontFamily: "var(--font-mono)",
+                    }}
                   >
                     Compare v{snap.version} with
                   </div>
                   {compareOptions.length === 0 ? (
-                    <p className="text-[11px]" style={{ color: "var(--fg-muted)" }}>
+                    <p
+                      className="text-[11px]"
+                      style={{ color: "var(--fg-muted)" }}
+                    >
                       No other versions available.
                     </p>
                   ) : (
@@ -1019,7 +1092,11 @@ function RevisionsTab({
                     </div>
                   )}
                   {compareError && (
-                    <p className="text-[10px] mt-1.5" style={{ color: "var(--danger)" }} role="alert">
+                    <p
+                      className="text-[10px] mt-1.5"
+                      style={{ color: "var(--danger)" }}
+                      role="alert"
+                    >
                       {compareError}
                     </p>
                   )}
@@ -1144,8 +1221,10 @@ export function RightPane({
                 onClick={onClearFeedbackBadge}
                 className="flex items-center gap-2 w-full px-3 py-2 text-left text-[11px] font-medium border-b transition-colors duration-[100ms] hover:opacity-80 cursor-pointer"
                 style={{
-                  background: "color-mix(in srgb, var(--success) 10%, var(--surface-2))",
-                  borderColor: "color-mix(in srgb, var(--success) 30%, transparent)",
+                  background:
+                    "color-mix(in srgb, var(--success) 10%, var(--surface-2))",
+                  borderColor:
+                    "color-mix(in srgb, var(--success) 30%, transparent)",
                   color: "var(--success)",
                 }}
               >

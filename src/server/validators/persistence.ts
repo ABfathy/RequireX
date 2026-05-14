@@ -22,7 +22,9 @@ export function assertExclusiveEvidenceTarget(input: {
 
 export function assertCommentSnapshotConsistency(input: SnapshotTargetInput) {
   if (input.claimId && input.claimSnapshotId !== input.snapshotId) {
-    throw new Error("BriefComment claim target must belong to the same snapshot.");
+    throw new Error(
+      "BriefComment claim target must belong to the same snapshot.",
+    );
   }
 
   if (input.questionId && input.questionSnapshotId !== input.snapshotId) {
@@ -38,7 +40,9 @@ export function assertFollowUpAnswerConsistency(input: {
   questionSection: string;
 }) {
   if (input.questionSnapshotId !== input.snapshotId) {
-    throw new Error("FollowUpAnswer question must belong to the same snapshot.");
+    throw new Error(
+      "FollowUpAnswer question must belong to the same snapshot.",
+    );
   }
 
   if (input.questionSection !== "FOLLOW_UP_QUESTIONS") {

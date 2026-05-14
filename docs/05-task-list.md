@@ -3,6 +3,7 @@
 ## Done
 
 ### Auth & Workspace
+
 - [x] Clerk auth routes and middleware
 - [x] Custom sign-in, sign-up, and SSO callback UI flow
 - [x] Per-user workspace bootstrap
@@ -12,6 +13,7 @@
 - [x] `/app` server-side project/session/source bootstrap
 
 ### Sources
+
 - [x] Source list loading
 - [x] Pasted-text asset creation
 - [x] UploadThing integration for mixed source uploads
@@ -19,6 +21,7 @@
 - [x] Client-side source upload, refresh, retry, and optimistic updates
 
 ### Generation
+
 - [x] Internal "Generate Brief" action wired to `POST /api/generate`
 - [x] Sync brief generation via `@google/genai` (Gemini 2.5 Flash, Vertex mode)
 - [x] PDF source processing — download, parse, chunk via `pdf-text.ts`
@@ -34,6 +37,7 @@
 - [x] Inline editing and revision navigation
 
 ### Internal Editor
+
 - [x] Latest-snapshot loading in `/app`
 - [x] Internal document view rendering from real snapshot data
 - [x] Project search palette (⌘P)
@@ -41,6 +45,7 @@
 - [x] Revision history enriched with public feedback bodies and authors
 
 ### Public Review (Backend)
+
 - [x] Public review comment route and service
 - [x] Public review answer route and service
 - [x] Public review confirmation route and service
@@ -49,6 +54,7 @@
 - [x] Unit tests for brief pipeline, PDF extraction, source processing
 
 ### Public Review (UI)
+
 - [x] Wire public comment submission to `/api/public/briefs/[shareToken]/comments`
 - [x] Wire public answer submission to `/api/public/briefs/[shareToken]/answers`
 - [x] Wire public confirmation submission to `/api/public/briefs/[shareToken]/confirm`

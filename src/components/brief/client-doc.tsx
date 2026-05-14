@@ -55,7 +55,7 @@ function ClientDoc({
   isConfirming,
   isConfirmed,
   confirmError,
-  onSubmitConfirmation
+  onSubmitConfirmation,
 }: ClientDocProps) {
   const sections = [...new Set(requirements.map((r) => r.section))];
 
@@ -101,17 +101,29 @@ function ClientDoc({
         <div className="h-px bg-border my-8 mb-6" />
         <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-2">
           {confirmError && (
-            <span className="text-sm text-destructive mr-auto text-right sm:text-left">{confirmError}</span>
+            <span className="text-sm text-destructive mr-auto text-right sm:text-left">
+              {confirmError}
+            </span>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={onDownloadPdf} disabled={!onDownloadPdf}>Download PDF</Button>
+            <Button
+              variant="secondary"
+              onClick={onDownloadPdf}
+              disabled={!onDownloadPdf}
+            >
+              Download PDF
+            </Button>
             {isConfirmed ? (
               <Button variant="secondary" disabled>
                 <Check size={13} />
                 Feedback submitted
               </Button>
             ) : (
-              <Button variant="default" disabled={isConfirming} onClick={onSubmitConfirmation}>
+              <Button
+                variant="default"
+                disabled={isConfirming}
+                onClick={onSubmitConfirmation}
+              >
                 {isConfirming ? (
                   "Submitting..."
                 ) : (

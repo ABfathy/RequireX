@@ -34,7 +34,6 @@ function ClientHeader({
   isConfirmed,
   onSubmitConfirmation,
 }: ClientHeaderProps) {
-
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 border-b border-border bg-background shrink-0 h-12 min-w-0">
       {/* Brand — links back to landing page */}
@@ -44,7 +43,9 @@ function ClientHeader({
         aria-label="RequireX — go to home"
       >
         <RxLogo size={20} className="text-accent" />
-        <span className="hidden sm:inline" translate="no">RequireX</span>
+        <span className="hidden sm:inline" translate="no">
+          RequireX
+        </span>
       </Link>
 
       {/* Separator — desktop only */}
@@ -55,7 +56,9 @@ function ClientHeader({
         <span className="text-[13px] text-fg-3 font-normal truncate min-w-0">
           {docName}
         </span>
-        <span className="text-fg-4 text-[13px] shrink-0 hidden xs:inline">·</span>
+        <span className="text-fg-4 text-[13px] shrink-0 hidden xs:inline">
+          ·
+        </span>
         <span className="text-[13px] text-fg-4 font-mono shrink-0 hidden xs:inline">
           {specVersion}
         </span>

@@ -1,548 +1,939 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RequireX — Editor</title>
-  <link rel="stylesheet" href="kit.css">
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-</head>
-<body>
-<div id="root"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RequireX — Editor</title>
+    <link rel="stylesheet" href="kit.css" />
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="root"></div>
 
-<script type="text/babel" src="icons.jsx"></script>
-<script type="text/babel" src="bits.jsx"></script>
+    <script type="text/babel" src="icons.jsx"></script>
+    <script type="text/babel" src="bits.jsx"></script>
 
-<!-- ── Data ─────────────────────────────────────────────── -->
-<script type="text/babel">
-const PROJECTS = [
-  { id:'p1', name:'payments-v2', chats:[
-    { id:'c1', name:'Initial extraction', time:'2h ago' },
-    { id:'c2', name:'SLO clarifications',  time:'yesterday' },
-  ]},
-  { id:'p2', name:'onboarding-flow', chats:[
-    { id:'c3', name:'First draft', time:'3d ago' },
-  ]},
-  { id:'p3', name:'billing-service', chats:[
-    { id:'c4', name:'Compliance review', time:'1w ago' },
-    { id:'c5', name:'Edge cases',        time:'1w ago' },
-  ]},
-];
+    <!-- ── Data ─────────────────────────────────────────────── -->
+    <script type="text/babel">
+      const PROJECTS = [
+        {
+          id: "p1",
+          name: "payments-v2",
+          chats: [
+            { id: "c1", name: "Initial extraction", time: "2h ago" },
+            { id: "c2", name: "SLO clarifications", time: "yesterday" },
+          ],
+        },
+        {
+          id: "p2",
+          name: "onboarding-flow",
+          chats: [{ id: "c3", name: "First draft", time: "3d ago" }],
+        },
+        {
+          id: "p3",
+          name: "billing-service",
+          chats: [
+            { id: "c4", name: "Compliance review", time: "1w ago" },
+            { id: "c5", name: "Edge cases", time: "1w ago" },
+          ],
+        },
+      ];
 
-const SOURCES = [
-  { id:'s1', type:'doc',        name:'payments-spec.pdf',          meta:'42 pages · 6.2 MB',  status:'ok'   },
-  { id:'s2', type:'doc',        name:'compliance-iso26262.pdf',    meta:'128 pages',           status:'ok'   },
-  { id:'s3', type:'transcript', name:'kickoff-call.vtt',           meta:'43 min',              status:'ok'   },
-  { id:'s4', type:'ticket',     name:'JIRA-2491',                  meta:'3 comments',          status:'ok'   },
-  { id:'s5', type:'code',       name:'repo/payments/handler.ts',   meta:'L89, L412',           status:'warn' },
-];
+      const SOURCES = [
+        {
+          id: "s1",
+          type: "doc",
+          name: "payments-spec.pdf",
+          meta: "42 pages · 6.2 MB",
+          status: "ok",
+        },
+        {
+          id: "s2",
+          type: "doc",
+          name: "compliance-iso26262.pdf",
+          meta: "128 pages",
+          status: "ok",
+        },
+        {
+          id: "s3",
+          type: "transcript",
+          name: "kickoff-call.vtt",
+          meta: "43 min",
+          status: "ok",
+        },
+        {
+          id: "s4",
+          type: "ticket",
+          name: "JIRA-2491",
+          meta: "3 comments",
+          status: "ok",
+        },
+        {
+          id: "s5",
+          type: "code",
+          name: "repo/payments/handler.ts",
+          meta: "L89, L412",
+          status: "warn",
+        },
+      ];
 
-const REQS = [
-  { id:'REQ-0140', section:'Functional requirements',
-    title:'Idempotency key required on all POST /payments',
-    body:'Every POST to /payments MUST include an Idempotency-Key header. Duplicate keys within a 24-hour window return the original response without re-executing the side effect.',
-    tags:['functional','api'], status:'approved',
-    evidence:[
-      { sourceId:'s1', ref:'spec §2.1',     quote:'"Duplicate requests within 24 h shall return the original response."' },
-      { sourceId:'s3', ref:'kickoff 12:04', quote:'"We need idempotency on all payment endpoints."' },
-    ]},
-  { id:'REQ-0141', section:'Functional requirements',
-    title:'Failed payment retries follow exponential backoff',
-    body:'Retries on transient gateway errors (5xx, network) follow exponential backoff with full jitter, capped at 30 s and 6 attempts.',
-    tags:['functional','retry'], status:'approved',
-    evidence:[
-      { sourceId:'s4', ref:'JIRA-2491 #3', quote:'"Exponential backoff with jitter, max 6 retries."' },
-    ]},
-  { id:'REQ-0142', section:'Performance requirements',
-    title:'Payment latency under 200 ms p99',
-    body:'The payments handler must respond within 200 ms at the 99th percentile under nominal load. Breaches escalate to the on-call within one minute.',
-    tags:['non-functional','slo'], status:'approved',
-    evidence:[
-      { sourceId:'s1', ref:'spec §3.4',      quote:'"Shall respond within 200 ms at the 99th percentile."' },
-      { sourceId:'s4', ref:'JIRA comment',   quote:'"Agreed to commit to 200 ms p99 as the formal SLO."' },
-      { sourceId:'s5', ref:'handler.ts L412',quote:'const threshold = 200; // p99 ms' },
-    ]},
-  { id:'REQ-0143', section:'Compliance requirements',
-    title:'Audit log retains 7 years',
-    body:'All payment events are persisted to the audit log for 7 years (regulatory). Deletion is denied for retention-locked rows.',
-    tags:['compliance','audit'], status:'in-review',
-    evidence:[
-      { sourceId:'s2', ref:'ISO §7.2', quote:'"Payment records shall be retained for a minimum of 7 years."' },
-    ]},
-  { id:'REQ-0144', section:'Operational requirements',
-    title:'Settlement reconciliation runs daily at 03:00 UTC',
-    body:'A nightly job reconciles processor statements against the ledger. Discrepancies above $0.01 raise a Sev-3 alert.',
-    tags:['ops','functional'], status:'draft',
-    evidence:[
-      { sourceId:'s3', ref:'kickoff 28:15', quote:'"Reconciliation should run every night after midnight UTC."' },
-    ]},
-  { id:'REQ-0145', section:'Security requirements',
-    title:'PII fields encrypted at rest with KMS-managed keys',
-    body:'Cardholder name and last-4 are encrypted using customer-managed KMS keys. Logs MUST scrub PAN entirely.',
-    tags:['security','compliance'], status:'conflict',
-    evidence:[
-      { sourceId:'s1', ref:'spec §5.1',     quote:'"All PII fields must be encrypted at rest."' },
-      { sourceId:'s5', ref:'handler.ts L89',quote:'// TODO: add KMS encryption (unresolved)' },
-    ]},
-];
+      const REQS = [
+        {
+          id: "REQ-0140",
+          section: "Functional requirements",
+          title: "Idempotency key required on all POST /payments",
+          body: "Every POST to /payments MUST include an Idempotency-Key header. Duplicate keys within a 24-hour window return the original response without re-executing the side effect.",
+          tags: ["functional", "api"],
+          status: "approved",
+          evidence: [
+            {
+              sourceId: "s1",
+              ref: "spec §2.1",
+              quote:
+                '"Duplicate requests within 24 h shall return the original response."',
+            },
+            {
+              sourceId: "s3",
+              ref: "kickoff 12:04",
+              quote: '"We need idempotency on all payment endpoints."',
+            },
+          ],
+        },
+        {
+          id: "REQ-0141",
+          section: "Functional requirements",
+          title: "Failed payment retries follow exponential backoff",
+          body: "Retries on transient gateway errors (5xx, network) follow exponential backoff with full jitter, capped at 30 s and 6 attempts.",
+          tags: ["functional", "retry"],
+          status: "approved",
+          evidence: [
+            {
+              sourceId: "s4",
+              ref: "JIRA-2491 #3",
+              quote: '"Exponential backoff with jitter, max 6 retries."',
+            },
+          ],
+        },
+        {
+          id: "REQ-0142",
+          section: "Performance requirements",
+          title: "Payment latency under 200 ms p99",
+          body: "The payments handler must respond within 200 ms at the 99th percentile under nominal load. Breaches escalate to the on-call within one minute.",
+          tags: ["non-functional", "slo"],
+          status: "approved",
+          evidence: [
+            {
+              sourceId: "s1",
+              ref: "spec §3.4",
+              quote: '"Shall respond within 200 ms at the 99th percentile."',
+            },
+            {
+              sourceId: "s4",
+              ref: "JIRA comment",
+              quote: '"Agreed to commit to 200 ms p99 as the formal SLO."',
+            },
+            {
+              sourceId: "s5",
+              ref: "handler.ts L412",
+              quote: "const threshold = 200; // p99 ms",
+            },
+          ],
+        },
+        {
+          id: "REQ-0143",
+          section: "Compliance requirements",
+          title: "Audit log retains 7 years",
+          body: "All payment events are persisted to the audit log for 7 years (regulatory). Deletion is denied for retention-locked rows.",
+          tags: ["compliance", "audit"],
+          status: "in-review",
+          evidence: [
+            {
+              sourceId: "s2",
+              ref: "ISO §7.2",
+              quote:
+                '"Payment records shall be retained for a minimum of 7 years."',
+            },
+          ],
+        },
+        {
+          id: "REQ-0144",
+          section: "Operational requirements",
+          title: "Settlement reconciliation runs daily at 03:00 UTC",
+          body: "A nightly job reconciles processor statements against the ledger. Discrepancies above $0.01 raise a Sev-3 alert.",
+          tags: ["ops", "functional"],
+          status: "draft",
+          evidence: [
+            {
+              sourceId: "s3",
+              ref: "kickoff 28:15",
+              quote:
+                '"Reconciliation should run every night after midnight UTC."',
+            },
+          ],
+        },
+        {
+          id: "REQ-0145",
+          section: "Security requirements",
+          title: "PII fields encrypted at rest with KMS-managed keys",
+          body: "Cardholder name and last-4 are encrypted using customer-managed KMS keys. Logs MUST scrub PAN entirely.",
+          tags: ["security", "compliance"],
+          status: "conflict",
+          evidence: [
+            {
+              sourceId: "s1",
+              ref: "spec §5.1",
+              quote: '"All PII fields must be encrypted at rest."',
+            },
+            {
+              sourceId: "s5",
+              ref: "handler.ts L89",
+              quote: "// TODO: add KMS encryption (unresolved)",
+            },
+          ],
+        },
+      ];
 
-const CHAT_MSGS = [
-  { role:'user', text:'Extract requirements from all sources.' },
-  { role:'ai',   text:'6 requirements extracted across 5 sources. 4 approved, 1 in review, 1 conflict on REQ-0145.' },
-  { role:'user', text:'Why is REQ-0145 in conflict?' },
-  { role:'ai',   text:'The spec requires KMS encryption, but handler.ts has an unresolved TODO on L89. Flagged as conflict pending code review.' },
-];
+      const CHAT_MSGS = [
+        { role: "user", text: "Extract requirements from all sources." },
+        {
+          role: "ai",
+          text: "6 requirements extracted across 5 sources. 4 approved, 1 in review, 1 conflict on REQ-0145.",
+        },
+        { role: "user", text: "Why is REQ-0145 in conflict?" },
+        {
+          role: "ai",
+          text: "The spec requires KMS encryption, but handler.ts has an unresolved TODO on L89. Flagged as conflict pending code review.",
+        },
+      ];
 
-const REVISIONS = [
-  { id:'r1', label:'v2.1.0', time:'2m ago',    msg:'Approved REQ-0140, REQ-0141, REQ-0142', active:true },
-  { id:'r2', label:'v2.0.1', time:'1h ago',    msg:'Added REQ-0144 from kickoff transcript' },
-  { id:'r3', label:'v2.0.0', time:'3h ago',    msg:'Initial extraction from payments-spec.pdf' },
-  { id:'r4', label:'v1.0.0', time:'yesterday', msg:'Draft from RFP document' },
-];
+      const REVISIONS = [
+        {
+          id: "r1",
+          label: "v2.1.0",
+          time: "2m ago",
+          msg: "Approved REQ-0140, REQ-0141, REQ-0142",
+          active: true,
+        },
+        {
+          id: "r2",
+          label: "v2.0.1",
+          time: "1h ago",
+          msg: "Added REQ-0144 from kickoff transcript",
+        },
+        {
+          id: "r3",
+          label: "v2.0.0",
+          time: "3h ago",
+          msg: "Initial extraction from payments-spec.pdf",
+        },
+        {
+          id: "r4",
+          label: "v1.0.0",
+          time: "yesterday",
+          msg: "Draft from RFP document",
+        },
+      ];
 
-Object.assign(window, { PROJECTS, SOURCES, REQS, CHAT_MSGS, REVISIONS });
-</script>
+      Object.assign(window, { PROJECTS, SOURCES, REQS, CHAT_MSGS, REVISIONS });
+    </script>
 
-<!-- ── Project Sidebar ──────────────────────────────────── -->
-<script type="text/babel">
-const { useState: useSbSt } = React;
+    <!-- ── Project Sidebar ──────────────────────────────────── -->
+    <script type="text/babel">
+      const { useState: useSbSt } = React;
 
-const ProjectSidebar = ({ activeProject, activeChat, onSelectProject, onSelectChat }) => {
-  const { PROJECTS } = window;
-  const [open, setOpen] = useSbSt({ p1:true, p2:false, p3:false });
-  const toggle = id => setOpen(o => ({ ...o, [id]: !o[id] }));
-  const activeProj = PROJECTS.find(p => p.id === activeProject);
+      const ProjectSidebar = ({
+        activeProject,
+        activeChat,
+        onSelectProject,
+        onSelectChat,
+      }) => {
+        const { PROJECTS } = window;
+        const [open, setOpen] = useSbSt({ p1: true, p2: false, p3: false });
+        const toggle = (id) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+        const activeProj = PROJECTS.find((p) => p.id === activeProject);
 
-  return (
-    <aside className="sidebar">
-      <div className="sidebar-head">
-        <div className="sidebar-logo">
-          <Icon.Logo size={16} style={{ color:'var(--accent)' }} />
-          <span className="sidebar-name">RequireX</span>
-          {activeProj && <span className="sidebar-proj-chip">{activeProj.name}</span>}
-        </div>
-        <IconBtn title="Settings"><Icon.Cog /></IconBtn>
-      </div>
-
-      <div className="sidebar-search">
-        <Icon.Search size={13} />
-        <input placeholder="Find requirement…" />
-        <Kbd>⌘K</Kbd>
-      </div>
-
-      <div className="sidebar-scroll">
-        {PROJECTS.map(proj => (
-          <div className="project-group" key={proj.id}>
-            <button
-              className={"project-head" + (activeProject === proj.id ? " is-active" : "")}
-              onClick={() => { toggle(proj.id); onSelectProject(proj.id); }}
-            >
-              <span className={"project-chev" + (open[proj.id] ? " is-open" : "")}>
-                <Icon.ChevronRight size={11} />
-              </span>
-              <span className="project-head-name">{proj.name}</span>
-              <span style={{ fontFamily:'var(--font-mono)', fontSize:9, color:'var(--fg-4)' }}>
-                {proj.chats.length}
-              </span>
-            </button>
-            {open[proj.id] && proj.chats.map(chat => (
-              <button
-                key={chat.id}
-                className={"chat-row" + (activeChat === chat.id ? " is-active" : "")}
-                onClick={() => onSelectChat(chat.id)}
-              >
-                <Icon.MessageSq size={12} style={{ flexShrink:0, color:'var(--fg-4)' }} />
-                <span className="chat-row-name">{chat.name}</span>
-                <span className="chat-row-time">{chat.time}</span>
-              </button>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      <div className="sidebar-foot">
-        <button>
-          <Icon.Plus size={13} />
-          <span>New project</span>
-        </button>
-        <button style={{ marginLeft:'auto' }}>
-          <Icon.Cog size={13} />
-        </button>
-      </div>
-    </aside>
-  );
-};
-window.ProjectSidebar = ProjectSidebar;
-</script>
-
-<!-- ── Doc View ─────────────────────────────────────────── -->
-<script type="text/babel">
-const { useState: useDvSt, useRef: useDvRef } = React;
-
-const STATUS_TONE  = { approved:'success', 'in-review':'info', draft:'neutral', conflict:'danger', stale:'warning' };
-const STATUS_LABEL = { approved:'Approved', 'in-review':'In review', draft:'Draft', conflict:'Conflict', stale:'Stale' };
-const SRC_ICON     = { doc:'DocLines', transcript:'Mic', ticket:'Ticket', code:'Code' };
-
-function wrapText(text, max=70) {
-  const words = text.split(' ');
-  const lines = []; let cur = '';
-  for (const w of words) {
-    if (cur && (cur+' '+w).length > max) { lines.push(cur); cur = w; }
-    else { cur = cur ? cur+' '+w : w; }
-  }
-  if (cur) lines.push(cur);
-  return lines;
-}
-
-function buildDocLines(reqs) {
-  const lines = []; let n = 1;
-  const add = obj => lines.push({ ...obj, lineNum: n++ });
-  add({ type:'h1', text:'Payment Service v2 — Requirements Specification' });
-  add({ type:'blank' });
-  add({ type:'meta', text:'payments-v2  ·  spec/v2.1  ·  6 requirements' });
-  add({ type:'blank' });
-  const sections = [...new Set(reqs.map(r => r.section))];
-  for (const section of sections) {
-    const sReqs = reqs.filter(r => r.section === section);
-    add({ type:'h2', text:section });
-    add({ type:'blank', small:true });
-    for (const req of sReqs) {
-      add({ type:'req-header', reqId:req.id, status:req.status, tags:req.tags });
-      add({ type:'req-title',  reqId:req.id, text:req.title });
-      add({ type:'blank', small:true });
-      const chunks = wrapText(req.body);
-      chunks.forEach((chunk, i) => add({
-        type:'body', reqId:req.id, text:chunk,
-        evidence: i === chunks.length-1 ? req.evidence : null,
-      }));
-      add({ type:'blank' });
-    }
-    add({ type:'blank' });
-  }
-  return lines;
-}
-
-const EvidenceBit = ({ ev }) => {
-  const [show, setShow] = useDvSt(false);
-  const src = (window.SOURCES||[]).find(s => s.id === ev.sourceId);
-  if (!src) return null;
-  const I = Icon[SRC_ICON[src.type]] || Icon.DocLines;
-  return (
-    <span className="ev-bit" onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
-      <I size={10} /><span>{ev.ref}</span>
-      {show && (
-        <span className="ev-tooltip">
-          <span className="ev-tooltip-src">{src.name}</span>
-          <span className="ev-tooltip-quote">{ev.quote}</span>
-        </span>
-      )}
-    </span>
-  );
-};
-
-const DocLine = ({ line, selectedReq, onSelectReq }) => {
-  const isReq     = !!line.reqId;
-  const isActive  = isReq && line.reqId === selectedReq;
-  const cls = ['doc-line', `is-${line.type}`, isActive?'req-active':'', line.small?'is-small':'', isReq?'is-req-group':''].filter(Boolean).join(' ');
-  return (
-    <div className={cls} onClick={isReq ? ()=>onSelectReq(line.reqId) : undefined}>
-      <div className="dl-num">{line.type!=='blank' ? line.lineNum : ''}</div>
-      <div className="dl-content">
-        {(line.type==='h1'||line.type==='h2'||line.type==='meta'||line.type==='req-title') && <span>{line.text}</span>}
-        {line.type==='req-header' && <>
-          <span className="req-line-id mono">{line.reqId}</span>
-          <Pill tone={STATUS_TONE[line.status]}>{STATUS_LABEL[line.status]}</Pill>
-          <span className="dl-spread" />
-          <span className="dl-tag-row">{line.tags.slice(0,2).map(t=><Tag key={t}>{t}</Tag>)}</span>
-        </>}
-        {line.type==='body' && <>
-          <span>{line.text}</span>
-          {line.evidence && line.evidence.map((ev,i)=><EvidenceBit key={i} ev={ev} />)}
-        </>}
-      </div>
-    </div>
-  );
-};
-
-const DocView = ({ selectedReq, onSelectReq }) => {
-  const { REQS } = window;
-  const [chatVal, setChatVal] = useDvSt('');
-  const [chatLog, setChatLog] = useDvSt([]);
-  const docLines = buildDocLines(REQS);
-
-  const sendMsg = () => {
-    if (!chatVal.trim()) return;
-    const msg = chatVal.trim();
-    setChatVal('');
-    setChatLog(l => [...l, { role:'user', text:msg }]);
-    setTimeout(() => setChatLog(l => [...l, { role:'ai', text:'Processing your request…' }]), 700);
-  };
-
-  return (
-    <div className="doc-view">
-      <div className="doc-topbar">
-        <div className="doc-crumbs">
-          <span>payments-v2</span>
-          <span className="doc-crumb-sep">/</span>
-          <span>requirements</span>
-          <span className="doc-crumb-sep">/</span>
-          <span className="doc-crumb-last">spec-v2.1</span>
-        </div>
-        <div className="doc-topbar-actions">
-          <Btn kind="ghost" size="sm" leading={<Icon.Filter size={12}/>}>Filter</Btn>
-          <Btn kind="ghost" size="sm" leading={<Icon.Trace size={12}/>}>Trace</Btn>
-          <Btn kind="primary" size="sm" leading={<Icon.Download size={12}/>}>Export</Btn>
-        </div>
-      </div>
-
-      <div className="doc-scroll">
-        {docLines.map((line, i) => (
-          <DocLine key={i} line={line} selectedReq={selectedReq} onSelectReq={onSelectReq} />
-        ))}
-        <div style={{height:32}} />
-      </div>
-
-      <div className="chatbar">
-        <div className="chatbar-input-row">
-          <Icon.MessageSq size={14} style={{color:'var(--fg-4)',flexShrink:0}} />
-          <input
-            className="chatbar-input"
-            placeholder="Ask about requirements, request changes, upload sources…"
-            value={chatVal}
-            onChange={e=>setChatVal(e.target.value)}
-            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); }}}
-          />
-          <IconBtn title="Attach source" onClick={()=>{}}><Icon.Upload /></IconBtn>
-          <IconBtn title="Send" onClick={sendMsg}><Icon.Send /></IconBtn>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-Object.assign(window, { DocView, STATUS_TONE, STATUS_LABEL, buildDocLines });
-</script>
-
-<!-- ── Right Pane ───────────────────────────────────────── -->
-<script type="text/babel">
-const RightPane = ({ activeTab, onTabChange }) => {
-  const { SOURCES, CHAT_MSGS, REVISIONS } = window;
-  const srcIconMap = { doc:'DocLines', transcript:'Mic', ticket:'Ticket', code:'Code' };
-  const tabs = ['Sources','Chat','Revisions'];
-
-  return (
-    <aside className="right-pane">
-      <div className="rp-tabs">
-        {tabs.map(t => (
-          <button
-            key={t}
-            className={"rp-tab"+(activeTab===t.toLowerCase()?' is-active':'')}
-            onClick={()=>onTabChange(t.toLowerCase())}
-          >{t}</button>
-        ))}
-      </div>
-
-      <div className="rp-content">
-        {activeTab==='sources' && <>
-          <div className="rp-section-label">Ingested sources</div>
-          {SOURCES.map(src => {
-            const I = Icon[srcIconMap[src.type]]||Icon.DocLines;
-            return (
-              <div key={src.id} className="source-row">
-                <I size={14} />
-                <div className="source-row-info">
-                  <div className="source-row-name">{src.name}</div>
-                  <div className="source-row-meta">{src.meta}</div>
-                </div>
-                <div className={"source-dot "+src.status} />
+        return (
+          <aside className="sidebar">
+            <div className="sidebar-head">
+              <div className="sidebar-logo">
+                <Icon.Logo size={16} style={{ color: "var(--accent)" }} />
+                <span className="sidebar-name">RequireX</span>
+                {activeProj && (
+                  <span className="sidebar-proj-chip">{activeProj.name}</span>
+                )}
               </div>
-            );
-          })}
-          <div style={{marginTop:8}}>
-            <Btn kind="ghost" size="sm" leading={<Icon.Plus size={12}/>}>Add source</Btn>
-          </div>
-        </>}
+              <IconBtn title="Settings">
+                <Icon.Cog />
+              </IconBtn>
+            </div>
 
-        {activeTab==='chat' && <>
-          <div className="rp-section-label">Chat history</div>
-          {CHAT_MSGS.map((msg, i) => (
-            <div key={i}>
-              {i>0 && <div className="chat-msg-sep" />}
-              <div className="chat-msg">
-                <div className={"chat-msg-role"+(msg.role==='ai'?' is-ai':'')}>{msg.role==='ai'?'RequireX':'You'}</div>
-                <div className="chat-msg-text">{msg.text}</div>
+            <div className="sidebar-search">
+              <Icon.Search size={13} />
+              <input placeholder="Find requirement…" />
+              <Kbd>⌘K</Kbd>
+            </div>
+
+            <div className="sidebar-scroll">
+              {PROJECTS.map((proj) => (
+                <div className="project-group" key={proj.id}>
+                  <button
+                    className={
+                      "project-head" +
+                      (activeProject === proj.id ? " is-active" : "")
+                    }
+                    onClick={() => {
+                      toggle(proj.id);
+                      onSelectProject(proj.id);
+                    }}
+                  >
+                    <span
+                      className={
+                        "project-chev" + (open[proj.id] ? " is-open" : "")
+                      }
+                    >
+                      <Icon.ChevronRight size={11} />
+                    </span>
+                    <span className="project-head-name">{proj.name}</span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 9,
+                        color: "var(--fg-4)",
+                      }}
+                    >
+                      {proj.chats.length}
+                    </span>
+                  </button>
+                  {open[proj.id] &&
+                    proj.chats.map((chat) => (
+                      <button
+                        key={chat.id}
+                        className={
+                          "chat-row" +
+                          (activeChat === chat.id ? " is-active" : "")
+                        }
+                        onClick={() => onSelectChat(chat.id)}
+                      >
+                        <Icon.MessageSq
+                          size={12}
+                          style={{ flexShrink: 0, color: "var(--fg-4)" }}
+                        />
+                        <span className="chat-row-name">{chat.name}</span>
+                        <span className="chat-row-time">{chat.time}</span>
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </div>
+
+            <div className="sidebar-foot">
+              <button>
+                <Icon.Plus size={13} />
+                <span>New project</span>
+              </button>
+              <button style={{ marginLeft: "auto" }}>
+                <Icon.Cog size={13} />
+              </button>
+            </div>
+          </aside>
+        );
+      };
+      window.ProjectSidebar = ProjectSidebar;
+    </script>
+
+    <!-- ── Doc View ─────────────────────────────────────────── -->
+    <script type="text/babel">
+      const { useState: useDvSt, useRef: useDvRef } = React;
+
+      const STATUS_TONE = {
+        approved: "success",
+        "in-review": "info",
+        draft: "neutral",
+        conflict: "danger",
+        stale: "warning",
+      };
+      const STATUS_LABEL = {
+        approved: "Approved",
+        "in-review": "In review",
+        draft: "Draft",
+        conflict: "Conflict",
+        stale: "Stale",
+      };
+      const SRC_ICON = {
+        doc: "DocLines",
+        transcript: "Mic",
+        ticket: "Ticket",
+        code: "Code",
+      };
+
+      function wrapText(text, max = 70) {
+        const words = text.split(" ");
+        const lines = [];
+        let cur = "";
+        for (const w of words) {
+          if (cur && (cur + " " + w).length > max) {
+            lines.push(cur);
+            cur = w;
+          } else {
+            cur = cur ? cur + " " + w : w;
+          }
+        }
+        if (cur) lines.push(cur);
+        return lines;
+      }
+
+      function buildDocLines(reqs) {
+        const lines = [];
+        let n = 1;
+        const add = (obj) => lines.push({ ...obj, lineNum: n++ });
+        add({
+          type: "h1",
+          text: "Payment Service v2 — Requirements Specification",
+        });
+        add({ type: "blank" });
+        add({
+          type: "meta",
+          text: "payments-v2  ·  spec/v2.1  ·  6 requirements",
+        });
+        add({ type: "blank" });
+        const sections = [...new Set(reqs.map((r) => r.section))];
+        for (const section of sections) {
+          const sReqs = reqs.filter((r) => r.section === section);
+          add({ type: "h2", text: section });
+          add({ type: "blank", small: true });
+          for (const req of sReqs) {
+            add({
+              type: "req-header",
+              reqId: req.id,
+              status: req.status,
+              tags: req.tags,
+            });
+            add({ type: "req-title", reqId: req.id, text: req.title });
+            add({ type: "blank", small: true });
+            const chunks = wrapText(req.body);
+            chunks.forEach((chunk, i) =>
+              add({
+                type: "body",
+                reqId: req.id,
+                text: chunk,
+                evidence: i === chunks.length - 1 ? req.evidence : null,
+              }),
+            );
+            add({ type: "blank" });
+          }
+          add({ type: "blank" });
+        }
+        return lines;
+      }
+
+      const EvidenceBit = ({ ev }) => {
+        const [show, setShow] = useDvSt(false);
+        const src = (window.SOURCES || []).find((s) => s.id === ev.sourceId);
+        if (!src) return null;
+        const I = Icon[SRC_ICON[src.type]] || Icon.DocLines;
+        return (
+          <span
+            className="ev-bit"
+            onMouseEnter={() => setShow(true)}
+            onMouseLeave={() => setShow(false)}
+          >
+            <I size={10} />
+            <span>{ev.ref}</span>
+            {show && (
+              <span className="ev-tooltip">
+                <span className="ev-tooltip-src">{src.name}</span>
+                <span className="ev-tooltip-quote">{ev.quote}</span>
+              </span>
+            )}
+          </span>
+        );
+      };
+
+      const DocLine = ({ line, selectedReq, onSelectReq }) => {
+        const isReq = !!line.reqId;
+        const isActive = isReq && line.reqId === selectedReq;
+        const cls = [
+          "doc-line",
+          `is-${line.type}`,
+          isActive ? "req-active" : "",
+          line.small ? "is-small" : "",
+          isReq ? "is-req-group" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return (
+          <div
+            className={cls}
+            onClick={isReq ? () => onSelectReq(line.reqId) : undefined}
+          >
+            <div className="dl-num">
+              {line.type !== "blank" ? line.lineNum : ""}
+            </div>
+            <div className="dl-content">
+              {(line.type === "h1" ||
+                line.type === "h2" ||
+                line.type === "meta" ||
+                line.type === "req-title") && <span>{line.text}</span>}
+              {line.type === "req-header" && (
+                <>
+                  <span className="req-line-id mono">{line.reqId}</span>
+                  <Pill tone={STATUS_TONE[line.status]}>
+                    {STATUS_LABEL[line.status]}
+                  </Pill>
+                  <span className="dl-spread" />
+                  <span className="dl-tag-row">
+                    {line.tags.slice(0, 2).map((t) => (
+                      <Tag key={t}>{t}</Tag>
+                    ))}
+                  </span>
+                </>
+              )}
+              {line.type === "body" && (
+                <>
+                  <span>{line.text}</span>
+                  {line.evidence &&
+                    line.evidence.map((ev, i) => (
+                      <EvidenceBit key={i} ev={ev} />
+                    ))}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      const DocView = ({ selectedReq, onSelectReq }) => {
+        const { REQS } = window;
+        const [chatVal, setChatVal] = useDvSt("");
+        const [chatLog, setChatLog] = useDvSt([]);
+        const docLines = buildDocLines(REQS);
+
+        const sendMsg = () => {
+          if (!chatVal.trim()) return;
+          const msg = chatVal.trim();
+          setChatVal("");
+          setChatLog((l) => [...l, { role: "user", text: msg }]);
+          setTimeout(
+            () =>
+              setChatLog((l) => [
+                ...l,
+                { role: "ai", text: "Processing your request…" },
+              ]),
+            700,
+          );
+        };
+
+        return (
+          <div className="doc-view">
+            <div className="doc-topbar">
+              <div className="doc-crumbs">
+                <span>payments-v2</span>
+                <span className="doc-crumb-sep">/</span>
+                <span>requirements</span>
+                <span className="doc-crumb-sep">/</span>
+                <span className="doc-crumb-last">spec-v2.1</span>
+              </div>
+              <div className="doc-topbar-actions">
+                <Btn kind="ghost" size="sm" leading={<Icon.Filter size={12} />}>
+                  Filter
+                </Btn>
+                <Btn kind="ghost" size="sm" leading={<Icon.Trace size={12} />}>
+                  Trace
+                </Btn>
+                <Btn
+                  kind="primary"
+                  size="sm"
+                  leading={<Icon.Download size={12} />}
+                >
+                  Export
+                </Btn>
               </div>
             </div>
-          ))}
-        </>}
 
-        {activeTab==='revisions' && <>
-          <div className="rp-section-label">Revision history</div>
-          <div className="rev-tree">
-            {REVISIONS.map(rev => (
-              <div key={rev.id} className="rev-node">
-                <div className="rev-dot-col">
-                  <div className={"rev-dot"+(rev.active?' is-active':'')} />
-                  <div className="rev-line" />
-                </div>
-                <div className="rev-info">
-                  <div className={"rev-label"+(rev.active?' is-active':'')}>{rev.label}</div>
-                  <div className="rev-meta">{rev.time}</div>
-                  <div className="rev-msg">{rev.msg}</div>
+            <div className="doc-scroll">
+              {docLines.map((line, i) => (
+                <DocLine
+                  key={i}
+                  line={line}
+                  selectedReq={selectedReq}
+                  onSelectReq={onSelectReq}
+                />
+              ))}
+              <div style={{ height: 32 }} />
+            </div>
+
+            <div className="chatbar">
+              <div className="chatbar-input-row">
+                <Icon.MessageSq
+                  size={14}
+                  style={{ color: "var(--fg-4)", flexShrink: 0 }}
+                />
+                <input
+                  className="chatbar-input"
+                  placeholder="Ask about requirements, request changes, upload sources…"
+                  value={chatVal}
+                  onChange={(e) => setChatVal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMsg();
+                    }
+                  }}
+                />
+                <IconBtn title="Attach source" onClick={() => {}}>
+                  <Icon.Upload />
+                </IconBtn>
+                <IconBtn title="Send" onClick={sendMsg}>
+                  <Icon.Send />
+                </IconBtn>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      Object.assign(window, {
+        DocView,
+        STATUS_TONE,
+        STATUS_LABEL,
+        buildDocLines,
+      });
+    </script>
+
+    <!-- ── Right Pane ───────────────────────────────────────── -->
+    <script type="text/babel">
+      const RightPane = ({ activeTab, onTabChange }) => {
+        const { SOURCES, CHAT_MSGS, REVISIONS } = window;
+        const srcIconMap = {
+          doc: "DocLines",
+          transcript: "Mic",
+          ticket: "Ticket",
+          code: "Code",
+        };
+        const tabs = ["Sources", "Chat", "Revisions"];
+
+        return (
+          <aside className="right-pane">
+            <div className="rp-tabs">
+              {tabs.map((t) => (
+                <button
+                  key={t}
+                  className={
+                    "rp-tab" +
+                    (activeTab === t.toLowerCase() ? " is-active" : "")
+                  }
+                  onClick={() => onTabChange(t.toLowerCase())}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <div className="rp-content">
+              {activeTab === "sources" && (
+                <>
+                  <div className="rp-section-label">Ingested sources</div>
+                  {SOURCES.map((src) => {
+                    const I = Icon[srcIconMap[src.type]] || Icon.DocLines;
+                    return (
+                      <div key={src.id} className="source-row">
+                        <I size={14} />
+                        <div className="source-row-info">
+                          <div className="source-row-name">{src.name}</div>
+                          <div className="source-row-meta">{src.meta}</div>
+                        </div>
+                        <div className={"source-dot " + src.status} />
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginTop: 8 }}>
+                    <Btn
+                      kind="ghost"
+                      size="sm"
+                      leading={<Icon.Plus size={12} />}
+                    >
+                      Add source
+                    </Btn>
+                  </div>
+                </>
+              )}
+
+              {activeTab === "chat" && (
+                <>
+                  <div className="rp-section-label">Chat history</div>
+                  {CHAT_MSGS.map((msg, i) => (
+                    <div key={i}>
+                      {i > 0 && <div className="chat-msg-sep" />}
+                      <div className="chat-msg">
+                        <div
+                          className={
+                            "chat-msg-role" +
+                            (msg.role === "ai" ? " is-ai" : "")
+                          }
+                        >
+                          {msg.role === "ai" ? "RequireX" : "You"}
+                        </div>
+                        <div className="chat-msg-text">{msg.text}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {activeTab === "revisions" && (
+                <>
+                  <div className="rp-section-label">Revision history</div>
+                  <div className="rev-tree">
+                    {REVISIONS.map((rev) => (
+                      <div key={rev.id} className="rev-node">
+                        <div className="rev-dot-col">
+                          <div
+                            className={
+                              "rev-dot" + (rev.active ? " is-active" : "")
+                            }
+                          />
+                          <div className="rev-line" />
+                        </div>
+                        <div className="rev-info">
+                          <div
+                            className={
+                              "rev-label" + (rev.active ? " is-active" : "")
+                            }
+                          >
+                            {rev.label}
+                          </div>
+                          <div className="rev-meta">{rev.time}</div>
+                          <div className="rev-msg">{rev.msg}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </aside>
+        );
+      };
+      window.RightPane = RightPane;
+    </script>
+
+    <!-- ── App Shell + Render ───────────────────────────────── -->
+    <script type="text/babel">
+      const { useState: useAppSt, useEffect: useAppEff } = React;
+
+      const TitleBar = ({
+        sidebarOpen,
+        rightOpen,
+        theme,
+        onToggleSidebar,
+        onToggleRight,
+        onToggleTheme,
+        onOpenPalette,
+      }) => (
+        <div className="titlebar">
+          <div className="titlebar-traffic">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="titlebar-brand">
+            <Icon.Logo size={15} style={{ color: "var(--accent)" }} />
+            <span>RequireX</span>
+            <span className="titlebar-brand-chip">payments-v2</span>
+          </div>
+          <div className="titlebar-search">
+            <div className="titlebar-search-inner" onClick={onOpenPalette}>
+              <Icon.Search size={12} />
+              <span className="titlebar-search-text">Search requirements…</span>
+              <Kbd>⌘K</Kbd>
+            </div>
+          </div>
+          <div className="titlebar-tools">
+            <IconBtn
+              title="Toggle sidebar"
+              active={sidebarOpen}
+              onClick={onToggleSidebar}
+            >
+              <Icon.Sidebar />
+            </IconBtn>
+            <IconBtn
+              title="Toggle panel"
+              active={rightOpen}
+              onClick={onToggleRight}
+            >
+              <Icon.PanelRight />
+            </IconBtn>
+            <IconBtn
+              title={theme === "dark" ? "Light mode" : "Dark mode"}
+              onClick={onToggleTheme}
+            >
+              {theme === "dark" ? <Icon.Sun /> : <Icon.Moon />}
+            </IconBtn>
+          </div>
+        </div>
+      );
+
+      const StatusBar = ({ selectedReq }) => (
+        <div className="statusbar">
+          <div className="statusbar-dot" />
+          <span>extract: idle</span>
+          <span className="statusbar-sep">·</span>
+          <span style={{ color: "var(--success)" }}>●</span>
+          <span>6 / 6 linked</span>
+          <div className="statusbar-grow" />
+          {selectedReq && (
+            <>
+              <span className="mono" style={{ color: "var(--accent)" }}>
+                {selectedReq}
+              </span>
+              <span className="statusbar-sep">·</span>
+            </>
+          )}
+          <span>main</span>
+          <span className="statusbar-sep">·</span>
+          <span>UTF-8</span>
+          <span className="statusbar-sep">·</span>
+          <span>spec/v2.1</span>
+        </div>
+      );
+
+      const CommandPalette = ({ onClose }) => {
+        const [q, setQ] = useAppSt("");
+        const cmds = [
+          { icon: "Upload", label: "Add source" },
+          { icon: "Refresh", label: "Re-extract requirements" },
+          { icon: "Download", label: "Export as PDF" },
+          { icon: "Share", label: "Share with client" },
+          { icon: "History", label: "View revision history" },
+          { icon: "Cog", label: "Project settings" },
+        ];
+        const items = cmds.filter(
+          (c) => !q || c.label.toLowerCase().includes(q.toLowerCase()),
+        );
+        return (
+          <div className="pal-scrim" onClick={onClose}>
+            <div className="pal" onClick={(e) => e.stopPropagation()}>
+              <div className="pal-input-row">
+                <Icon.Search size={14} />
+                <input
+                  autoFocus
+                  placeholder="Search commands…"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && onClose()}
+                />
+                <Kbd>Esc</Kbd>
+              </div>
+              <div className="pal-body">
+                <div className="pal-section">
+                  <div className="pal-heading">Commands</div>
+                  {items.map((cmd, i) => {
+                    const I = Icon[cmd.icon];
+                    return (
+                      <button
+                        key={i}
+                        className={"pal-row" + (i === 0 ? " is-active" : "")}
+                        onClick={onClose}
+                      >
+                        {I && <I size={14} />}
+                        <span className="pal-label">{cmd.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-        </>}
-      </div>
-    </aside>
-  );
-};
-window.RightPane = RightPane;
-</script>
+        );
+      };
 
-<!-- ── App Shell + Render ───────────────────────────────── -->
-<script type="text/babel">
-const { useState: useAppSt, useEffect: useAppEff } = React;
+      const AppShell = () => {
+        const [sidebarOpen, setSidebarOpen] = useAppSt(true);
+        const [rightOpen, setRightOpen] = useAppSt(false);
+        const [theme, setTheme] = useAppSt("dark");
+        const [palOpen, setPalOpen] = useAppSt(false);
+        const [activeProj, setActiveProj] = useAppSt("p1");
+        const [activeChat, setActiveChat] = useAppSt("c1");
+        const [rightTab, setRightTab] = useAppSt("sources");
+        const [selectedReq, setSelectedReq] = useAppSt(null);
 
-const TitleBar = ({ sidebarOpen, rightOpen, theme, onToggleSidebar, onToggleRight, onToggleTheme, onOpenPalette }) => (
-  <div className="titlebar">
-    <div className="titlebar-traffic"><span/><span/><span/></div>
-    <div className="titlebar-brand">
-      <Icon.Logo size={15} style={{color:'var(--accent)'}} />
-      <span>RequireX</span>
-      <span className="titlebar-brand-chip">payments-v2</span>
-    </div>
-    <div className="titlebar-search">
-      <div className="titlebar-search-inner" onClick={onOpenPalette}>
-        <Icon.Search size={12} />
-        <span className="titlebar-search-text">Search requirements…</span>
-        <Kbd>⌘K</Kbd>
-      </div>
-    </div>
-    <div className="titlebar-tools">
-      <IconBtn title="Toggle sidebar" active={sidebarOpen} onClick={onToggleSidebar}><Icon.Sidebar /></IconBtn>
-      <IconBtn title="Toggle panel"   active={rightOpen}   onClick={onToggleRight}><Icon.PanelRight /></IconBtn>
-      <IconBtn title={theme==='dark'?'Light mode':'Dark mode'} onClick={onToggleTheme}>
-        {theme==='dark' ? <Icon.Sun /> : <Icon.Moon />}
-      </IconBtn>
-    </div>
-  </div>
-);
+        useAppEff(() => {
+          document.documentElement.setAttribute("data-theme", theme);
+        }, [theme]);
 
-const StatusBar = ({ selectedReq }) => (
-  <div className="statusbar">
-    <div className="statusbar-dot" />
-    <span>extract: idle</span>
-    <span className="statusbar-sep">·</span>
-    <span style={{color:'var(--success)'}}>●</span>
-    <span>6 / 6 linked</span>
-    <div className="statusbar-grow" />
-    {selectedReq && <><span className="mono" style={{color:'var(--accent)'}}>{selectedReq}</span><span className="statusbar-sep">·</span></>}
-    <span>main</span>
-    <span className="statusbar-sep">·</span>
-    <span>UTF-8</span>
-    <span className="statusbar-sep">·</span>
-    <span>spec/v2.1</span>
-  </div>
-);
+        useAppEff(() => {
+          const h = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+              e.preventDefault();
+              setPalOpen((p) => !p);
+            }
+            if (e.key === "Escape") setPalOpen(false);
+          };
+          window.addEventListener("keydown", h);
+          return () => window.removeEventListener("keydown", h);
+        }, []);
 
-const CommandPalette = ({ onClose }) => {
-  const [q, setQ] = useAppSt('');
-  const cmds = [
-    {icon:'Upload',   label:'Add source'},
-    {icon:'Refresh',  label:'Re-extract requirements'},
-    {icon:'Download', label:'Export as PDF'},
-    {icon:'Share',    label:'Share with client'},
-    {icon:'History',  label:'View revision history'},
-    {icon:'Cog',      label:'Project settings'},
-  ];
-  const items = cmds.filter(c => !q || c.label.toLowerCase().includes(q.toLowerCase()));
-  return (
-    <div className="pal-scrim" onClick={onClose}>
-      <div className="pal" onClick={e=>e.stopPropagation()}>
-        <div className="pal-input-row">
-          <Icon.Search size={14} />
-          <input autoFocus placeholder="Search commands…" value={q}
-            onChange={e=>setQ(e.target.value)}
-            onKeyDown={e=>e.key==='Escape'&&onClose()} />
-          <Kbd>Esc</Kbd>
-        </div>
-        <div className="pal-body">
-          <div className="pal-section">
-            <div className="pal-heading">Commands</div>
-            {items.map((cmd,i) => {
-              const I = Icon[cmd.icon];
-              return (
-                <button key={i} className={"pal-row"+(i===0?' is-active':'')} onClick={onClose}>
-                  {I && <I size={14}/>}
-                  <span className="pal-label">{cmd.label}</span>
-                </button>
-              );
-            })}
+        const bodyClass = [
+          "app-body",
+          !sidebarOpen ? "sidebar-closed" : "",
+          rightOpen ? "right-open" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        return (
+          <div className="app-shell">
+            <TitleBar
+              sidebarOpen={sidebarOpen}
+              rightOpen={rightOpen}
+              theme={theme}
+              onToggleSidebar={() => setSidebarOpen((p) => !p)}
+              onToggleRight={() => setRightOpen((p) => !p)}
+              onToggleTheme={() =>
+                setTheme((t) => (t === "dark" ? "light" : "dark"))
+              }
+              onOpenPalette={() => setPalOpen(true)}
+            />
+            <div className={bodyClass}>
+              {sidebarOpen && (
+                <ProjectSidebar
+                  activeProject={activeProj}
+                  activeChat={activeChat}
+                  onSelectProject={setActiveProj}
+                  onSelectChat={setActiveChat}
+                />
+              )}
+              <DocView
+                selectedReq={selectedReq}
+                onSelectReq={(id) =>
+                  setSelectedReq(id === selectedReq ? null : id)
+                }
+              />
+              {rightOpen && (
+                <RightPane activeTab={rightTab} onTabChange={setRightTab} />
+              )}
+            </div>
+            <StatusBar selectedReq={selectedReq} />
+            {palOpen && <CommandPalette onClose={() => setPalOpen(false)} />}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+        );
+      };
 
-const AppShell = () => {
-  const [sidebarOpen, setSidebarOpen] = useAppSt(true);
-  const [rightOpen,   setRightOpen]   = useAppSt(false);
-  const [theme,       setTheme]       = useAppSt('dark');
-  const [palOpen,     setPalOpen]     = useAppSt(false);
-  const [activeProj,  setActiveProj]  = useAppSt('p1');
-  const [activeChat,  setActiveChat]  = useAppSt('c1');
-  const [rightTab,    setRightTab]    = useAppSt('sources');
-  const [selectedReq, setSelectedReq] = useAppSt(null);
-
-  useAppEff(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  useAppEff(() => {
-    const h = e => {
-      if ((e.metaKey||e.ctrlKey) && e.key==='k') { e.preventDefault(); setPalOpen(p=>!p); }
-      if (e.key==='Escape') setPalOpen(false);
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, []);
-
-  const bodyClass = ['app-body', !sidebarOpen?'sidebar-closed':'', rightOpen?'right-open':''].filter(Boolean).join(' ');
-
-  return (
-    <div className="app-shell">
-      <TitleBar
-        sidebarOpen={sidebarOpen} rightOpen={rightOpen} theme={theme}
-        onToggleSidebar={()=>setSidebarOpen(p=>!p)}
-        onToggleRight={()=>setRightOpen(p=>!p)}
-        onToggleTheme={()=>setTheme(t=>t==='dark'?'light':'dark')}
-        onOpenPalette={()=>setPalOpen(true)}
-      />
-      <div className={bodyClass}>
-        {sidebarOpen && (
-          <ProjectSidebar
-            activeProject={activeProj} activeChat={activeChat}
-            onSelectProject={setActiveProj} onSelectChat={setActiveChat}
-          />
-        )}
-        <DocView
-          selectedReq={selectedReq}
-          onSelectReq={id=>setSelectedReq(id===selectedReq?null:id)}
-        />
-        {rightOpen && <RightPane activeTab={rightTab} onTabChange={setRightTab} />}
-      </div>
-      <StatusBar selectedReq={selectedReq} />
-      {palOpen && <CommandPalette onClose={()=>setPalOpen(false)} />}
-    </div>
-  );
-};
-
-ReactDOM.createRoot(document.getElementById('root')).render(<AppShell />);
-</script>
-</body>
+      ReactDOM.createRoot(document.getElementById("root")).render(<AppShell />);
+    </script>
+  </body>
 </html>

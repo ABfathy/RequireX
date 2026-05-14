@@ -388,6 +388,14 @@ export type PublicBriefViewData = {
     createdAt: Date;
     snapshotVersion: number | null;
   }>;
+  diagrams: Array<{
+    id: string;
+    diagramType: string;
+    title: string;
+    mermaidCode: string;
+    description: string | null;
+    createdAt: Date;
+  }>;
 };
 
 export async function loadPublicBriefView(
@@ -395,7 +403,7 @@ export async function loadPublicBriefView(
 ): Promise<PublicBriefViewData> {
   const access = await getPublicReviewAccessContext(prisma, shareToken);
 
-  const [snapshot, revisions, comments] = await Promise.all([
+  const [snapshot, revisions, diagramRows, comments] = await Promise.all([
     prisma.briefSnapshot.findUnique({
       where: { id: access.snapshotId },
       select: {
@@ -445,6 +453,18 @@ export async function loadPublicBriefView(
         snapshot: { select: { version: true } },
       },
     }),
+    prisma.briefDiagram.findMany({
+      where: { snapshotId: access.snapshotId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        diagramType: true,
+        title: true,
+        mermaidCode: true,
+        description: true,
+        createdAt: true,
+      },
+    }),
     prisma.briefComment.findMany({
       where: { snapshotId: access.snapshotId },
       orderBy: { createdAt: "asc" },
@@ -485,6 +505,14 @@ export async function loadPublicBriefView(
       summary: rev.summary,
       createdAt: rev.createdAt,
       snapshotVersion: rev.snapshot?.version ?? null,
+    })),
+    diagrams: diagramRows.map((d) => ({
+      id: d.id,
+      diagramType: d.diagramType as string,
+      title: d.title,
+      mermaidCode: d.mermaidCode,
+      description: d.description,
+      createdAt: d.createdAt,
     })),
   };
 }

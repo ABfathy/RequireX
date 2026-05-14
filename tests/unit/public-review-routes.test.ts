@@ -19,7 +19,9 @@ const mocks = vi.hoisted(() => {
   }
 
   class HoistedPublicReviewReadOnlyError extends Error {
-    constructor(message = "Snapshot is read-only for public review: CONFIRMED") {
+    constructor(
+      message = "Snapshot is read-only for public review: CONFIRMED",
+    ) {
       super(message);
       this.name = "PublicReviewReadOnlyError";
     }
@@ -92,14 +94,17 @@ describe("public comment route", () => {
   it("creates comments for valid payloads", async () => {
     mocks.createPublicComment.mockResolvedValueOnce({ id: "comment_1" });
 
-    const response = await postComment(buildRequest({
-      section: "SUMMARY",
-      anchorType: "SECTION",
-      authorEmail: "Client@Example.com",
-      body: "Please clarify this item.",
-    }), {
-      params: Promise.resolve({ shareToken: "token-1" }),
-    });
+    const response = await postComment(
+      buildRequest({
+        section: "SUMMARY",
+        anchorType: "SECTION",
+        authorEmail: "Client@Example.com",
+        body: "Please clarify this item.",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-1" }),
+      },
+    );
 
     expect(response.status).toBe(201);
     expect(mocks.assertPublicMutationRateLimit).toHaveBeenCalledWith({
@@ -119,13 +124,16 @@ describe("public comment route", () => {
   });
 
   it("returns 400 for invalid request bodies", async () => {
-    const response = await postComment(buildRequest({
-      section: "SUMMARY",
-      anchorType: "CLAIM",
-      body: "Missing claim ID",
-    }), {
-      params: Promise.resolve({ shareToken: "token-2" }),
-    });
+    const response = await postComment(
+      buildRequest({
+        section: "SUMMARY",
+        anchorType: "CLAIM",
+        body: "Missing claim ID",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-2" }),
+      },
+    );
 
     expect(response.status).toBe(400);
     expect(mocks.createPublicComment).not.toHaveBeenCalled();
@@ -136,13 +144,16 @@ describe("public comment route", () => {
       throw new mocks.PublicRateLimitError(42);
     });
 
-    const response = await postComment(buildRequest({
-      section: "SUMMARY",
-      anchorType: "SECTION",
-      body: "Rate limited",
-    }), {
-      params: Promise.resolve({ shareToken: "token-3" }),
-    });
+    const response = await postComment(
+      buildRequest({
+        section: "SUMMARY",
+        anchorType: "SECTION",
+        body: "Rate limited",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-3" }),
+      },
+    );
 
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("42");
@@ -153,13 +164,16 @@ describe("public comment route", () => {
       new mocks.PublicReviewValidationError("Bad target."),
     );
 
-    const response = await postComment(buildRequest({
-      section: "SUMMARY",
-      anchorType: "SECTION",
-      body: "Bad target",
-    }), {
-      params: Promise.resolve({ shareToken: "token-4" }),
-    });
+    const response = await postComment(
+      buildRequest({
+        section: "SUMMARY",
+        anchorType: "SECTION",
+        body: "Bad target",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-4" }),
+      },
+    );
 
     expect(response.status).toBe(400);
     await expect(readJson(response)).resolves.toEqual({ error: "Bad target." });
@@ -170,13 +184,16 @@ describe("public answer route", () => {
   it("creates answers for valid payloads", async () => {
     mocks.createPublicFollowUpAnswer.mockResolvedValueOnce({ id: "answer_1" });
 
-    const response = await postAnswer(buildRequest({
-      questionId: "550e8400-e29b-41d4-a716-446655440010",
-      authorEmail: "Client@Example.com",
-      body: "Store managers and supervisors.",
-    }), {
-      params: Promise.resolve({ shareToken: "token-5" }),
-    });
+    const response = await postAnswer(
+      buildRequest({
+        questionId: "550e8400-e29b-41d4-a716-446655440010",
+        authorEmail: "Client@Example.com",
+        body: "Store managers and supervisors.",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-5" }),
+      },
+    );
 
     expect(response.status).toBe(201);
     expect(mocks.assertPublicMutationRateLimit).toHaveBeenCalledWith({
@@ -199,12 +216,15 @@ describe("public answer route", () => {
       new mocks.PublicShareLinkNotFoundError(),
     );
 
-    const response = await postAnswer(buildRequest({
-      questionId: "550e8400-e29b-41d4-a716-446655440011",
-      body: "Answer text",
-    }), {
-      params: Promise.resolve({ shareToken: "token-6" }),
-    });
+    const response = await postAnswer(
+      buildRequest({
+        questionId: "550e8400-e29b-41d4-a716-446655440011",
+        body: "Answer text",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-6" }),
+      },
+    );
 
     expect(response.status).toBe(404);
   });
@@ -214,12 +234,15 @@ describe("public answer route", () => {
       new mocks.PublicReviewReadOnlyError(),
     );
 
-    const response = await postAnswer(buildRequest({
-      questionId: "550e8400-e29b-41d4-a716-446655440012",
-      body: "Answer text",
-    }), {
-      params: Promise.resolve({ shareToken: "token-7" }),
-    });
+    const response = await postAnswer(
+      buildRequest({
+        questionId: "550e8400-e29b-41d4-a716-446655440012",
+        body: "Answer text",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-7" }),
+      },
+    );
 
     expect(response.status).toBe(409);
   });
@@ -232,11 +255,14 @@ describe("public confirm route", () => {
       status: "CONFIRMED",
     });
 
-    const response = await postConfirm(buildRequest({
-      authorName: "Demo Client",
-    }), {
-      params: Promise.resolve({ shareToken: "token-8" }),
-    });
+    const response = await postConfirm(
+      buildRequest({
+        authorName: "Demo Client",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-8" }),
+      },
+    );
 
     expect(response.status).toBe(200);
     expect(mocks.assertPublicMutationRateLimit).toHaveBeenCalledWith({
@@ -253,11 +279,14 @@ describe("public confirm route", () => {
   });
 
   it("returns 400 for invalid confirmation payloads", async () => {
-    const response = await postConfirm(buildRequest({
-      authorEmail: "invalid-email",
-    }), {
-      params: Promise.resolve({ shareToken: "token-9" }),
-    });
+    const response = await postConfirm(
+      buildRequest({
+        authorEmail: "invalid-email",
+      }),
+      {
+        params: Promise.resolve({ shareToken: "token-9" }),
+      },
+    );
 
     expect(response.status).toBe(400);
     expect(mocks.confirmPublicBrief).not.toHaveBeenCalled();

@@ -29,7 +29,12 @@ interface PillProps {
   className?: string;
 }
 
-function Pill({ tone = "neutral", dot = true, children, className }: PillProps) {
+function Pill({
+  tone = "neutral",
+  dot = true,
+  children,
+  className,
+}: PillProps) {
   return (
     <span
       className={cn(
@@ -40,7 +45,10 @@ function Pill({ tone = "neutral", dot = true, children, className }: PillProps) 
     >
       {dot && (
         <span
-          className={cn("w-[5px] h-[5px] rounded-full shrink-0", dotStyles[tone])}
+          className={cn(
+            "w-[5px] h-[5px] rounded-full shrink-0",
+            dotStyles[tone],
+          )}
         />
       )}
       {children}

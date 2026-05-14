@@ -3,16 +3,19 @@
 ## Implemented
 
 ### Auth & Workspace
+
 - Internal auth flow with custom Clerk sign-in / sign-up pages
 - Middleware-enforced route protection; signed-in users redirected away from auth pages
 - Automatic workspace bootstrap per Clerk user on first load
 
 ### Projects & Sessions
+
 - Project list loading and active-project switching via `?projectId=`
 - New project creation with automatic initial intake session
 - Project search palette (⌘P)
 
 ### Sources
+
 - Source listing for the active session
 - Pasted-text source creation (`POST /api/sessions/[sessionId]/assets`)
 - File uploads for image, PDF, and audio via UploadThing
@@ -20,6 +23,7 @@
 - Client-side optimistic updates, retry, and loading states
 
 ### Brief Generation
+
 - Sync Vertex AI generation via `@google/genai` (Gemini 2.5 Flash) — default path
 - Async generation via Inngest (`BRIEF_GENERATION_ASYNC=1` flag)
 - PDF sources: downloaded, parsed to text, chunked into `SourceChunk` rows
@@ -32,12 +36,14 @@
 - `GENERATED` revision event created per run
 
 ### AI Revision (Chat)
+
 - `/api/revise` accepts a user message and optional selection
 - Streaming revision response renders incrementally in the editor
 - `REGENERATED` revision event created per revision
 - Inline editing and revision navigation
 
 ### Internal Editor
+
 - Latest `BriefSnapshot` rendered as `DocLineData[]` in the document view
 - Source preview modal
 - Resizable sidebar and right pane with persistent widths
@@ -46,6 +52,7 @@
 - Right pane — **Chat tab**: displays chat revision messages (send action not yet wired)
 
 ### Public Review (Backend)
+
 - Comment submission route and service with `BriefComment` persistence
 - Follow-up answer route and service with `FollowUpAnswer` persistence
 - Confirmation route and service — marks snapshot `CONFIRMED`
@@ -55,6 +62,7 @@
 - `RevisionEvent` created for every public mutation
 
 ### Public Review (UI)
+
 - `/brief/[shareToken]` — responsive public review shell with themed header
 - Comment threads wired to `POST /api/public/briefs/[shareToken]/comments`
 - Follow-up answers wired to `POST /api/public/briefs/[shareToken]/answers`
@@ -62,6 +70,7 @@
 - Error mapping from API status codes to user-facing messages
 
 ### Testing
+
 - 11 Vitest unit test files, 93 tests — all passing
 - Coverage: validators, asset services, brief pipeline, PDF extraction, source processing, public auth, public review services and routes
 

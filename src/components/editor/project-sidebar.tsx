@@ -158,9 +158,7 @@ export function ProjectSidebar({
         </div>
       </aside>
 
-      {settingsOpen && (
-        <SettingsPanel onClose={() => setSettingsOpen(false)} />
-      )}
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </>
   );
 }
@@ -326,7 +324,9 @@ function CreateFormFields({ onCancel }: { onCancel: () => void }) {
             aria-label="Creating…"
           >
             <circle
-              cx="5" cy="5" r="4"
+              cx="5"
+              cy="5"
+              r="4"
               stroke="currentColor"
               strokeWidth="1.5"
               strokeOpacity="0.3"
@@ -349,7 +349,11 @@ function CreateFormFields({ onCancel }: { onCancel: () => void }) {
 function EmptyProjects() {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-10 px-4 text-center">
-      <Icons.FileText size={20} className="text-[var(--fg-disabled)]" aria-hidden="true" />
+      <Icons.FileText
+        size={20}
+        className="text-[var(--fg-disabled)]"
+        aria-hidden="true"
+      />
       <p
         className="text-[11px] leading-[1.5]"
         style={{ color: "var(--fg-muted)" }}

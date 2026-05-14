@@ -5,19 +5,23 @@
 Everything needed to receive client feedback exists except the path that puts a brief in front of a client.
 
 **a. Share-link creation service**
+
 - Add `createShareLink(snapshotId, createdBy, expiresAt?)` in a new `src/server/services/share-link.ts`
 - Returns a `ShareLink` row with a cryptographically random token
 - Sets snapshot status to `SHARED`
 
 **b. Share-link creation API**
+
 - `POST /api/snapshots/[snapshotId]/share` — calls the service; returns `{ token, url }`
 - Protected by `requireInternalActor()`
 
 **c. Share button in the internal workspace**
+
 - Button in the doc header or right pane that calls the API and shows the resulting URL
 - Copy-to-clipboard; show expiry time
 
 **d. Wire `/brief/[shareToken]` to real data**
+
 - Load `ShareLink` → `BriefSnapshot` → `snapshotToDocLines()` on page load
 - Replace `MOCK_REQUIREMENTS` and `MOCK_REVISIONS` with data from `BriefClaim`, `BriefQuestion`, and `RevisionEvent`
 

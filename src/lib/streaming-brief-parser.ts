@@ -74,7 +74,11 @@ export class StreamingBriefParser {
 
   getSnapshot(): DocLineData[] {
     const result = [...this.completedLines];
-    if (this.currentField && this.currentSection && this.currentText.length > 0) {
+    if (
+      this.currentField &&
+      this.currentSection &&
+      this.currentText.length > 0
+    ) {
       const info = SECTION_DISPLAY[this.currentSection];
       result.push({
         lineNum: this.lineNum,
@@ -95,8 +99,14 @@ export class StreamingBriefParser {
         return;
 
       case "in-key":
-        if (ch === "\\") { this.state = "escape-key"; return; }
-        if (ch === '"') { this.endKey(); return; }
+        if (ch === "\\") {
+          this.state = "escape-key";
+          return;
+        }
+        if (ch === '"') {
+          this.endKey();
+          return;
+        }
         this.keyBuf += ch;
         return;
 
@@ -125,7 +135,11 @@ export class StreamingBriefParser {
 
       case "after-content-key":
         if (ch === ":") return;
-        if (ch === '"') { this.state = "in-content"; this.currentText = ""; return; }
+        if (ch === '"') {
+          this.state = "in-content";
+          this.currentText = "";
+          return;
+        }
         // Non-string value (shouldn't happen for text/reason but guard anyway).
         // Re-process through handleOuter so depth stays correct.
         if (ch !== " " && ch !== "\t" && ch !== "\n") {
@@ -137,7 +151,10 @@ export class StreamingBriefParser {
 
       case "after-other-key":
         if (ch === ":") return;
-        if (ch === '"') { this.state = "in-skip"; return; }
+        if (ch === '"') {
+          this.state = "in-skip";
+          return;
+        }
         // Non-string value (array, object, number, bool, null).
         // Re-process through handleOuter so depth stays correct —
         // this is the fix for evidence arrays breaking depth tracking.
@@ -148,8 +165,15 @@ export class StreamingBriefParser {
         return;
 
       case "in-content":
-        if (ch === "\\") { this.state = "escape-content"; return; }
-        if (ch === '"') { this.completeField(); this.state = "outer"; return; }
+        if (ch === "\\") {
+          this.state = "escape-content";
+          return;
+        }
+        if (ch === '"') {
+          this.completeField();
+          this.state = "outer";
+          return;
+        }
         this.currentText += ch;
         return;
 
@@ -161,7 +185,10 @@ export class StreamingBriefParser {
         return;
 
       case "in-skip":
-        if (ch === "\\") { this.state = "escape-skip"; return; }
+        if (ch === "\\") {
+          this.state = "escape-skip";
+          return;
+        }
         if (ch === '"') this.state = "outer";
         return;
 
@@ -217,11 +244,19 @@ export class StreamingBriefParser {
     if (this.completedLines.length > 0) {
       this.completedLines.push({ lineNum: 0, type: "blank" });
     }
-    this.completedLines.push({ lineNum: this.lineNum++, type: "h2", text: info.label });
+    this.completedLines.push({
+      lineNum: this.lineNum++,
+      type: "h2",
+      text: info.label,
+    });
   }
 
   private completeField(): void {
-    if (!this.currentField || !this.currentSection || !this.currentText.trim()) {
+    if (
+      !this.currentField ||
+      !this.currentSection ||
+      !this.currentText.trim()
+    ) {
       this.currentField = null;
       this.currentText = "";
       return;
