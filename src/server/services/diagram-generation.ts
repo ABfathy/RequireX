@@ -4,7 +4,6 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
 import { type DiagramType } from "../../../generated/prisma/client";
-import { serializeCurrentBrief } from "./brief-revision";
 import {
   getClient,
   MODEL,
@@ -107,6 +106,98 @@ export type GenerateDiagramInput = {
   userContext?: string;
 };
 
+function serializeSnapshotForDiagram(snapshot: {
+  claims: Array<{ section: string; text: string; confidence: string }>;
+  questions: Array<{ section: string; text: string; reason: string }>;
+}) {
+  const lines: string[] = [];
+  const claimsBySection = new Map<string, typeof snapshot.claims>();
+  const questionsBySection = new Map<string, typeof snapshot.questions>();
+
+  for (const claim of snapshot.claims) {
+    const bucket = claimsBySection.get(claim.section) ?? [];
+    bucket.push(claim);
+    claimsBySection.set(claim.section, bucket);
+  }
+
+  for (const question of snapshot.questions) {
+    const bucket = questionsBySection.get(question.section) ?? [];
+    bucket.push(question);
+    questionsBySection.set(question.section, bucket);
+  }
+
+  for (const [section, claims] of claimsBySection) {
+    lines.push(`${section}:`);
+    for (const claim of claims) {
+      lines.push(`- [${claim.confidence}] ${claim.text}`);
+    }
+  }
+
+  for (const [section, questions] of questionsBySection) {
+    lines.push(`${section}:`);
+    for (const question of questions) {
+      lines.push(`- ${question.text} (reason: ${question.reason})`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function stripMarkdownFences(code: string) {
+  const trimmed = code.trim();
+  const fenced = trimmed.match(/^```(?:mermaid)?\s*([\s\S]*?)\s*```$/i);
+  return fenced?.[1] ? fenced[1].trim() : trimmed;
+}
+
+async function validateMermaidCode(code: string) {
+  const mermaid = (await import("mermaid")).default;
+  mermaid.initialize({
+    startOnLoad: false,
+    suppressErrorRendering: true,
+  });
+
+  try {
+    const result = await mermaid.parse(code);
+    return { ok: true as const, diagramType: result.diagramType };
+  } catch (error) {
+    return {
+      ok: false as const,
+      message:
+        error instanceof Error ? error.message : "Unknown Mermaid parse error.",
+    };
+  }
+}
+
+async function requestDiagramJson(input: {
+  diagramType: DiagramType;
+  userPrompt: string;
+  extraRepairInstruction?: string;
+  previousRawText?: string;
+}) {
+  const { diagramType, userPrompt, extraRepairInstruction, previousRawText } =
+    input;
+
+  const contents = previousRawText && extraRepairInstruction
+    ? [
+        { role: "user" as const, parts: [{ text: userPrompt }] },
+        { role: "model" as const, parts: [{ text: previousRawText }] },
+        { role: "user" as const, parts: [{ text: extraRepairInstruction }] },
+      ]
+    : [{ role: "user" as const, parts: [{ text: userPrompt }] }];
+
+  return getClient().models.generateContent({
+    model: MODEL,
+    contents,
+    config: {
+      systemInstruction: DIAGRAM_SYSTEM_PROMPTS[diagramType],
+      temperature: extraRepairInstruction ? 0.2 : 0.4,
+      maxOutputTokens: STRUCTURED_OUTPUT_MAX_TOKENS,
+      responseMimeType: "application/json",
+      responseJsonSchema: diagramResponseJsonSchema,
+    },
+  });
+}
+
 export async function generateDiagram(input: GenerateDiagramInput) {
   const { snapshotId, sessionId, diagramType, userContext } = input;
 
@@ -128,7 +219,7 @@ export async function generateDiagram(input: GenerateDiagramInput) {
     throw new Error("Snapshot not found.");
   }
 
-  const briefSummary = serializeCurrentBrief(snapshot);
+  const briefSummary = serializeSnapshotForDiagram(snapshot);
   const userPrompt = [
     "Requirements:",
     briefSummary,
@@ -139,16 +230,9 @@ export async function generateDiagram(input: GenerateDiagramInput) {
     .filter(Boolean)
     .join("\n");
 
-  const result = await getClient().models.generateContent({
-    model: MODEL,
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    config: {
-      systemInstruction: DIAGRAM_SYSTEM_PROMPTS[diagramType],
-      temperature: 0.4,
-      maxOutputTokens: STRUCTURED_OUTPUT_MAX_TOKENS,
-      responseMimeType: "application/json",
-      responseJsonSchema: diagramResponseJsonSchema,
-    },
+  const result = await requestDiagramJson({
+    diagramType,
+    userPrompt,
   });
 
   let rawText = result.text ?? "";
@@ -156,30 +240,43 @@ export async function generateDiagram(input: GenerateDiagramInput) {
   try {
     parsed = parseStructuredResponse(result, DiagramOutputSchema).parsed;
   } catch {
-    const retryResult = await getClient().models.generateContent({
-      model: MODEL,
-      contents: [
-        { role: "user", parts: [{ text: userPrompt }] },
-        { role: "model", parts: [{ text: rawText }] },
-        {
-          role: "user",
-          parts: [
-            {
-              text: 'Your response was not valid JSON. Reply with only a JSON object: {"title":"...","mermaidCode":"...","description":"..."}. No markdown fences, no explanation.',
-            },
-          ],
-        },
-      ],
-      config: {
-        systemInstruction: DIAGRAM_SYSTEM_PROMPTS[diagramType],
-        temperature: 0.2,
-        maxOutputTokens: STRUCTURED_OUTPUT_MAX_TOKENS,
-        responseMimeType: "application/json",
-        responseJsonSchema: diagramResponseJsonSchema,
-      },
+    const retryResult = await requestDiagramJson({
+      diagramType,
+      userPrompt,
+      previousRawText: rawText,
+      extraRepairInstruction:
+        'Your response was not valid JSON. Reply with only a JSON object: {"title":"...","mermaidCode":"...","description":"..."}. No markdown fences, no explanation.',
     });
     rawText = retryResult.text ?? "";
     parsed = parseStructuredResponse(retryResult, DiagramOutputSchema).parsed;
+  }
+
+  parsed = {
+    ...parsed,
+    mermaidCode: stripMarkdownFences(parsed.mermaidCode),
+  };
+
+  const validation = await validateMermaidCode(parsed.mermaidCode);
+  if (!validation.ok) {
+    const repairResult = await requestDiagramJson({
+      diagramType,
+      userPrompt,
+      previousRawText: JSON.stringify(parsed),
+      extraRepairInstruction: `The JSON was valid, but mermaidCode failed Mermaid syntax validation with this error: ${validation.message}\nReturn the same JSON shape, preserve the diagram intent, preserve title/description unless they are clearly wrong, and fix only mermaidCode so Mermaid can parse it. Reply with JSON only and no markdown fences.`,
+    });
+    const repaired = parseStructuredResponse(repairResult, DiagramOutputSchema)
+      .parsed;
+    parsed = {
+      ...repaired,
+      mermaidCode: stripMarkdownFences(repaired.mermaidCode),
+    };
+
+    const repairedValidation = await validateMermaidCode(parsed.mermaidCode);
+    if (!repairedValidation.ok) {
+      throw new Error(
+        `Generated Mermaid code could not be validated: ${repairedValidation.message}`,
+      );
+    }
   }
 
   await prisma.briefDiagram.deleteMany({ where: { snapshotId, diagramType } });

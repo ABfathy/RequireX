@@ -1224,12 +1224,12 @@ export function DocView({
     >
       {/* Topbar */}
       <div
-        className="flex items-center flex-wrap min-h-8 px-4 py-1 gap-x-3 gap-y-1 shrink-0 border-b"
+        className="flex items-center min-h-8 px-4 py-1 gap-3 shrink-0 border-b"
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         {/* Breadcrumbs */}
         <div
-          className="flex items-center gap-1 text-[12px] flex-1 basis-[220px] min-w-0"
+          className="flex items-center gap-1 text-[12px] flex-1 min-w-0"
           style={{ color: "var(--fg-tertiary)" }}
         >
           {projectName && (
@@ -1264,10 +1264,10 @@ export function DocView({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 shrink-0 max-w-full flex-wrap justify-end">
+        <div className="flex items-center justify-end gap-1.5 shrink-0 min-w-0">
           {filterOpen ? (
             <div
-              className="flex items-center gap-1 h-[22px] px-1.5 rounded-[4px] border max-w-full"
+              className="flex items-center gap-1 h-[24px] px-1.5 rounded-[6px] border min-w-0"
               style={{
                 background: "var(--surface-2)",
                 borderColor: "var(--border-strong)",
@@ -1286,7 +1286,7 @@ export function DocView({
                   if (e.key === "Escape") closeFilter();
                 }}
                 placeholder="Filter requirements…"
-                className="w-[120px] sm:w-[160px] min-w-0 bg-transparent text-[11px] focus-visible:outline-none"
+                className="w-[96px] lg:w-[132px] min-w-0 bg-transparent text-[11px] focus-visible:outline-none"
                 style={{ color: "var(--fg-primary)" }}
                 aria-label="Filter requirements"
               />
@@ -1304,7 +1304,7 @@ export function DocView({
             <button
               type="button"
               onClick={() => setFilterOpen(true)}
-              className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              className="inline-flex items-center gap-1 h-[24px] px-2.5 rounded-[6px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer whitespace-nowrap"
               style={{
                 color: filterQuery ? "var(--accent)" : "var(--fg-tertiary)",
               }}
@@ -1317,7 +1317,7 @@ export function DocView({
             <button
               type="button"
               onClick={onShareBrief}
-              className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              className="inline-flex items-center gap-1 h-[24px] px-2.5 rounded-[6px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer whitespace-nowrap"
               style={{ color: "var(--fg-muted)" }}
             >
               <Icons.Share size={11} aria-hidden="true" />
@@ -1335,20 +1335,29 @@ export function DocView({
                   : undefined
             }
             onClick={onCreateFinalizedDocument}
-            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 h-[26px] px-2.5 rounded-[7px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap shrink-0"
             style={
               !finalizedDisabled
-                ? { background: "var(--surface-3)", color: "var(--fg-primary)" }
-                : { background: "var(--surface-3)", color: "var(--fg-muted)" }
+                ? {
+                    background:
+                      "linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 90%, white 10%), var(--surface-3))",
+                    color: "var(--fg-primary)",
+                    border: "1px solid color-mix(in srgb, var(--border-strong) 80%, transparent)",
+                  }
+                : {
+                    background: "var(--surface-3)",
+                    color: "var(--fg-muted)",
+                    border: "1px solid color-mix(in srgb, var(--border) 75%, transparent)",
+                  }
             }
           >
             <Icons.FileText
               size={11}
               aria-hidden="true"
-              className={finalizing ? "animate-pulse" : undefined}
+              className={finalizing ? "animate-pulse shrink-0" : "shrink-0"}
             />
             <span>
-              {finalizing ? "Finalizing..." : "Create Finalized Document"}
+              {finalizing ? "Finalizing..." : "Create Finalized"}
             </span>
           </button>
           <button
@@ -1362,20 +1371,29 @@ export function DocView({
                   : undefined
             }
             onClick={onGenerateBrief}
-            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 h-[26px] px-2.5 rounded-[7px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap shrink-0"
             style={
               canGenerate && !generateDisabled
-                ? { background: "var(--accent)", color: "var(--accent-fg)" }
-                : { background: "var(--surface-3)", color: "var(--fg-muted)" }
+                ? {
+                    background:
+                      "linear-gradient(135deg, color-mix(in srgb, var(--accent) 92%, white 8%), color-mix(in srgb, var(--accent) 72%, black 28%))",
+                    color: "var(--accent-fg)",
+                    boxShadow:
+                      "inset 0 1px 0 color-mix(in srgb, white 18%, transparent)",
+                  }
+                : {
+                    background: "var(--surface-3)",
+                    color: "var(--fg-muted)",
+                  }
             }
           >
             {hasSnapshot && !generating ? (
-              <Icons.Refresh size={11} aria-hidden="true" />
+              <Icons.Refresh size={11} aria-hidden="true" className="shrink-0" />
             ) : (
               <Icons.Download
                 size={11}
                 aria-hidden="true"
-                className={generating ? "animate-spin" : undefined}
+                className={generating ? "animate-spin shrink-0" : "shrink-0"}
               />
             )}
             <span>
