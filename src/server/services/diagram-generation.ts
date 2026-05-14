@@ -177,6 +177,8 @@ export async function generateDiagram(input: GenerateDiagramInput) {
     parsed = DiagramOutputSchema.parse(extractJson(rawText));
   }
 
+  await prisma.briefDiagram.deleteMany({ where: { snapshotId, diagramType } });
+
   return prisma.briefDiagram.create({
     data: {
       snapshotId,
