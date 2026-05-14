@@ -459,14 +459,34 @@ export function EditorShell({
       if (!sessionId || files.length === 0) return;
       setSourcesLoading(true);
       try {
-        await startUpload(files, { sessionId });
+        const isTxt = (f: File) => f.type === "text/plain" || f.name.endsWith(".txt");
+        const txtFiles = files.filter(isTxt);
+        const uploadable = files.filter((f) => !isTxt(f));
+
+        await Promise.all(
+          txtFiles.map(async (f) => {
+            const text = await f.text();
+            const res = await fetch(`/api/sessions/${sessionId}/assets`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ textContent: text, displayLabel: f.name }),
+            });
+            if (!res.ok) throw new Error("Failed to save text file");
+          }),
+        );
+
+        if (uploadable.length > 0) {
+          await startUpload(uploadable, { sessionId });
+        } else {
+          await refreshSources();
+        }
       } catch {
         setSourcesError("Upload failed.");
       } finally {
         setSourcesLoading(false);
       }
     },
-    [sessionId, startUpload],
+    [sessionId, startUpload, refreshSources],
   );
 
   const loadRevisions = useCallback(async (sid: string) => {

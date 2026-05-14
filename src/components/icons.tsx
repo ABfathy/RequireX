@@ -9,6 +9,7 @@ import {
   Eye,
   FileText,
   Filter,
+  FolderOpen,
   GitCompareArrows,
   History,
   type LucideProps,
@@ -70,6 +71,7 @@ export const Icons = {
   ArrowLeft: icon(ArrowLeft),
   ArrowRight: icon(ArrowRight),
   Pencil: icon(Pencil),
+  Folder: icon(FolderOpen),
 } as const;
 
 export function RxLogo({

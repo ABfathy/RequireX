@@ -164,6 +164,7 @@ function DocLine({
   isEditing,
   onStartEdit,
   onStopEdit,
+  isFirst,
 }: {
   line: DocLineData;
   selectedReq: string | null;
@@ -183,6 +184,8 @@ function DocLine({
   onStartEdit: () => void;
   /** Ask DocView to close the active editor. */
   onStopEdit: () => void;
+  /** True for the very first rendered row — gives version meta a header treatment. */
+  isFirst?: boolean;
 }) {
   const isReq = !!line.reqId && !!line.reqType;
   const isActive = isReq && line.reqId === selectedReq;
@@ -309,9 +312,10 @@ function DocLine({
 
   return (
     <div
-      className={`flex items-start w-full transition-colors duration-[80ms] group ${isReq && !editing ? "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]" : ""}`}
+      className={`flex items-start w-full transition-colors duration-[80ms] group ${isReq && !editing ? "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-ring)]" : ""} ${isFirst ? "pb-3 mb-1 border-b" : ""}`}
       style={{
         background: isActive && !editing ? "var(--accent-subtle)" : undefined,
+        borderColor: isFirst ? "var(--border)" : undefined,
       }}
       role={isReq && !editing ? "button" : undefined}
       tabIndex={isReq && !editing ? 0 : undefined}
@@ -391,7 +395,15 @@ function DocLine({
             {line.text}
           </span>
         )}
-        {line.type === "meta" && (
+        {line.type === "meta" && isFirst && (
+          <span
+            className="text-[16px] font-semibold tracking-[-0.015em]"
+            style={{ color: "var(--fg-primary)" }}
+          >
+            {line.text}
+          </span>
+        )}
+        {line.type === "meta" && !isFirst && (
           <span
             className="text-[11px]"
             style={{ fontFamily: "var(--font-mono)", color: "var(--fg-muted)" }}
@@ -1246,6 +1258,7 @@ export function DocView({
               isEditing={false}
               onStartEdit={() => undefined}
               onStopEdit={() => undefined}
+              isFirst={i === 0}
             />
           ))
         ) : (appState === "generating" || appState === "revising") ? (
@@ -1269,6 +1282,7 @@ export function DocView({
               isEditing={!!line.reqId && line.reqId === activeEditReqId}
               onStartEdit={() => line.reqId && setActiveEditReqId(line.reqId)}
               onStopEdit={() => setActiveEditReqId(null)}
+              isFirst={i === 0}
             />
           ))
         )}

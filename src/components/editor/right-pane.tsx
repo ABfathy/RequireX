@@ -355,6 +355,23 @@ function SkeletonRow() {
 }
 
 /* ── SourcesTab ─────────────────────────────────────────── */
+
+const ACCEPTED_MIME = /^(image\/|audio\/|application\/pdf|text\/plain)/;
+
+async function collectFolderFiles(entry: FileSystemEntry): Promise<File[]> {
+  if (entry.isFile) {
+    return new Promise((res) =>
+      (entry as FileSystemFileEntry).file((f) => res([f])),
+    );
+  }
+  const reader = (entry as FileSystemDirectoryEntry).createReader();
+  const entries: FileSystemEntry[] = await new Promise((res) =>
+    reader.readEntries(res),
+  );
+  const nested = await Promise.all(entries.map(collectFolderFiles));
+  return nested.flat();
+}
+
 interface SourcesTabProps {
   sources?: SourceItem[];
   loading?: boolean;
@@ -379,7 +396,10 @@ function SourcesTab({
   onPreview,
 }: SourcesTabProps) {
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
 
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files ? Array.from(e.target.files) : [];
@@ -389,8 +409,77 @@ function SourcesTab({
     }
   }
 
+  function handleFolderPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files
+      ? Array.from(e.target.files).filter((f) => ACCEPTED_MIME.test(f.type))
+      : [];
+    e.target.value = "";
+    if (picked.length > 0 && onUploadFiles) {
+      void onUploadFiles(picked);
+    }
+  }
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current === 0) setDragActive(false);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setDragActive(false);
+    if (!onUploadFiles) return;
+
+    const items = Array.from(e.dataTransfer.items);
+    const allFiles: File[] = [];
+
+    await Promise.all(
+      items.map(async (item) => {
+        const entry = item.webkitGetAsEntry();
+        if (!entry) return;
+        const files = await collectFolderFiles(entry);
+        allFiles.push(...files.filter((f) => ACCEPTED_MIME.test(f.type)));
+      }),
+    );
+
+    if (allFiles.length > 0) void onUploadFiles(allFiles);
+  }
+
   return (
-    <div className="flex flex-col min-h-full">
+    <div
+      className="flex flex-col min-h-full relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {dragActive && (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-[6px] pointer-events-none"
+          style={{
+            background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+            border: "2px dashed var(--accent)",
+          }}
+        >
+          <Icons.FileText size={22} style={{ color: "var(--accent)" }} />
+          <span className="text-[12px] font-medium" style={{ color: "var(--accent)" }}>
+            Drop files or folder
+          </span>
+        </div>
+      )}
+
       <SectionLabel>Ingested sources</SectionLabel>
 
       {/* Error state */}
@@ -485,13 +574,36 @@ function SourcesTab({
             <Icons.FileText size={12} aria-hidden="true" />
             <span>Upload files</span>
           </button>
+          <button
+            type="button"
+            onClick={() => folderInputRef.current?.click()}
+            disabled={!onUploadFiles}
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
+            style={{
+              color: "var(--fg-tertiary)",
+              borderColor: "var(--border)",
+              background: "transparent",
+            }}
+          >
+            <Icons.Folder size={12} aria-hidden="true" />
+            <span>Add folder</span>
+          </button>
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,application/pdf,audio/*"
+            accept="image/*,application/pdf,audio/*,text/plain,.txt"
             className="hidden"
             onChange={handleFilePick}
+          />
+          {/* webkitdirectory is non-standard; cast to any to satisfy TS */}
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={handleFolderPick}
+            {...({ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
           />
         </div>
       </div>
