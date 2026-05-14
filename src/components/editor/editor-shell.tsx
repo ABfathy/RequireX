@@ -459,7 +459,8 @@ export function EditorShell({
       if (!sessionId || files.length === 0) return;
       setSourcesLoading(true);
       try {
-        const isTxt = (f: File) => f.type === "text/plain" || f.name.endsWith(".txt");
+        const isTxt = (f: File) =>
+          f.type === "text/plain" || f.name.endsWith(".txt") || f.name.endsWith(".rdt");
         const txtFiles = files.filter(isTxt);
         const uploadable = files.filter((f) => !isTxt(f));
 

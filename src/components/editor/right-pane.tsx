@@ -357,6 +357,7 @@ function SkeletonRow() {
 /* ── SourcesTab ─────────────────────────────────────────── */
 
 const ACCEPTED_MIME = /^(image\/|audio\/|application\/pdf|text\/plain)/;
+const isAccepted = (f: File) => ACCEPTED_MIME.test(f.type) || f.name.endsWith(".rdt");
 
 async function collectFolderFiles(entry: FileSystemEntry): Promise<File[]> {
   if (entry.isFile) {
@@ -411,7 +412,7 @@ function SourcesTab({
 
   function handleFolderPick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files
-      ? Array.from(e.target.files).filter((f) => ACCEPTED_MIME.test(f.type))
+      ? Array.from(e.target.files).filter(isAccepted)
       : [];
     e.target.value = "";
     if (picked.length > 0 && onUploadFiles) {
@@ -449,7 +450,7 @@ function SourcesTab({
         const entry = item.webkitGetAsEntry();
         if (!entry) return;
         const files = await collectFolderFiles(entry);
-        allFiles.push(...files.filter((f) => ACCEPTED_MIME.test(f.type)));
+        allFiles.push(...files.filter(isAccepted));
       }),
     );
 
