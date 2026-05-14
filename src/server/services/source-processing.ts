@@ -75,7 +75,9 @@ async function downloadAssetBytes(
   }
 
   const parsed = new URL(url);
-  if (parsed.hostname !== "utfs.io") {
+  const trusted =
+    parsed.hostname === "utfs.io" || parsed.hostname.endsWith(".ufs.sh");
+  if (!trusted) {
     throw new Error(`Untrusted asset URL host: ${parsed.hostname}`);
   }
 
