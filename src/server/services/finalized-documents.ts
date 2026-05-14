@@ -13,6 +13,9 @@ import type {
   Prisma,
 } from "../../../generated/prisma/client";
 
+const FINALIZED_PERSIST_TRANSACTION_TIMEOUT_MS = 20_000;
+const FINALIZED_PERSIST_TRANSACTION_MAX_WAIT_MS = 10_000;
+
 export class FinalizedDocumentGenerationError extends Error {
   constructor(
     message: string,
@@ -137,78 +140,79 @@ export async function createFinalizedDocument({
     .map(briefVersionForPrompt);
   const output = await generateWithRetry(briefVersions);
 
-  return prisma.$transaction(async (tx) => {
-    const latest = await tx.briefSnapshot.aggregate({
-      where: { sessionId, documentType: "FINALIZED_DOCUMENT" },
-      _max: { version: true },
-    });
-    const version = (latest._max.version ?? 0) + 1;
+  return prisma.$transaction(
+    async (tx) => {
+      const latest = await tx.briefSnapshot.aggregate({
+        where: { sessionId, documentType: "FINALIZED_DOCUMENT" },
+        _max: { version: true },
+      });
+      const version = (latest._max.version ?? 0) + 1;
 
-    const latestSourceBriefVersion = sourceBriefs[0]?.version ?? version;
-    const snapshot = await tx.briefSnapshot.create({
-      data: {
-        projectId: session.projectId,
-        sessionId,
-        version,
-        documentType: "FINALIZED_DOCUMENT",
-        status: "DRAFT",
-        sourceBundleVersion: latestSourceBriefVersion,
-        createdBy: requestedBy,
-      },
-    });
-
-    async function insertClaims(
-      section: BriefClaimSection,
-      claims: BriefClaimOutput[],
-    ) {
-      for (const [orderIndex, item] of claims.entries()) {
-        await tx.briefClaim.create({
-          data: {
-            snapshotId: snapshot.id,
-            section,
-            orderIndex,
-            text: item.text,
-            confidence: item.confidence,
-          },
-        });
-      }
-    }
-
-    for (const [key, section] of Object.entries(FINALIZED_SECTION_MAP) as Array<
-      [keyof FinalizedDocumentOutput, BriefClaimSection]
-    >) {
-      await insertClaims(section, output[key]);
-    }
-
-    await tx.revisionEvent.create({
-      data: {
-        projectId: session.projectId,
-        sessionId,
-        snapshotId: snapshot.id,
-        type: "GENERATED",
-        actorType: "INTERNAL_USER",
-        actorId: requestedBy,
-        summary: `Generated finalized document v${version}.`,
-        metadata: {
+      const latestSourceBriefVersion = sourceBriefs[0]?.version ?? version;
+      const snapshot = await tx.briefSnapshot.create({
+        data: {
+          projectId: session.projectId,
+          sessionId,
+          version,
           documentType: "FINALIZED_DOCUMENT",
-          sourceBriefSnapshotIds: sourceBriefs.map((brief) => brief.id),
-          sourceBriefVersions: sourceBriefs.map((brief) => brief.version),
-        } as Prisma.InputJsonValue,
-      },
-    });
+          status: "DRAFT",
+          sourceBundleVersion: latestSourceBriefVersion,
+          createdBy: requestedBy,
+        },
+      });
 
-    await tx.intakeSession.update({
-      where: { id: sessionId },
-      data: {
-        status: "REVIEW_READY",
-        lastActivityAt: new Date(),
-      },
-    });
+      const claimRows = (
+        Object.entries(FINALIZED_SECTION_MAP) as Array<
+          [keyof FinalizedDocumentOutput, BriefClaimSection]
+        >
+      ).flatMap(([key, section]) =>
+        output[key].map((item: BriefClaimOutput, orderIndex) => ({
+          snapshotId: snapshot.id,
+          section,
+          orderIndex,
+          text: item.text,
+          confidence: item.confidence,
+        })),
+      );
 
-    return {
-      snapshotId: snapshot.id,
-      version: snapshot.version,
-      documentType: snapshot.documentType,
-    };
-  });
+      if (claimRows.length > 0) {
+        await tx.briefClaim.createMany({ data: claimRows });
+      }
+
+      await tx.revisionEvent.create({
+        data: {
+          projectId: session.projectId,
+          sessionId,
+          snapshotId: snapshot.id,
+          type: "GENERATED",
+          actorType: "INTERNAL_USER",
+          actorId: requestedBy,
+          summary: `Generated finalized document v${version}.`,
+          metadata: {
+            documentType: "FINALIZED_DOCUMENT",
+            sourceBriefSnapshotIds: sourceBriefs.map((brief) => brief.id),
+            sourceBriefVersions: sourceBriefs.map((brief) => brief.version),
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.intakeSession.update({
+        where: { id: sessionId },
+        data: {
+          status: "REVIEW_READY",
+          lastActivityAt: new Date(),
+        },
+      });
+
+      return {
+        snapshotId: snapshot.id,
+        version: snapshot.version,
+        documentType: snapshot.documentType,
+      };
+    },
+    {
+      maxWait: FINALIZED_PERSIST_TRANSACTION_MAX_WAIT_MS,
+      timeout: FINALIZED_PERSIST_TRANSACTION_TIMEOUT_MS,
+    },
+  );
 }

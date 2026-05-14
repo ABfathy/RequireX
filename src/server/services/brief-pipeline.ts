@@ -14,17 +14,13 @@ import {
   processSessionFileSources,
 } from "@/server/services/source-processing";
 import type {
-  BriefClaimOutput,
   BriefEvidenceOutput,
   BriefOutput,
-  BriefQuestionOutput,
 } from "@/server/validators/brief-output";
 import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 import type {
-  BriefClaimSection,
   BriefDocumentType,
-  BriefQuestionSection,
   Prisma,
   SourceAsset,
   SourceChunk,
@@ -46,6 +42,8 @@ const parsedEnv = process.env.PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE
 const PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE = isNaN(parsedEnv)
   ? 750_000
   : Math.max(1_000, parsedEnv);
+const SNAPSHOT_PERSIST_TRANSACTION_TIMEOUT_MS = 20_000;
+const SNAPSHOT_PERSIST_TRANSACTION_MAX_WAIT_MS = 10_000;
 
 function logBriefPipeline(
   level: "info" | "warn" | "error",
@@ -377,124 +375,169 @@ export async function persistSnapshot({
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
   const chunkByAssetId = firstChunkByAssetId(assets);
 
-  return prisma.$transaction(async (tx) => {
-    const latest = await tx.briefSnapshot.aggregate({
-      where: { sessionId, documentType },
-      _max: { version: true },
-    });
-    const version = (latest._max.version ?? 0) + 1;
+  return prisma.$transaction(
+    async (tx) => {
+      const latest = await tx.briefSnapshot.aggregate({
+        where: { sessionId, documentType },
+        _max: { version: true },
+      });
+      const version = (latest._max.version ?? 0) + 1;
 
-    const snapshot = await tx.briefSnapshot.create({
-      data: {
-        projectId,
-        sessionId,
-        version,
-        documentType,
-        status: "DRAFT",
-        sourceBundleVersion: version,
-        createdBy: requestedBy,
-      },
-    });
+      const snapshot = await tx.briefSnapshot.create({
+        data: {
+          projectId,
+          sessionId,
+          version,
+          documentType,
+          status: "DRAFT",
+          sourceBundleVersion: version,
+          createdBy: requestedBy,
+        },
+      });
 
-    async function insertClaims(
-      section: BriefClaimSection,
-      claims: BriefClaimOutput[],
-    ) {
-      for (const [orderIndex, item] of claims.entries()) {
-        const claim = await tx.briefClaim.create({
-          data: {
+      const claimInputs = [
+        ...output.summary.map((item, orderIndex) => ({
+          section: "SUMMARY" as const,
+          orderIndex,
+          item,
+        })),
+        ...output.goals.map((item, orderIndex) => ({
+          section: "GOALS" as const,
+          orderIndex,
+          item,
+        })),
+      ];
+      const questionInputs = [
+        ...output.ambiguities.map((item, orderIndex) => ({
+          section: "AMBIGUITIES" as const,
+          orderIndex,
+          item,
+        })),
+        ...output.followUpQuestions.map((item, orderIndex) => ({
+          section: "FOLLOW_UP_QUESTIONS" as const,
+          orderIndex,
+          item,
+        })),
+      ];
+
+      const claimIdByKey = new Map<string, string>();
+      if (claimInputs.length > 0) {
+        const claims = await tx.briefClaim.createManyAndReturn({
+          data: claimInputs.map(({ section, orderIndex, item }) => ({
             snapshotId: snapshot.id,
             section,
             orderIndex,
             text: item.text,
             confidence: item.confidence,
+          })),
+          select: {
+            id: true,
+            section: true,
+            orderIndex: true,
           },
         });
-        const rows = buildEvidenceRows({
-          snapshotId: snapshot.id,
-          claimId: claim.id,
-          evidence: item.evidence,
-          assetById,
-          chunkByAssetId,
-        });
-        if (rows.length > 0) {
-          await tx.evidenceRef.createMany({ data: rows });
+        for (const claim of claims) {
+          claimIdByKey.set(`${claim.section}:${claim.orderIndex}`, claim.id);
         }
       }
-    }
 
-    async function insertQuestions(
-      section: BriefQuestionSection,
-      questions: BriefQuestionOutput[],
-    ) {
-      for (const [orderIndex, item] of questions.entries()) {
-        const question = await tx.briefQuestion.create({
-          data: {
+      const questionIdByKey = new Map<string, string>();
+      if (questionInputs.length > 0) {
+        const questions = await tx.briefQuestion.createManyAndReturn({
+          data: questionInputs.map(({ section, orderIndex, item }) => ({
             snapshotId: snapshot.id,
             section,
             orderIndex,
             text: item.text,
             reason: item.reason,
+          })),
+          select: {
+            id: true,
+            section: true,
+            orderIndex: true,
           },
         });
-        const rows = buildEvidenceRows({
-          snapshotId: snapshot.id,
-          questionId: question.id,
-          evidence: item.evidence,
-          assetById,
-          chunkByAssetId,
-        });
-        if (rows.length > 0) {
-          await tx.evidenceRef.createMany({ data: rows });
+        for (const question of questions) {
+          questionIdByKey.set(
+            `${question.section}:${question.orderIndex}`,
+            question.id,
+          );
         }
       }
-    }
 
-    await insertClaims("SUMMARY", output.summary);
-    await insertClaims("GOALS", output.goals);
-    await insertQuestions("AMBIGUITIES", output.ambiguities);
-    await insertQuestions("FOLLOW_UP_QUESTIONS", output.followUpQuestions);
+      const evidenceRows = [
+        ...claimInputs.flatMap(({ section, orderIndex, item }) => {
+          const claimId = claimIdByKey.get(`${section}:${orderIndex}`);
+          if (!claimId) return [];
+          return buildEvidenceRows({
+            snapshotId: snapshot.id,
+            claimId,
+            evidence: item.evidence,
+            assetById,
+            chunkByAssetId,
+          });
+        }),
+        ...questionInputs.flatMap(({ section, orderIndex, item }) => {
+          const questionId = questionIdByKey.get(`${section}:${orderIndex}`);
+          if (!questionId) return [];
+          return buildEvidenceRows({
+            snapshotId: snapshot.id,
+            questionId,
+            evidence: item.evidence,
+            assetById,
+            chunkByAssetId,
+          });
+        }),
+      ];
+      if (evidenceRows.length > 0) {
+        await tx.evidenceRef.createMany({ data: evidenceRows });
+      }
 
-    const evt = revisionEvent ?? {
-      type: "GENERATED" as const,
-      actorType: "SYSTEM" as const,
-      summary: `Generated brief snapshot v${version}.`,
-      metadata: { sourceAssetCount: assets.length, documentType },
-    };
-    await tx.revisionEvent.create({
-      data: {
+      const evt = revisionEvent ?? {
+        type: "GENERATED" as const,
+        actorType: "SYSTEM" as const,
+        summary: `Generated brief snapshot v${version}.`,
+        metadata: { sourceAssetCount: assets.length, documentType },
+      };
+      await tx.revisionEvent.create({
+        data: {
+          projectId,
+          sessionId,
+          snapshotId: snapshot.id,
+          type: evt.type,
+          actorType: evt.actorType,
+          actorId: requestedBy,
+          summary: evt.summary,
+          metadata: evt.metadata as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.intakeSession.update({
+        where: { id: sessionId },
+        data: {
+          status: "REVIEW_READY",
+          lastActivityAt: new Date(),
+        },
+      });
+
+      logBriefPipeline("info", "Persisted generated snapshot.", {
         projectId,
         sessionId,
         snapshotId: snapshot.id,
-        type: evt.type,
-        actorType: evt.actorType,
-        actorId: requestedBy,
-        summary: evt.summary,
-        metadata: evt.metadata as Prisma.InputJsonValue,
-      },
-    });
+        documentType,
+        version: snapshot.version,
+        claimCount: output.summary.length + output.goals.length,
+        questionCount:
+          output.ambiguities.length + output.followUpQuestions.length,
+      });
 
-    await tx.intakeSession.update({
-      where: { id: sessionId },
-      data: {
-        status: "REVIEW_READY",
-        lastActivityAt: new Date(),
-      },
-    });
-
-    logBriefPipeline("info", "Persisted generated snapshot.", {
-      projectId,
-      sessionId,
-      snapshotId: snapshot.id,
-      documentType,
-      version: snapshot.version,
-      claimCount: output.summary.length + output.goals.length,
-      questionCount:
-        output.ambiguities.length + output.followUpQuestions.length,
-    });
-
-    return snapshot;
-  });
+      return snapshot;
+    },
+    {
+      maxWait: SNAPSHOT_PERSIST_TRANSACTION_MAX_WAIT_MS,
+      timeout: SNAPSHOT_PERSIST_TRANSACTION_TIMEOUT_MS,
+    },
+  );
 }
 
 export type StreamEvent =

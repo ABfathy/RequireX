@@ -226,6 +226,21 @@ function documentVersionLabel(
   return `${documentType === "FINALIZED_DOCUMENT" ? "Finalized Version" : "Brief Version"} ${version}`;
 }
 
+function upsertSnapshotSummary(
+  snapshots: SnapshotSummary[],
+  snapshot: SnapshotSummary,
+) {
+  const existingIndex = snapshots.findIndex((item) => item.id === snapshot.id);
+  if (existingIndex === -1) return [...snapshots, snapshot];
+
+  const next = [...snapshots];
+  next[existingIndex] = {
+    ...next[existingIndex],
+    ...snapshot,
+  };
+  return next;
+}
+
 function linesToComparisonText(lines: DocLineData[]) {
   return lines
     .filter((line) => line.type !== "meta")
@@ -293,6 +308,10 @@ export function EditorShell({
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
   const shouldPollFeedbackRef = useRef(false);
   const latestSnapshotIdRef = useRef<string | null>(initialSnapshotId ?? null);
+  const previousSessionIdRef = useRef<string | null>(
+    initialSession?.id ?? null,
+  );
+  const pendingSnapshotSummaryRef = useRef<SnapshotSummary | null>(null);
   const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(
     null,
   );
@@ -537,34 +556,44 @@ export function EditorShell({
           })),
       );
 
-      // All revisions go to the revisions tab
-      setSnapshots(
-        allRevisions.map((r) => ({
-          eventId: r.id,
-          id: r.snapshotId,
-          version: r.version,
-          documentType: r.documentType,
-          snapshotStatus: r.snapshotStatus,
-          type: r.type,
-          summary: r.summary,
-          createdAt: r.createdAt,
-          trigger: r.trigger,
-          userMessage: r.userMessage,
-          feedbackBody: r.feedbackBody,
-          feedbackAuthor: r.feedbackAuthor,
-        })),
-      );
+      // All revisions go to the revisions tab. Keep a just-created snapshot in
+      // local state if the immediate refetch lags behind the write.
+      const nextSnapshots = allRevisions.map((r) => ({
+        eventId: r.id,
+        id: r.snapshotId,
+        version: r.version,
+        documentType: r.documentType,
+        snapshotStatus: r.snapshotStatus,
+        type: r.type,
+        summary: r.summary,
+        createdAt: r.createdAt,
+        trigger: r.trigger,
+        userMessage: r.userMessage,
+        feedbackBody: r.feedbackBody,
+        feedbackAuthor: r.feedbackAuthor,
+      }));
+      const pendingSnapshot = pendingSnapshotSummaryRef.current;
+      if (
+        pendingSnapshot &&
+        nextSnapshots.some((snapshot) => snapshot.id === pendingSnapshot.id)
+      ) {
+        pendingSnapshotSummaryRef.current = null;
+      }
+      const snapshotsForState =
+        pendingSnapshot &&
+        !nextSnapshots.some((snapshot) => snapshot.id === pendingSnapshot.id)
+          ? upsertSnapshotSummary(nextSnapshots, pendingSnapshot)
+          : nextSnapshots;
+      setSnapshots(snapshotsForState);
 
       // Track the latest document snapshot so Return-to-latest can reset correctly
-      const latestDocument = [...allRevisions]
+      const latestDocument = [...snapshotsForState]
         .reverse()
         .find(
-          (r) =>
-            (r.type === "GENERATED" || r.type === "REGENERATED") &&
-            r.snapshotId,
+          (r) => (r.type === "GENERATED" || r.type === "REGENERATED") && r.id,
         );
-      if (latestDocument?.snapshotId) {
-        latestSnapshotIdRef.current = latestDocument.snapshotId;
+      if (latestDocument?.id) {
+        latestSnapshotIdRef.current = latestDocument.id;
       }
 
       // Detect new client activity since last load (BRIEF_CONFIRMED triggers auto-revise)
@@ -793,6 +822,23 @@ export function EditorShell({
         version: number;
         documentType: DocumentType;
       };
+      const optimisticSnapshot: SnapshotSummary = {
+        eventId: `optimistic-finalized-${result.snapshotId}`,
+        id: result.snapshotId,
+        version: result.version,
+        documentType: result.documentType,
+        snapshotStatus: "DRAFT",
+        type: "GENERATED",
+        summary: `Generated finalized document v${result.version}.`,
+        createdAt: new Date().toISOString(),
+        trigger: null,
+        userMessage: null,
+        feedbackBody: null,
+        feedbackAuthor: null,
+      };
+      pendingSnapshotSummaryRef.current = optimisticSnapshot;
+      setSnapshots((prev) => upsertSnapshotSummary(prev, optimisticSnapshot));
+
       const snapshotRes = await fetch(`/api/snapshots/${result.snapshotId}`, {
         cache: "no-store",
       });
@@ -1484,7 +1530,22 @@ ${lines
 
   /* Reset snapshot state when session changes */
   useEffect(() => {
-    if (!sessionId) return;
+    if (previousSessionIdRef.current === sessionId) return;
+    previousSessionIdRef.current = sessionId ?? null;
+
+    if (!sessionId) {
+      setSnapshots([]);
+      setViewingVersion(null);
+      setClientLines(null);
+      setChatMessages([]);
+      setComparisonTabs([]);
+      setCurrentSnapshotId(null);
+      setCurrentDocumentType(null);
+      setActiveWorkspaceTab(DRAFT_TAB_ID);
+      pendingSnapshotSummaryRef.current = null;
+      return;
+    }
+
     setSnapshots([]);
     setViewingVersion(null);
     setClientLines(null);
@@ -1494,6 +1555,7 @@ ${lines
       sessionId === initialSession?.id ? initialDocumentType : null,
     );
     setActiveWorkspaceTab(DRAFT_TAB_ID);
+    pendingSnapshotSummaryRef.current = null;
   }, [sessionId, initialSession?.id, initialDocumentType]);
 
   // Clean up polls when the component unmounts

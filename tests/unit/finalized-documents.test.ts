@@ -90,7 +90,7 @@ function createTx(finalizedMaxVersion = 1) {
       }),
     },
     briefClaim: {
-      create: vi.fn().mockResolvedValue({ id: "claim_1" }),
+      createMany: vi.fn().mockResolvedValue({ count: 6 }),
     },
     revisionEvent: {
       create: vi.fn().mockResolvedValue({ id: "revision_1" }),
@@ -159,7 +159,20 @@ describe("createFinalizedDocument", () => {
         sourceBundleVersion: 4,
       }),
     });
-    expect(tx.briefClaim.create).toHaveBeenCalledTimes(6);
+    expect(tx.briefClaim.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          snapshotId: "finalized_2",
+          section: "PROJECT_OVERVIEW",
+          orderIndex: 0,
+        }),
+        expect.objectContaining({
+          snapshotId: "finalized_2",
+          section: "USER_FLOWS",
+          orderIndex: 0,
+        }),
+      ]),
+    });
     expect(result).toEqual({
       snapshotId: "finalized_2",
       version: 2,
@@ -178,8 +191,9 @@ describe("createFinalizedDocument", () => {
       requestedBy: "user_1",
     });
 
+    const createManyArg = tx.briefClaim.createMany.mock.calls[0]?.[0];
     expect(
-      tx.briefClaim.create.mock.calls.map(([arg]) => arg.data.section),
+      createManyArg.data.map((row: { section: string }) => row.section),
     ).toEqual([
       "PROJECT_OVERVIEW",
       "PROJECT_GOALS",
