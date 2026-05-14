@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import {
+  extractJson,
   type FinalizedBriefVersion,
   generateFinalizedDocumentFromBriefs,
+  generateFinalizedDocumentStreamFromBriefs,
 } from "@/server/services/google-genai";
 import {
   type BriefClaimOutput,
   type FinalizedDocumentOutput,
+  FinalizedDocumentOutputSchema,
 } from "@/server/validators/brief-output";
 
 import type {
@@ -85,13 +88,7 @@ async function generateWithRetry(briefVersions: FinalizedBriefVersion[]) {
   }
 }
 
-export async function createFinalizedDocument({
-  sessionId,
-  requestedBy,
-}: {
-  sessionId: string;
-  requestedBy: string;
-}) {
+async function loadFinalizedDocumentInputs(sessionId: string) {
   const session = await prisma.intakeSession.findUnique({
     where: { id: sessionId },
     select: { id: true, projectId: true },
@@ -138,8 +135,26 @@ export async function createFinalizedDocument({
     .slice()
     .reverse()
     .map(briefVersionForPrompt);
-  const output = await generateWithRetry(briefVersions);
 
+  return { session, sourceBriefs, briefVersions };
+}
+
+async function persistFinalizedDocument({
+  sessionId,
+  requestedBy,
+  projectId,
+  sourceBriefs,
+  output,
+}: {
+  sessionId: string;
+  requestedBy: string;
+  projectId: string;
+  sourceBriefs: Array<{
+    id: string;
+    version: number;
+  }>;
+  output: FinalizedDocumentOutput;
+}) {
   return prisma.$transaction(
     async (tx) => {
       const latest = await tx.briefSnapshot.aggregate({
@@ -151,7 +166,7 @@ export async function createFinalizedDocument({
       const latestSourceBriefVersion = sourceBriefs[0]?.version ?? version;
       const snapshot = await tx.briefSnapshot.create({
         data: {
-          projectId: session.projectId,
+          projectId,
           sessionId,
           version,
           documentType: "FINALIZED_DOCUMENT",
@@ -181,7 +196,7 @@ export async function createFinalizedDocument({
 
       await tx.revisionEvent.create({
         data: {
-          projectId: session.projectId,
+          projectId,
           sessionId,
           snapshotId: snapshot.id,
           type: "GENERATED",
@@ -215,4 +230,93 @@ export async function createFinalizedDocument({
       timeout: FINALIZED_PERSIST_TRANSACTION_TIMEOUT_MS,
     },
   );
+}
+
+export async function createFinalizedDocument({
+  sessionId,
+  requestedBy,
+}: {
+  sessionId: string;
+  requestedBy: string;
+}) {
+  const { session, sourceBriefs, briefVersions } =
+    await loadFinalizedDocumentInputs(sessionId);
+  const output = await generateWithRetry(briefVersions);
+
+  return persistFinalizedDocument({
+    sessionId,
+    requestedBy,
+    projectId: session.projectId,
+    sourceBriefs,
+    output,
+  });
+}
+
+export type FinalizedDocumentStreamEvent =
+  | { type: "token"; text: string }
+  | {
+      type: "complete";
+      snapshotId: string;
+      version: number;
+      documentType: "FINALIZED_DOCUMENT";
+    }
+  | { type: "error"; code: string; message: string };
+
+export async function* createFinalizedDocumentStream({
+  sessionId,
+  requestedBy,
+}: {
+  sessionId: string;
+  requestedBy: string;
+}): AsyncGenerator<FinalizedDocumentStreamEvent> {
+  try {
+    const { session, sourceBriefs, briefVersions } =
+      await loadFinalizedDocumentInputs(sessionId);
+
+    let fullText = "";
+    try {
+      for await (const chunk of generateFinalizedDocumentStreamFromBriefs(
+        briefVersions,
+      )) {
+        fullText += chunk;
+        yield { type: "token", text: chunk };
+      }
+    } catch (streamError) {
+      throw finalizedErrorFromUnknown(streamError);
+    }
+
+    let output: FinalizedDocumentOutput;
+    try {
+      output = FinalizedDocumentOutputSchema.parse(extractJson(fullText));
+    } catch (parseError) {
+      const hint = finalizedErrorFromUnknown(parseError).message;
+      try {
+        output = await generateFinalizedDocumentFromBriefs(briefVersions, hint);
+      } catch (retryError) {
+        throw finalizedErrorFromUnknown(retryError);
+      }
+    }
+
+    const result = await persistFinalizedDocument({
+      sessionId,
+      requestedBy,
+      projectId: session.projectId,
+      sourceBriefs,
+      output,
+    });
+
+    yield {
+      type: "complete",
+      snapshotId: result.snapshotId,
+      version: result.version,
+      documentType: "FINALIZED_DOCUMENT",
+    };
+  } catch (error) {
+    const finalError = finalizedErrorFromUnknown(error);
+    yield {
+      type: "error",
+      code: finalError.code,
+      message: finalError.message,
+    };
+  }
 }

@@ -6,7 +6,7 @@ import {
   requireInternalAuth,
 } from "@/server/auth/internal";
 import {
-  createFinalizedDocument,
+  createFinalizedDocumentStream,
   FinalizedDocumentGenerationError,
 } from "@/server/services/finalized-documents";
 
@@ -20,12 +20,38 @@ export async function POST(_request: Request, { params }: RouteContext) {
   try {
     const auth = await requireInternalAuth();
     const { sessionId } = paramsSchema.parse(await params);
-    const result = await createFinalizedDocument({
-      sessionId,
-      requestedBy: auth.clerkUserId,
+
+    const encoder = new TextEncoder();
+    const requestedBy = auth.clerkUserId;
+
+    const sseStream = new ReadableStream({
+      async start(controller) {
+        const send = (data: object) =>
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+          );
+
+        send({ type: "start" });
+
+        for await (const event of createFinalizedDocumentStream({
+          sessionId,
+          requestedBy,
+        })) {
+          send(event);
+        }
+
+        controller.close();
+      },
     });
 
-    return NextResponse.json(result, { status: 201 });
+    return new Response(sseStream, {
+      status: 201,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     if (isInternalAuthorizationError(error)) {
       return NextResponse.json(

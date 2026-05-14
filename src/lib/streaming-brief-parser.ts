@@ -14,15 +14,35 @@ type ParseState =
   | "escape-skip";
 
 type SectionKey = "summary" | "goals" | "ambiguities" | "followUpQuestions";
+type FinalizedSectionKey =
+  | "projectOverview"
+  | "projectGoals"
+  | "mainFeatures"
+  | "functionalRequirements"
+  | "nonFunctionalRequirements"
+  | "userFlows";
+type StreamSectionKey = SectionKey | FinalizedSectionKey;
 
 const SECTION_DISPLAY: Record<
-  SectionKey,
+  StreamSectionKey,
   { label: string; reqType: "claim" | "question" }
 > = {
   summary: { label: "Summary", reqType: "claim" },
   goals: { label: "Goals", reqType: "claim" },
   ambiguities: { label: "Ambiguities", reqType: "question" },
   followUpQuestions: { label: "Follow-up Questions", reqType: "question" },
+  projectOverview: { label: "Project Overview", reqType: "claim" },
+  projectGoals: { label: "Project Goals", reqType: "claim" },
+  mainFeatures: { label: "Main Features", reqType: "claim" },
+  functionalRequirements: {
+    label: "Functional Requirements",
+    reqType: "claim",
+  },
+  nonFunctionalRequirements: {
+    label: "Non-Functional Requirements",
+    reqType: "claim",
+  },
+  userFlows: { label: "User Flows", reqType: "claim" },
 };
 
 const SECTION_KEYS = new Set<string>([
@@ -30,11 +50,17 @@ const SECTION_KEYS = new Set<string>([
   "goals",
   "ambiguities",
   "followUpQuestions",
+  "projectOverview",
+  "projectGoals",
+  "mainFeatures",
+  "functionalRequirements",
+  "nonFunctionalRequirements",
+  "userFlows",
 ]);
 const CONTENT_KEYS = new Set<string>(["text", "reason"]);
 
 /**
- * Incrementally parses streaming JSON from Gemini's structured brief output
+ * Incrementally parses streaming JSON from Gemini's structured document output
  * and builds DocLineData[] in the same visual format as snapshotToDocLines().
  *
  * Critical: when transitioning from a key-waiting state (after-other-key,
@@ -47,8 +73,8 @@ export class StreamingBriefParser {
   private state: ParseState = "outer";
   private depth = 0;
   private keyBuf = "";
-  private pendingSectionKey: SectionKey | null = null;
-  private currentSection: SectionKey | null = null;
+  private pendingSectionKey: StreamSectionKey | null = null;
+  private currentSection: StreamSectionKey | null = null;
   private currentField: "text" | "reason" | null = null;
   private currentText = "";
   private lineNum = 1;
@@ -74,7 +100,11 @@ export class StreamingBriefParser {
 
   getSnapshot(): DocLineData[] {
     const result = [...this.completedLines];
-    if (this.currentField && this.currentSection && this.currentText.length > 0) {
+    if (
+      this.currentField &&
+      this.currentSection &&
+      this.currentText.length > 0
+    ) {
       const info = SECTION_DISPLAY[this.currentSection];
       result.push({
         lineNum: this.lineNum,
@@ -95,8 +125,14 @@ export class StreamingBriefParser {
         return;
 
       case "in-key":
-        if (ch === "\\") { this.state = "escape-key"; return; }
-        if (ch === '"') { this.endKey(); return; }
+        if (ch === "\\") {
+          this.state = "escape-key";
+          return;
+        }
+        if (ch === '"') {
+          this.endKey();
+          return;
+        }
         this.keyBuf += ch;
         return;
 
@@ -125,7 +161,11 @@ export class StreamingBriefParser {
 
       case "after-content-key":
         if (ch === ":") return;
-        if (ch === '"') { this.state = "in-content"; this.currentText = ""; return; }
+        if (ch === '"') {
+          this.state = "in-content";
+          this.currentText = "";
+          return;
+        }
         // Non-string value (shouldn't happen for text/reason but guard anyway).
         // Re-process through handleOuter so depth stays correct.
         if (ch !== " " && ch !== "\t" && ch !== "\n") {
@@ -137,7 +177,10 @@ export class StreamingBriefParser {
 
       case "after-other-key":
         if (ch === ":") return;
-        if (ch === '"') { this.state = "in-skip"; return; }
+        if (ch === '"') {
+          this.state = "in-skip";
+          return;
+        }
         // Non-string value (array, object, number, bool, null).
         // Re-process through handleOuter so depth stays correct —
         // this is the fix for evidence arrays breaking depth tracking.
@@ -148,8 +191,15 @@ export class StreamingBriefParser {
         return;
 
       case "in-content":
-        if (ch === "\\") { this.state = "escape-content"; return; }
-        if (ch === '"') { this.completeField(); this.state = "outer"; return; }
+        if (ch === "\\") {
+          this.state = "escape-content";
+          return;
+        }
+        if (ch === '"') {
+          this.completeField();
+          this.state = "outer";
+          return;
+        }
         this.currentText += ch;
         return;
 
@@ -161,7 +211,10 @@ export class StreamingBriefParser {
         return;
 
       case "in-skip":
-        if (ch === "\\") { this.state = "escape-skip"; return; }
+        if (ch === "\\") {
+          this.state = "escape-skip";
+          return;
+        }
         if (ch === '"') this.state = "outer";
         return;
 
@@ -198,7 +251,7 @@ export class StreamingBriefParser {
     this.keyBuf = "";
 
     if (this.depth === 1 && SECTION_KEYS.has(key)) {
-      this.pendingSectionKey = key as SectionKey;
+      this.pendingSectionKey = key as StreamSectionKey;
       this.state = "wait-section-colon";
     } else if (this.depth === 3 && CONTENT_KEYS.has(key)) {
       this.currentField = key as "text" | "reason";
@@ -217,11 +270,19 @@ export class StreamingBriefParser {
     if (this.completedLines.length > 0) {
       this.completedLines.push({ lineNum: 0, type: "blank" });
     }
-    this.completedLines.push({ lineNum: this.lineNum++, type: "h2", text: info.label });
+    this.completedLines.push({
+      lineNum: this.lineNum++,
+      type: "h2",
+      text: info.label,
+    });
   }
 
   private completeField(): void {
-    if (!this.currentField || !this.currentSection || !this.currentText.trim()) {
+    if (
+      !this.currentField ||
+      !this.currentSection ||
+      !this.currentText.trim()
+    ) {
       this.currentField = null;
       this.currentText = "";
       return;

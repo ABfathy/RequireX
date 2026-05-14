@@ -66,6 +66,14 @@ function sourceUrl(asset: Pick<SourceAsset, "appUrl" | "ufsUrl">) {
   return asset.appUrl ?? asset.ufsUrl;
 }
 
+function isTrustedAssetUrlHost(hostname: string) {
+  return (
+    hostname === "utfs.io" ||
+    hostname === "ufs.sh" ||
+    hostname.endsWith(".ufs.sh")
+  );
+}
+
 async function downloadAssetBytes(
   asset: Pick<SourceAsset, "id" | "appUrl" | "ufsUrl">,
 ) {
@@ -75,7 +83,7 @@ async function downloadAssetBytes(
   }
 
   const parsed = new URL(url);
-  if (parsed.hostname !== "utfs.io") {
+  if (!isTrustedAssetUrlHost(parsed.hostname)) {
     throw new Error(`Untrusted asset URL host: ${parsed.hostname}`);
   }
 

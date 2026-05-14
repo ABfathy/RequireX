@@ -148,7 +148,12 @@ function escapeHtml(s: string) {
 type SseEvent =
   | { type: "start"; jobId?: string }
   | { type: "token"; text: string }
-  | { type: "complete"; snapshotId: string; version: number }
+  | {
+      type: "complete";
+      snapshotId: string;
+      version: number;
+      documentType?: DocumentType;
+    }
   | { type: "error"; code: string; message: string };
 
 const SMOOTH_CHAR_DELAY_MS = 5; // ~200 chars/sec — matches typical model generation speed
@@ -160,12 +165,20 @@ async function readSseStream(
   body: ReadableStream<Uint8Array>,
   onLines: (lines: DocLineData[]) => void,
   onJobId?: (jobId: string) => void,
-): Promise<{ snapshotId: string; version: number }> {
+): Promise<{
+  snapshotId: string;
+  version: number;
+  documentType?: DocumentType;
+}> {
   const parser = new StreamingBriefParser();
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
-  let completeResult: { snapshotId: string; version: number } | null = null;
+  let completeResult: {
+    snapshotId: string;
+    version: number;
+    documentType?: DocumentType;
+  } | null = null;
   let lastRenderTime = 0;
 
   const flushIfDue = () => {
@@ -198,7 +211,11 @@ async function readSseStream(
         const snapshot = parser.getSnapshot();
         if (snapshot.length > 0) onLines(snapshot);
       } else if (evt.type === "complete") {
-        completeResult = { snapshotId: evt.snapshotId, version: evt.version };
+        completeResult = {
+          snapshotId: evt.snapshotId,
+          version: evt.version,
+          documentType: evt.documentType,
+        };
       } else if (evt.type === "error") {
         throw new Error(evt.message);
       }
@@ -786,15 +803,39 @@ export function EditorShell({
     setFinalizing(true);
     setGenerationError(null);
     setExtractStatus("running");
-    setStreamingLines([
+
+    const PHASE_LABELS = [
+      "Collecting generated briefs…",
+      "Drafting finalized document…",
+    ];
+    let phaseIdx = 0;
+    const makeHeaderLines = (phaseLabel: string): DocLineData[] => [
       {
         lineNum: 1,
         type: "meta",
-        text: "Creating finalized document...",
+        text: phaseLabel,
         small: true,
       },
       { lineNum: 0, type: "blank" },
-    ]);
+    ];
+    const initialHeader = makeHeaderLines(PHASE_LABELS[0]!);
+    setStreamingLines(initialHeader);
+
+    const phaseInterval = setInterval(() => {
+      phaseIdx = Math.min(phaseIdx + 1, PHASE_LABELS.length - 1);
+      const nextLabel = PHASE_LABELS[phaseIdx];
+      setStreamingLines((prev) => {
+        if (!prev || prev.length < 1) return prev;
+        const updated = [...prev];
+        updated[0] = {
+          lineNum: 1,
+          type: "meta",
+          text: nextLabel,
+          small: true,
+        };
+        return updated;
+      });
+    }, 3000);
 
     try {
       const res = await fetch(
@@ -806,6 +847,7 @@ export function EditorShell({
       );
 
       if (!res.ok) {
+        clearInterval(phaseInterval);
         const payload = (await res.json().catch(() => null)) as {
           error?: string;
           message?: string;
@@ -817,11 +859,48 @@ export function EditorShell({
         );
       }
 
-      const result = (await res.json()) as {
+      let result: {
         snapshotId: string;
         version: number;
         documentType: DocumentType;
       };
+      const lineOffset = initialHeader.length;
+      let firstToken = true;
+
+      const onStreamLines = (parserLines: DocLineData[]) => {
+        if (firstToken) {
+          clearInterval(phaseInterval);
+          firstToken = false;
+        }
+        const shifted = parserLines.map((line) => ({
+          ...line,
+          lineNum: line.lineNum > 0 ? line.lineNum + lineOffset : 0,
+        }));
+        setStreamingLines([
+          ...makeHeaderLines("Drafting finalized document…"),
+          ...shifted,
+        ]);
+      };
+
+      if (
+        res.headers.get("content-type")?.includes("text/event-stream") &&
+        res.body
+      ) {
+        const streamResult = await readSseStream(res.body, onStreamLines);
+        result = {
+          snapshotId: streamResult.snapshotId,
+          version: streamResult.version,
+          documentType: streamResult.documentType ?? "FINALIZED_DOCUMENT",
+        };
+      } else {
+        clearInterval(phaseInterval);
+        result = (await res.json()) as {
+          snapshotId: string;
+          version: number;
+          documentType: DocumentType;
+        };
+      }
+
       const optimisticSnapshot: SnapshotSummary = {
         eventId: `optimistic-finalized-${result.snapshotId}`,
         id: result.snapshotId,
@@ -861,6 +940,7 @@ export function EditorShell({
       await loadRevisions(sessionId);
       router.refresh();
     } catch (error) {
+      clearInterval(phaseInterval);
       setExtractStatus("failed");
       setGenerationError(
         error instanceof Error
@@ -869,6 +949,7 @@ export function EditorShell({
       );
       setStreamingLines(null);
     } finally {
+      clearInterval(phaseInterval);
       setFinalizing(false);
     }
   }, [sessionId, finalizing, loadRevisions, router]);

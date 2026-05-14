@@ -13,12 +13,20 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/server/services/google-genai", () => ({
+  extractJson: (raw: string) => JSON.parse(raw),
   generateFinalizedDocumentFromBriefs: vi.fn(),
+  generateFinalizedDocumentStreamFromBriefs: vi.fn(),
 }));
 
 import { prisma } from "@/lib/prisma";
-import { createFinalizedDocument } from "@/server/services/finalized-documents";
-import { generateFinalizedDocumentFromBriefs } from "@/server/services/google-genai";
+import {
+  createFinalizedDocument,
+  createFinalizedDocumentStream,
+} from "@/server/services/finalized-documents";
+import {
+  generateFinalizedDocumentFromBriefs,
+  generateFinalizedDocumentStreamFromBriefs,
+} from "@/server/services/google-genai";
 
 const mockPrisma = prisma as unknown as {
   intakeSession: {
@@ -32,6 +40,10 @@ const mockPrisma = prisma as unknown as {
 
 const mockGenerateFinalizedDocumentFromBriefs =
   generateFinalizedDocumentFromBriefs as unknown as ReturnType<typeof vi.fn>;
+const mockGenerateFinalizedDocumentStreamFromBriefs =
+  generateFinalizedDocumentStreamFromBriefs as unknown as ReturnType<
+    typeof vi.fn
+  >;
 
 function finalizedOutput() {
   const item = (text: string) => ({
@@ -99,6 +111,12 @@ function createTx(finalizedMaxVersion = 1) {
       update: vi.fn().mockResolvedValue({ id: "session_1" }),
     },
   };
+}
+
+async function* chunksFrom(text: string) {
+  const midpoint = Math.ceil(text.length / 2);
+  yield text.slice(0, midpoint);
+  yield text.slice(midpoint);
 }
 
 describe("createFinalizedDocument", () => {
@@ -219,5 +237,47 @@ describe("createFinalizedDocument", () => {
     });
     expect(mockGenerateFinalizedDocumentFromBriefs).not.toHaveBeenCalled();
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("streams finalized document tokens and persists the parsed output", async () => {
+    const tx = createTx(2);
+    mockPrisma.$transaction.mockImplementation(async (callback) =>
+      callback(tx),
+    );
+    const rawOutput = JSON.stringify(finalizedOutput());
+    mockGenerateFinalizedDocumentStreamFromBriefs.mockReturnValueOnce(
+      chunksFrom(rawOutput),
+    );
+
+    const events = [];
+    for await (const event of createFinalizedDocumentStream({
+      sessionId: "session_1",
+      requestedBy: "user_1",
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      {
+        type: "token",
+        text: rawOutput.slice(0, Math.ceil(rawOutput.length / 2)),
+      },
+      { type: "token", text: rawOutput.slice(Math.ceil(rawOutput.length / 2)) },
+      {
+        type: "complete",
+        snapshotId: "finalized_2",
+        version: 3,
+        documentType: "FINALIZED_DOCUMENT",
+      },
+    ]);
+    expect(mockGenerateFinalizedDocumentFromBriefs).not.toHaveBeenCalled();
+    expect(tx.briefClaim.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          snapshotId: "finalized_2",
+          section: "FUNCTIONAL_REQUIREMENTS",
+        }),
+      ]),
+    });
   });
 });

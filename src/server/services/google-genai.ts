@@ -970,3 +970,45 @@ export async function generateFinalizedDocumentFromBriefs(
     throw error;
   }
 }
+
+export async function* generateFinalizedDocumentStreamFromBriefs(
+  briefVersions: FinalizedBriefVersion[],
+  retryHint?: string,
+): AsyncGenerator<string> {
+  let stream;
+  try {
+    stream = await getClient().models.generateContentStream({
+      model: MODEL,
+      contents: [
+        { text: buildFinalizedDocumentPrompt(briefVersions, retryHint) },
+      ],
+      config: {
+        systemInstruction: FINALIZED_DOCUMENT_SYSTEM_PROMPT,
+        temperature: 0.2,
+        maxOutputTokens: 16384,
+        responseMimeType: "application/json",
+        responseJsonSchema: finalizedDocumentJsonSchema,
+      },
+    });
+  } catch (error) {
+    logGoogleGenAI(
+      "error",
+      "Gemini finalized document streaming call failed.",
+      {
+        project: serverEnv.GOOGLE_CLOUD_PROJECT ?? null,
+        location: serverEnv.GOOGLE_CLOUD_LOCATION ?? null,
+        briefVersionCount: briefVersions.length,
+        retry: Boolean(retryHint),
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage:
+          error instanceof Error ? error.message : "Unknown Gemini error.",
+      },
+    );
+    throw error;
+  }
+
+  for await (const chunk of stream) {
+    const text = chunk.text ?? "";
+    if (text) yield text;
+  }
+}
