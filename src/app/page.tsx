@@ -97,12 +97,12 @@ export default function HomePage() {
         {/* Nav cards */}
         <div className="grid grid-cols-2 gap-3">
           <NavCard
-            href="/app"
+            href="/demo/workspace"
             label="Internal Workspace"
             description="Editor, chat, source ingestion, revision history."
           />
           <NavCard
-            href="/brief/demo-share-token"
+            href="/demo/brief"
             label="Client Brief View"
             description="Shareable review link — comment, answer, approve."
           />

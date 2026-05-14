@@ -7,47 +7,52 @@
 ╚═╝  ╚═╝╚══════╝ ╚══▀▀═╝  ╚═════╝ ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
 ```
 
-AI intake and brief-generation workspace for the Softworks x AISprint hackathon.
+AI intake and brief-generation workspace for the EUI Hackathon 2026.
 
-## Repo state
+## What It Does
 
-This repo is no longer just a planning scaffold. It now includes a working internal workspace with auth, per-user workspace/project bootstrapping, source ingestion, UploadThing-backed file uploads, public review mutation APIs, Prisma persistence, and Inngest job request wiring.
+RequireX ingests PDFs, voice notes, screenshots, and pasted text from a client engagement, runs the full content through Gemini 2.5 Flash, and produces a structured requirements brief with traceable evidence back to every source. The brief is then shared with the client via a unique link — they can comment on individual requirements, answer clarification questions, and confirm approval, all without a login.
 
-The generation pipeline itself is still not implemented. `POST /api/generate` and `POST /api/regenerate` create `ProcessingJob` records and dispatch Inngest events, but the current Inngest functions intentionally mark those jobs as failed with `PIPELINE_NOT_IMPLEMENTED`.
+## Current State
 
-The public client brief route also still renders mock data today, even though the supporting public review APIs and database models exist.
+The full product loop is implemented end-to-end:
 
-## Current Capabilities
+**Internal workspace:**
+- Clerk auth with custom sign-in / sign-up pages; `/app/**` protected by middleware
+- Per-user workspace bootstrap; project creation and switching
+- Source panel: pasted text, PDF upload, audio upload, image upload — rename, delete, preview
+- Brief generation: unified "Generate Brief" / "Regenerate" button; sync pipeline (default) streams tokens to the editor via SSE with character-by-character animation; async Inngest path available via `BRIEF_GENERATION_ASYNC=1`
+- Source processing: PDF parsed by built-in stream extractor, audio transcribed via Gemini, images passed as base64 vision input; all sources chunked into `SourceChunk` rows with evidence locators
+- AI chat revision: select text in the brief or send a message from the chat tab — Gemini streams a revised brief, revision is persisted and navigable
+- Revision history tab: full `RevisionEvent` timeline with client feedback bodies and authors shown inline
+- Share-link creation: "Share" button in the doc header opens a modal, generates a cryptographically random token, sets snapshot status to `SHARED`, and shows the copy-able URL
 
-- Internal auth with Clerk on `/app/**`
-- Automatic per-user workspace creation
-- Project list, project switching, and project creation
-- One initial intake session created per new project
-- Source ingestion via pasted text and uploaded files
-- UploadThing routes for images, PDFs, audio, and mixed uploads
-- Source rename and delete flows
-- Public review APIs for comments, follow-up answers, and confirmation
-- Prisma schema and migration for the full core data model
-- Vitest coverage for asset services, public auth, public review services, validators, and public review routes
+**Public review:**
+- `/brief/[shareToken]` loads the real `BriefSnapshot` from the database — claims, questions, comments, revision history, and diagrams
+- Clients can comment on individual requirements, answer clarification questions, and confirm brief approval — all without a login
+- Rate limiting per action + share token + IP; read-only guard once snapshot is `CONFIRMED`
+- Every client action writes a `RevisionEvent` visible in the internal workspace
 
-## Important Gaps
+**Demo views (no login required):**
+- Landing page → "Internal Workspace" → `/demo/workspace`
+- Landing page → "Client Brief View" → `/demo/brief`
 
-- No implemented AI extraction or brief generation pipeline yet
-- No live brief snapshot rendering in the internal editor
-- No live snapshot-backed rendering on `/brief/[shareToken]`
-- No share-link creation UI yet
-- No e2e or accessibility automation despite placeholder scripts
+## Remaining Gaps
+
+- Chat tab standalone send input not wired — chat messages currently only trigger from document text selection
+- No e2e or accessibility automation (placeholder scripts only)
 
 ## Stack
 
-- `Next.js 16` App Router
+- `Next.js 15` App Router
 - `React 19`
 - `Tailwind CSS 4`
 - `Clerk`
 - `Prisma`
 - `PostgreSQL`
 - `UploadThing`
-- `Inngest`
+- `Inngest` (async generation path)
+- `@google/genai` — Gemini 2.5 Flash via Vertex AI
 - `Vitest`
 
 ## Scripts
@@ -66,28 +71,31 @@ pnpm prisma:seed
 pnpm prisma:studio
 ```
 
-Note: `pnpm test` and `pnpm test:unit` both run the current Vitest suite. `pnpm test:e2e` and `pnpm test:a11y` are still placeholders.
+`pnpm test` and `pnpm test:unit` run the Vitest suite (11 files, 93 tests). `pnpm test:e2e` and `pnpm test:a11y` are placeholder scripts.
+
+## Environment
+
+Required for generation:
+- `GOOGLE_CLOUD_PROJECT`
+- `GOOGLE_CLOUD_LOCATION`
+- `GOOGLE_APPLICATION_CREDENTIALS` (path to ADC JSON)
+
+Required for auth:
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+
+Required for file uploads:
+- `UPLOADTHING_TOKEN`
+
+Optional:
+- `BRIEF_GENERATION_ASYNC=1` — switches `/api/generate` to Inngest dispatch (default `0`, sync)
+- `SEED_USER_ID` — Clerk user ID to tie seeded rows to
 
 ## Docs
 
-Start with [docs/README.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/README.md).
-
-Most useful docs:
-
-- [docs/09-current-state.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/09-current-state.md)
-- [docs/05-task-list.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/05-task-list.md)
-- [docs/11-next-steps.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/11-next-steps.md)
-- [claude-curr-sesh.md](/Users/abdallah/repos/EUI-hackathon-2026/claude-curr-sesh.md)
-
-Reference docs:
-
-- [docs/01-tech-stack.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/01-tech-stack.md)
-- [docs/02-system-architecture.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/02-system-architecture.md)
-- [docs/03-brief-contract.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/03-brief-contract.md)
-- [docs/04-feature-list.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/04-feature-list.md)
-- [docs/08-testing-strategy.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/08-testing-strategy.md)
-
-Original hackathon reference material:
-
-- [docs/hackathon-softworks-extracted.md](/Users/abdallah/repos/EUI-hackathon-2026/docs/hackathon-softworks-extracted.md)
-- [docs/hackathon-softworks.pdf](/Users/abdallah/repos/EUI-hackathon-2026/docs/hackathon-softworks.pdf)
+- [docs/09-current-state.md](docs/09-current-state.md) — detailed per-area status
+- [docs/05-task-list.md](docs/05-task-list.md) — done / in-progress / next engineering work
+- [docs/11-next-steps.md](docs/11-next-steps.md) — prioritised next steps
+- [docs/02-system-architecture.md](docs/02-system-architecture.md) — data model and request flow
+- [docs/03-brief-contract.md](docs/03-brief-contract.md) — Gemini output schema
+- [docs/hackathon-softworks-extracted.md](docs/hackathon-softworks-extracted.md) — original brief

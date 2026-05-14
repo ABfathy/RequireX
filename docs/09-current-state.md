@@ -1,10 +1,10 @@
 # Current State
 
-Last refreshed: 2026-05-13
+Last refreshed: 2026-05-14
 
 ## Summary
 
-The internal workspace is end-to-end functional: auth → source upload → brief generation (text, PDF, audio, image) → streaming editor view → AI chat revision → revision history. The public review mutation surface is fully wired. The two remaining gaps before the full public loop closes are **share-link creation** and **binding the public brief page to real snapshot data**.
+The full product loop is implemented end-to-end. Auth → source upload → brief generation (text, PDF, audio, image) → streaming editor → AI chat revision → share-link creation → public client review → revision history with client feedback visible internally. The only outstanding UI wiring is the standalone chat send input (chat currently only sends from document text selection).
 
 ---
 
@@ -12,17 +12,17 @@ The internal workspace is end-to-end functional: auth → source upload → brie
 
 **Working end-to-end:**
 
-- Clerk auth with custom sign-in / sign-up pages; middleware enforces protection
+- Clerk auth with custom sign-in / sign-up pages; middleware enforces protection on `/app/**`
 - Workspace bootstrap, project listing, project creation, active-project switching
 - Source panel: pasted text, file uploads (PDF, audio, image), rename, delete, preview
 - Generate / Regenerate: unified button shows "Generate Brief" before the first snapshot, "Regenerate" after; downloads file sources, processes PDF/audio/image, builds prompt bundle, calls Gemini 2.5 Flash, streams tokens to editor with character animation
-- AI chat revision: user sends a message from the right pane or selection, Gemini streams a revised brief, revision is persisted and navigable
+- AI chat revision: user sends a message from the right pane or document text selection, Gemini streams a revised brief, revision is persisted and navigable
 - Revision history tab: full `RevisionEvent` list with type colouring; client feedback bodies and authors shown inline for `CLIENT_COMMENT_ADDED` / `CLIENT_ANSWER_ADDED` events
+- Share-link creation: "Share" button in the doc header opens a modal that calls `POST /api/snapshots/[snapshotId]/share`, generates a cryptographically random token, sets the snapshot to `SHARED`, and presents a copy-able client URL
 
 **Not wired:**
 
-- No share-link creation button — `ShareLink` model is ready but no creation path exists
-- Chat tab "send" input is display-only; send action only triggers from document text selection
+- Chat tab standalone send input is display-only; send action only triggers from document text selection
 
 ---
 
@@ -54,13 +54,12 @@ The internal workspace is end-to-end functional: auth → source upload → brie
 - Source bundle assembly passes each source's full text to the model; each asset is independently capped at `PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE` (default 750 000 chars — well within Gemini 2.5 Flash's 1 M-token context window)
 - Gemini output validated against JSON schema; retried once on parse failure
 - `BriefSnapshot`, `BriefClaim`, `BriefQuestion`, `EvidenceRef` persisted in a single Prisma transaction
-- `GENERATED` revision event written per run
+- `GENERATED` / `REGENERATED` revision event written per run
 
 **Known limits:**
 
 - No server-side timeout on the streaming Gemini call — a stalled request hangs the worker
 - SSE stream controller not explicitly closed after error events
-- Per-source prompt ceiling is env-configurable (`PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE`, default 750 000); no truncation expected for any realistic source
 
 ---
 
@@ -68,6 +67,8 @@ The internal workspace is end-to-end functional: auth → source upload → brie
 
 **Working:**
 
+- Share-link creation: `POST /api/snapshots/[snapshotId]/share` creates or returns an existing active `ShareLink`; snapshot status set to `SHARED`
+- `/brief/[shareToken]` loads real `BriefSnapshot` data from the database — claims, questions, comments, revision history, and diagrams
 - Comment, answer, and confirm mutation routes fully implemented and tested
 - Share-link validation (token lookup, expiry, status)
 - Snapshot mutability guard (only `SHARED` snapshots accept mutations)
@@ -75,10 +76,14 @@ The internal workspace is end-to-end functional: auth → source upload → brie
 - Revision events written for every public mutation
 - Public brief page shell is responsive and themed; submission handlers wired to real APIs
 
-**Not working:**
+---
 
-- `/brief/[shareToken]` renders `MOCK_REQUIREMENTS` and `MOCK_REVISIONS` — no code reads the real `BriefSnapshot` from the database for display
-- No share-link creation path; tokens cannot be generated from the internal workspace
+## Demo Views
+
+Landing page cards route to static demo views (no login or DB required):
+
+- `/demo/workspace` — full `EditorShell` with static Softworks Retail App data (4 processed sources, generated brief with claims and ambiguities)
+- `/demo/brief` — full `PublicBriefView` with static data (10 claims, 3 questions, 2 comments, 1 flowchart diagram)
 
 ---
 

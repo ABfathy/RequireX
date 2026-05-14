@@ -28,7 +28,7 @@
 - [x] Audio source processing — download, transcribe via Gemini, chunk
 - [x] Image source support — base64 passed directly to Gemini vision API
 - [x] `SourceChunk` creation for all source types during generation
-- [x] Source bundle assembly — each asset's full text sent to Gemini independently, capped per-asset at `PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE` (default 750 000 chars); no shared budget split across sources
+- [x] Source bundle assembly — each asset's full text sent to Gemini independently, capped per-asset at `PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE` (default 750 000 chars)
 - [x] `BriefSnapshot`, `BriefClaim`, `BriefQuestion`, and `EvidenceRef` persistence
 - [x] `RevisionEvent` creation for generated snapshots
 - [x] Streaming SSE generation with character-by-character animation in the editor
@@ -44,6 +44,13 @@
 - [x] Revisions tab with full `RevisionEvent` history
 - [x] Revision history enriched with public feedback bodies and authors
 
+### Share-Link Creation
+
+- [x] `createShareLink()` and `revokeShareLink()` service in `src/server/services/share-link.ts`
+- [x] `POST /api/snapshots/[snapshotId]/share` route — creates or returns existing active share link
+- [x] `DELETE /api/snapshots/[snapshotId]/share?shareLinkId=…` route — revokes a link
+- [x] `ShareModal` component — calls the API, shows copy-able URL, wired into `EditorShell` doc header
+
 ### Public Review (Backend)
 
 - [x] Public review comment route and service
@@ -55,30 +62,28 @@
 
 ### Public Review (UI)
 
+- [x] `/brief/[shareToken]` backed by real `BriefSnapshot` data via `loadPublicBriefView()`
 - [x] Wire public comment submission to `/api/public/briefs/[shareToken]/comments`
 - [x] Wire public answer submission to `/api/public/briefs/[shareToken]/answers`
 - [x] Wire public confirmation submission to `/api/public/briefs/[shareToken]/confirm`
 - [x] Surface public mutation success, validation, rate-limit, and read-only errors in the UI
 - [x] Show revision history and public feedback inside the internal workspace
 
+### Demo Views
+
+- [x] `/demo/brief` — static `PublicBriefView` with Softworks Retail App data (no login or DB)
+- [x] `/demo/workspace` — static `EditorShell` with Softworks Retail App data (no login or DB)
+- [x] Landing page cards route to demo views instead of auth-gated routes
+
 ---
 
 ## In Progress / Partially Done
 
-- [ ] `/brief/[shareToken]` has the real responsive shell and wired submissions, but still renders `MOCK_REQUIREMENTS` and `MOCK_REVISIONS` — not yet backed by real snapshot data
-- [x] Generation supports both sync and async modes; job status surfaced in status bar; retry button on failure
 - [ ] Right pane chat tab displays messages but the standalone send input is not wired (send only works from document text selection)
 
 ---
 
 ## Next Engineering Work
-
-### P0 — Close the Public Review Loop
-
-- [ ] Add `createShareLink()` service function in `src/server/services/share-link.ts`
-- [ ] Add `POST /api/snapshots/[snapshotId]/share` route
-- [ ] Add share button in the internal workspace (doc header or right pane) that shows the generated URL
-- [ ] Load real `ShareLink → BriefSnapshot` data in `/brief/[shareToken]/page.tsx` — replace mock requirements and revisions
 
 ### P1 — Code Quality (Discovered Enhancements)
 
@@ -87,7 +92,6 @@
 - [ ] Audio processor: add parser-version tracking to `providerMetadata` (like PDF uses `PDF_TEXT_PARSER_VERSION`)
 - [ ] Add 10-minute `AbortSignal` timeout to streaming Gemini call in generation pipeline
 - [ ] Call `controller.close()` after error event in `api/generate/route.ts` SSE stream
-- [x] Move `PROMPT_BUNDLE_MAX_CHARS = 30_000` to an env-configurable value (`PROMPT_BUNDLE_MAX_CHARS_PER_SOURCE`, default 750 000 — full-source mode, no budget splitting)
 
 ### P2 — Test Coverage
 
