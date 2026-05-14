@@ -246,6 +246,7 @@ export async function requestBriefRegeneration({
     where: {
       id: sourceSnapshotId,
       sessionId,
+      documentType: "GENERATED_BRIEF",
     },
     select: {
       id: true,

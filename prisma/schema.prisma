@@ -112,6 +112,7 @@ model BriefSnapshot {
   projectId           String              @db.Uuid
   sessionId           String              @db.Uuid
   version             Int
+  documentType        BriefDocumentType   @default(GENERATED_BRIEF)
   status              BriefSnapshotStatus @default(DRAFT)
   sourceBundleVersion Int
   createdBy           String
@@ -128,9 +129,10 @@ model BriefSnapshot {
   sourceJobs          ProcessingJob[]     @relation("SourceSnapshotJobs")
   resultJobs          ProcessingJob[]     @relation("ResultSnapshotJobs")
 
-  @@unique([sessionId, version])
+  @@unique([sessionId, documentType, version])
   @@index([projectId, createdAt])
   @@index([sessionId, createdAt])
+  @@index([sessionId, documentType, createdAt])
 }
 
 model BriefClaim {
@@ -332,9 +334,20 @@ enum BriefSnapshotStatus {
   SUPERSEDED
 }
 
+enum BriefDocumentType {
+  GENERATED_BRIEF
+  FINALIZED_DOCUMENT
+}
+
 enum BriefClaimSection {
   SUMMARY
   GOALS
+  PROJECT_OVERVIEW
+  PROJECT_GOALS
+  MAIN_FEATURES
+  FUNCTIONAL_REQUIREMENTS
+  NON_FUNCTIONAL_REQUIREMENTS
+  USER_FLOWS
 }
 
 enum BriefQuestionSection {
@@ -353,6 +366,12 @@ enum BriefCommentSection {
   GOALS
   AMBIGUITIES
   FOLLOW_UP_QUESTIONS
+  PROJECT_OVERVIEW
+  PROJECT_GOALS
+  MAIN_FEATURES
+  FUNCTIONAL_REQUIREMENTS
+  NON_FUNCTIONAL_REQUIREMENTS
+  USER_FLOWS
 }
 
 enum BriefCommentAnchorType {

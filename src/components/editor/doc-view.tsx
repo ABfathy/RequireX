@@ -331,8 +331,12 @@ function DocLine({
         }}
         aria-hidden="true"
       >
-        {isReq && line.reqType === "claim" && !editing && onInsertLineAfter &&
-          line.section != null && line.orderIndex != null ? (
+        {isReq &&
+        line.reqType === "claim" &&
+        !editing &&
+        onInsertLineAfter &&
+        line.section != null &&
+        line.orderIndex != null ? (
           <span className="relative inline-flex items-center justify-end w-full">
             <span className="group-hover:opacity-0 transition-opacity duration-[80ms]">
               {line.lineNum > 0 ? line.lineNum : ""}
@@ -350,9 +354,11 @@ function DocLine({
                 // discard the second call so we never append twice.
                 if (insertingRef.current) return;
                 insertingRef.current = true;
-                void onInsertLineAfter(line.section!, line.orderIndex!).finally(() => {
-                  insertingRef.current = false;
-                });
+                void onInsertLineAfter(line.section!, line.orderIndex!).finally(
+                  () => {
+                    insertingRef.current = false;
+                  },
+                );
               }}
               className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-60 hover:!opacity-100 rounded-[3px] transition-opacity duration-[80ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
               style={{ color: "var(--accent)" }}
@@ -360,8 +366,10 @@ function DocLine({
               <Icons.Plus size={11} />
             </button>
           </span>
+        ) : line.lineNum > 0 ? (
+          line.lineNum
         ) : (
-          line.lineNum > 0 ? line.lineNum : ""
+          ""
         )}
       </div>
 
@@ -612,7 +620,10 @@ function EmptyDoc({
   if (state === "revising" || state === "generating") {
     const isRevising = state === "revising";
     // Skeleton rows: [type, width%] — mirror realistic doc structure
-    const skeletonRows: Array<{ kind: "h1" | "h2" | "meta" | "body" | "blank"; w?: number }> = [
+    const skeletonRows: Array<{
+      kind: "h1" | "h2" | "meta" | "body" | "blank";
+      w?: number;
+    }> = [
       { kind: "h1", w: 55 },
       { kind: "blank" },
       { kind: "meta", w: 28 },
@@ -648,7 +659,9 @@ function EmptyDoc({
           <div className="flex items-center gap-2 py-2">
             <span
               className="size-[7px] rounded-full animate-pulse shrink-0"
-              style={{ background: isRevising ? "var(--accent)" : "var(--warning)" }}
+              style={{
+                background: isRevising ? "var(--accent)" : "var(--warning)",
+              }}
               aria-hidden="true"
             />
             <span className="text-[12px]" style={{ color: "var(--fg-muted)" }}>
@@ -657,9 +670,14 @@ function EmptyDoc({
           </div>
         </div>
         {skeletonRows.map((row, i) => (
-          <div key={i} className={`flex items-start w-full ${gutterH[row.kind]}`}>
+          <div
+            key={i}
+            className={`flex items-start w-full ${gutterH[row.kind]}`}
+          >
             {/* Gutter — matches DocLine exactly */}
-            <div className={`shrink-0 flex items-start justify-end pr-3 pt-[3px] w-[52px] ${gutterH[row.kind]}`}>
+            <div
+              className={`shrink-0 flex items-start justify-end pr-3 pt-[3px] w-[52px] ${gutterH[row.kind]}`}
+            >
               {row.kind !== "blank" && row.kind !== "meta" && (
                 <div
                   className="h-[9px] w-[18px] rounded-[2px] animate-pulse"
@@ -668,7 +686,9 @@ function EmptyDoc({
               )}
             </div>
             {/* Content */}
-            <div className={`flex items-center flex-1 pr-6 ${gutterH[row.kind]}`}>
+            <div
+              className={`flex items-center flex-1 pr-6 ${gutterH[row.kind]}`}
+            >
               {row.kind !== "blank" && (
                 <div
                   className={`${heights[row.kind]} rounded-[3px] animate-pulse`}
@@ -709,13 +729,18 @@ function EmptyDoc({
             className="text-[13px] leading-[1.65] mb-3"
             style={{ color: "var(--fg-muted)" }}
           >
-            {generationError ?? "The pipeline could not complete. Check sources and try again."}
+            {generationError ??
+              "The pipeline could not complete. Check sources and try again."}
           </p>
           {onRetry && (
             <button
               onClick={onRetry}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[12px] font-medium transition-opacity hover:opacity-80"
-              style={{ background: "var(--surface-2)", color: "var(--fg-secondary)", border: "1px solid var(--border)" }}
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--fg-secondary)",
+                border: "1px solid var(--border)",
+              }}
             >
               <Icons.Refresh size={11} aria-hidden="true" />
               Retry
@@ -788,9 +813,16 @@ function ChatBar({
               color: "var(--accent)",
             }}
           >
-            <Icons.MessageSquare size={10} aria-hidden="true" className="shrink-0" />
+            <Icons.MessageSquare
+              size={10}
+              aria-hidden="true"
+              className="shrink-0"
+            />
             <span className="truncate text-[11px]">
-              Re: {selectedReqText.length > 72 ? `${selectedReqText.slice(0, 72)}…` : selectedReqText}
+              Re:{" "}
+              {selectedReqText.length > 72
+                ? `${selectedReqText.slice(0, 72)}…`
+                : selectedReqText}
             </span>
           </span>
           <button
@@ -813,7 +845,9 @@ function ChatBar({
           borderColor: "var(--border-strong)",
         }}
       >
-        <label htmlFor="doc-chat-input" className="sr-only">Chat input</label>
+        <label htmlFor="doc-chat-input" className="sr-only">
+          Chat input
+        </label>
         <input
           id="doc-chat-input"
           ref={inputRef}
@@ -861,7 +895,10 @@ function ChatBar({
             {!isDisabled && (
               <span
                 className="text-[10px] select-none"
-                style={{ color: "var(--fg-disabled)", fontFamily: "var(--font-mono)" }}
+                style={{
+                  color: "var(--fg-disabled)",
+                  fontFamily: "var(--font-mono)",
+                }}
               >
                 ↵ send
               </span>
@@ -889,7 +926,13 @@ function applyFilter(lines: DocLineData[], query: string): DocLineData[] {
   if (!query.trim()) return lines;
   const q = query.toLowerCase();
   return lines.filter((l) => {
-    if (l.type === "h1" || l.type === "h2" || l.type === "meta" || l.type === "req-header") return true;
+    if (
+      l.type === "h1" ||
+      l.type === "h2" ||
+      l.type === "meta" ||
+      l.type === "req-header"
+    )
+      return true;
     if (l.type === "blank") return false;
     return l.text?.toLowerCase().includes(q) ?? false;
   });
@@ -900,11 +943,14 @@ export interface DocViewProps {
   appState?: AppState;
   projectName?: string | null;
   currentVersion?: number | null;
+  currentDocumentType?: "GENERATED_BRIEF" | "FINALIZED_DOCUMENT" | null;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
   onAddSources?: () => void;
   onGenerateBrief?: () => void;
+  onCreateFinalizedDocument?: () => void;
   generating?: boolean;
+  finalizing?: boolean;
   hasSnapshot?: boolean;
   generationError?: string | null;
   onRetry?: () => void;
@@ -939,11 +985,14 @@ export function DocView({
   appState = "no-session",
   projectName,
   currentVersion,
+  currentDocumentType = null,
   selectedReq,
   onSelectReq,
   onAddSources,
   onGenerateBrief,
+  onCreateFinalizedDocument,
   generating = false,
+  finalizing = false,
   hasSnapshot = false,
   generationError = null,
   onRetry,
@@ -993,10 +1042,24 @@ export function DocView({
     appState === "generating" ||
     appState === "revising" ||
     generating ||
+    finalizing ||
     revising ||
     !onGenerateBrief;
+  const finalizedDisabled =
+    appState === "no-session" ||
+    appState === "generating" ||
+    appState === "revising" ||
+    generating ||
+    finalizing ||
+    revising ||
+    !onCreateFinalizedDocument;
   const showingComparison =
     activeWorkspaceTab !== "draft" && activeComparisonContent;
+  const displayedVersion = viewingVersion ?? currentVersion;
+  const displayedVersionLabel =
+    displayedVersion == null
+      ? null
+      : `${currentDocumentType === "FINALIZED_DOCUMENT" ? "Finalized Version" : "Brief Version"} ${displayedVersion}`;
 
   return (
     <div
@@ -1030,7 +1093,7 @@ export function DocView({
               )}
             </>
           )}
-          {(viewingVersion != null || currentVersion != null) && (
+          {displayedVersionLabel && (
             <span
               style={{
                 fontFamily: "var(--font-mono)",
@@ -1038,7 +1101,7 @@ export function DocView({
                 fontSize: 11,
               }}
             >
-              v{viewingVersion ?? currentVersion}
+              {displayedVersionLabel}
             </span>
           )}
         </div>
@@ -1048,14 +1111,23 @@ export function DocView({
           {filterOpen ? (
             <div
               className="flex items-center gap-1 h-[22px] px-1.5 rounded-[4px] border"
-              style={{ background: "var(--surface-2)", borderColor: "var(--border-strong)" }}
+              style={{
+                background: "var(--surface-2)",
+                borderColor: "var(--border-strong)",
+              }}
             >
-              <Icons.Filter size={10} aria-hidden="true" style={{ color: "var(--fg-muted)" }} />
+              <Icons.Filter
+                size={10}
+                aria-hidden="true"
+                style={{ color: "var(--fg-muted)" }}
+              />
               <input
                 ref={filterInputRef}
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Escape") closeFilter(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") closeFilter();
+                }}
                 placeholder="Filter requirements…"
                 className="w-[160px] bg-transparent text-[11px] focus-visible:outline-none"
                 style={{ color: "var(--fg-primary)" }}
@@ -1076,7 +1148,9 @@ export function DocView({
               type="button"
               onClick={() => setFilterOpen(true)}
               className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-              style={{ color: filterQuery ? "var(--accent)" : "var(--fg-tertiary)" }}
+              style={{
+                color: filterQuery ? "var(--accent)" : "var(--fg-tertiary)",
+              }}
             >
               <Icons.Filter size={11} aria-hidden="true" />
               <span>Filter</span>
@@ -1087,12 +1161,42 @@ export function DocView({
               type="button"
               onClick={onShareBrief}
               className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-              style={{ background: "var(--surface-3)", color: "var(--fg-muted)" }}
+              style={{
+                background: "var(--surface-3)",
+                color: "var(--fg-muted)",
+              }}
             >
               <Icons.Share size={11} aria-hidden="true" />
               <span>Share</span>
             </button>
           )}
+          <button
+            type="button"
+            disabled={finalizedDisabled}
+            title={
+              finalizing
+                ? "Finalized document generation in progress"
+                : finalizedDisabled
+                  ? "Generate a brief first"
+                  : undefined
+            }
+            onClick={onCreateFinalizedDocument}
+            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            style={
+              !finalizedDisabled
+                ? { background: "var(--surface-3)", color: "var(--fg-primary)" }
+                : { background: "var(--surface-3)", color: "var(--fg-muted)" }
+            }
+          >
+            <Icons.FileText
+              size={11}
+              aria-hidden="true"
+              className={finalizing ? "animate-pulse" : undefined}
+            />
+            <span>
+              {finalizing ? "Finalizing..." : "Create Finalized Document"}
+            </span>
+          </button>
           <button
             type="button"
             disabled={generateDisabled}
@@ -1114,9 +1218,19 @@ export function DocView({
             {hasSnapshot && !generating ? (
               <Icons.Refresh size={11} aria-hidden="true" />
             ) : (
-              <Icons.Download size={11} aria-hidden="true" className={generating ? "animate-spin" : undefined} />
+              <Icons.Download
+                size={11}
+                aria-hidden="true"
+                className={generating ? "animate-spin" : undefined}
+              />
             )}
-            <span>{generating ? "Generating..." : hasSnapshot ? "Regenerate" : "Generate Brief"}</span>
+            <span>
+              {generating
+                ? "Generating..."
+                : hasSnapshot
+                  ? "Regenerate"
+                  : "Generate Brief"}
+            </span>
           </button>
         </div>
       </div>
@@ -1140,15 +1254,15 @@ export function DocView({
             style={
               activeWorkspaceTab === "draft"
                 ? {
-                  background: "var(--surface-3)",
-                  borderColor: "var(--border-strong)",
-                  color: "var(--fg-primary)",
-                }
+                    background: "var(--surface-3)",
+                    borderColor: "var(--border-strong)",
+                    color: "var(--fg-primary)",
+                  }
                 : {
-                  background: "transparent",
-                  borderColor: "transparent",
-                  color: "var(--fg-tertiary)",
-                }
+                    background: "transparent",
+                    borderColor: "transparent",
+                    color: "var(--fg-tertiary)",
+                  }
             }
           >
             Draft
@@ -1162,15 +1276,15 @@ export function DocView({
                 style={
                   active
                     ? {
-                      background: "var(--surface-3)",
-                      borderColor: "var(--border-strong)",
-                      color: "var(--fg-primary)",
-                    }
+                        background: "var(--surface-3)",
+                        borderColor: "var(--border-strong)",
+                        color: "var(--fg-primary)",
+                      }
                     : {
-                      background: "transparent",
-                      borderColor: "transparent",
-                      color: "var(--fg-tertiary)",
-                    }
+                        background: "transparent",
+                        borderColor: "transparent",
+                        color: "var(--fg-tertiary)",
+                      }
                 }
               >
                 <button
@@ -1217,8 +1331,13 @@ export function DocView({
         >
           <span>
             Viewing{" "}
-            <span className="font-mono font-medium">v{viewingVersion}</span> —
-            this is a past version
+            <span className="font-mono font-medium">
+              {currentDocumentType === "FINALIZED_DOCUMENT"
+                ? "Finalized Version"
+                : "Brief Version"}{" "}
+              {viewingVersion}
+            </span>{" "}
+            — this is a past version
           </span>
           <button
             type="button"
@@ -1248,10 +1367,20 @@ export function DocView({
               onStopEdit={() => undefined}
             />
           ))
-        ) : (appState === "generating" || appState === "revising") ? (
-          <EmptyDoc state={appState} onAddSources={onAddSources} generationError={generationError} onRetry={onRetry} />
+        ) : appState === "generating" || appState === "revising" ? (
+          <EmptyDoc
+            state={appState}
+            onAddSources={onAddSources}
+            generationError={generationError}
+            onRetry={onRetry}
+          />
         ) : appState !== "ready" ? (
-          <EmptyDoc state={appState} onAddSources={onAddSources} generationError={generationError} onRetry={onRetry} />
+          <EmptyDoc
+            state={appState}
+            onAddSources={onAddSources}
+            generationError={generationError}
+            onRetry={onRetry}
+          />
         ) : lines.length === 0 ? (
           <EmptyDoc state="no-sources" onAddSources={onAddSources} />
         ) : (

@@ -23,6 +23,7 @@ import { BriefOutputSchema } from "@/server/validators/brief-output";
 
 import type {
   BriefClaimSection,
+  BriefDocumentType,
   BriefQuestionSection,
   Prisma,
   SourceAsset,
@@ -317,6 +318,7 @@ export type PersistSnapshotInput = {
   requestedBy: string;
   output: BriefOutput;
   assets: PromptAssetWithChunks[];
+  documentType?: BriefDocumentType;
   revisionEvent?: {
     type: "GENERATED" | "REGENERATED";
     actorType: "SYSTEM" | "INTERNAL_USER";
@@ -369,6 +371,7 @@ export async function persistSnapshot({
   requestedBy,
   output,
   assets,
+  documentType = "GENERATED_BRIEF",
   revisionEvent,
 }: PersistSnapshotInput) {
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
@@ -376,7 +379,7 @@ export async function persistSnapshot({
 
   return prisma.$transaction(async (tx) => {
     const latest = await tx.briefSnapshot.aggregate({
-      where: { sessionId },
+      where: { sessionId, documentType },
       _max: { version: true },
     });
     const version = (latest._max.version ?? 0) + 1;
@@ -386,6 +389,7 @@ export async function persistSnapshot({
         projectId,
         sessionId,
         version,
+        documentType,
         status: "DRAFT",
         sourceBundleVersion: version,
         createdBy: requestedBy,
@@ -455,7 +459,7 @@ export async function persistSnapshot({
       type: "GENERATED" as const,
       actorType: "SYSTEM" as const,
       summary: `Generated brief snapshot v${version}.`,
-      metadata: { sourceAssetCount: assets.length },
+      metadata: { sourceAssetCount: assets.length, documentType },
     };
     await tx.revisionEvent.create({
       data: {
@@ -482,6 +486,7 @@ export async function persistSnapshot({
       projectId,
       sessionId,
       snapshotId: snapshot.id,
+      documentType,
       version: snapshot.version,
       claimCount: output.summary.length + output.goals.length,
       questionCount:
@@ -553,7 +558,10 @@ export async function* runBriefGenerationStream(
     }
 
     const latestSnapshot = await prisma.briefSnapshot.findFirst({
-      where: { sessionId: input.sessionId },
+      where: {
+        sessionId: input.sessionId,
+        documentType: "GENERATED_BRIEF",
+      },
       orderBy: { version: "desc" },
       select: {
         claims: {
@@ -719,7 +727,10 @@ export async function runBriefGeneration({
     }
 
     const latestSnapshotForRun = await prisma.briefSnapshot.findFirst({
-      where: { sessionId },
+      where: {
+        sessionId,
+        documentType: "GENERATED_BRIEF",
+      },
       orderBy: { version: "desc" },
       select: {
         claims: {

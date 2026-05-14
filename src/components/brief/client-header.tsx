@@ -19,6 +19,8 @@ interface ClientHeaderProps {
   isConfirming?: boolean;
   isConfirmed?: boolean;
   onSubmitConfirmation?: () => void;
+  showConfirmationControls?: boolean;
+  showNeedsInputCount?: boolean;
 }
 
 function ClientHeader({
@@ -33,8 +35,9 @@ function ClientHeader({
   isConfirming,
   isConfirmed,
   onSubmitConfirmation,
+  showConfirmationControls = true,
+  showNeedsInputCount = true,
 }: ClientHeaderProps) {
-
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 border-b border-border bg-background shrink-0 h-12 min-w-0">
       {/* Brand — links back to landing page */}
@@ -44,7 +47,9 @@ function ClientHeader({
         aria-label="RequireX — go to home"
       >
         <RxLogo size={20} className="text-accent" />
-        <span className="hidden sm:inline" translate="no">RequireX</span>
+        <span className="hidden sm:inline" translate="no">
+          RequireX
+        </span>
       </Link>
 
       {/* Separator — desktop only */}
@@ -55,7 +60,9 @@ function ClientHeader({
         <span className="text-[13px] text-fg-3 font-normal truncate min-w-0">
           {docName}
         </span>
-        <span className="text-fg-4 text-[13px] shrink-0 hidden xs:inline">·</span>
+        <span className="text-fg-4 text-[13px] shrink-0 hidden xs:inline">
+          ·
+        </span>
         <span className="text-[13px] text-fg-4 font-mono shrink-0 hidden xs:inline">
           {specVersion}
         </span>
@@ -66,9 +73,11 @@ function ClientHeader({
 
       {/* Req count — hidden on mobile */}
       <span className="hidden md:block font-mono text-[10.5px] text-fg-4 shrink-0">
-        {needsInputCount === 0
-          ? "All input collected"
-          : `${reqCount} req · ${needsInputCount} need input`}
+        {!showNeedsInputCount
+          ? `${reqCount} items`
+          : needsInputCount === 0
+            ? "All input collected"
+            : `${reqCount} req · ${needsInputCount} need input`}
       </span>
 
       {/* Controls */}
@@ -102,32 +111,33 @@ function ClientHeader({
       </IconBtn>
 
       {/* Submit */}
-      {isConfirmed ? (
-        <Button variant="secondary" size="sm" className="shrink-0" disabled>
-          <Check size={12} aria-hidden="true" />
-          <span className="hidden sm:inline">Submitted</span>
-        </Button>
-      ) : (
-        <Button
-          variant="default"
-          size="sm"
-          className="shrink-0"
-          disabled={isConfirming}
-          onClick={onSubmitConfirmation}
-        >
-          {isConfirming ? (
-            <>
-              <span className="sm:hidden">...</span>
-              <span className="hidden sm:inline">Submitting...</span>
-            </>
-          ) : (
-            <>
-              <span className="sm:hidden">Submit</span>
-              <span className="hidden sm:inline">Submit feedback</span>
-            </>
-          )}
-        </Button>
-      )}
+      {showConfirmationControls &&
+        (isConfirmed ? (
+          <Button variant="secondary" size="sm" className="shrink-0" disabled>
+            <Check size={12} aria-hidden="true" />
+            <span className="hidden sm:inline">Submitted</span>
+          </Button>
+        ) : (
+          <Button
+            variant="default"
+            size="sm"
+            className="shrink-0"
+            disabled={isConfirming}
+            onClick={onSubmitConfirmation}
+          >
+            {isConfirming ? (
+              <>
+                <span className="sm:hidden">...</span>
+                <span className="hidden sm:inline">Submitting...</span>
+              </>
+            ) : (
+              <>
+                <span className="sm:hidden">Submit</span>
+                <span className="hidden sm:inline">Submit feedback</span>
+              </>
+            )}
+          </Button>
+        ))}
     </header>
   );
 }

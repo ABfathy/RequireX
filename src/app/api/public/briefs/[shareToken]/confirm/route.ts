@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { prisma } from "@/lib/prisma";
 import {
   assertPublicMutationRateLimit,
   getRequestClientIp,
   PublicRateLimitError,
 } from "@/server/auth/public";
-import { runBriefRevision } from "@/server/services/brief-revision";
 import {
   confirmPublicBrief,
   PublicReviewReadOnlyError,
@@ -17,6 +15,7 @@ import { PublicBriefConfirmInputSchema } from "@/server/validators";
 type RouteContext = { params: Promise<{ shareToken: string }> };
 
 async function buildClientFeedbackMessage(snapshotId: string): Promise<string> {
+  const { prisma } = await import("@/lib/prisma");
   const [questions, comments] = await Promise.all([
     prisma.briefQuestion.findMany({
       where: { snapshotId, status: "ANSWERED" },
@@ -92,20 +91,26 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const snapshot = await confirmPublicBrief(shareToken, parsed.data);
 
     // Fire-and-forget: auto-revise the brief with all client feedback
-    if (snapshot.status === "CONFIRMED") {
+    if (snapshot.status === "CONFIRMED" && snapshot.sessionId) {
       void buildClientFeedbackMessage(snapshot.id).then((userMessage) =>
-        runBriefRevision({
-          sessionId: snapshot.sessionId,
-          snapshotId: snapshot.id,
-          userMessage,
-          requestedBy: `client:confirm:${shareToken}`,
-        }).catch(() => {
-          // Silently ignore revision errors — confirmation already succeeded
-        }),
+        import("@/server/services/brief-revision")
+          .then(({ runBriefRevision }) =>
+            runBriefRevision({
+              sessionId: snapshot.sessionId,
+              snapshotId: snapshot.id,
+              userMessage,
+              requestedBy: `client:confirm:${shareToken}`,
+            }),
+          )
+          .catch(() => {
+            // Silently ignore revision errors — confirmation already succeeded
+          }),
       );
     }
 
-    return NextResponse.json({ snapshot: { id: snapshot.id, status: snapshot.status } });
+    return NextResponse.json({
+      snapshot: { id: snapshot.id, status: snapshot.status },
+    });
   } catch (error) {
     if (error instanceof PublicRateLimitError) {
       return NextResponse.json(

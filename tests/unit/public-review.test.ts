@@ -52,6 +52,7 @@ function activeSharedLinkSnapshot() {
     snapshot: {
       id: "snapshot_1",
       status: "SHARED",
+      documentType: "GENERATED_BRIEF",
       projectId: "project_1",
       sessionId: "session_1",
     },
@@ -73,7 +74,9 @@ function resetPublicReviewMocks() {
 describe("createPublicComment", () => {
   it("creates a client comment for an active shared link", async () => {
     resetPublicReviewMocks();
-    mockTx.shareLink.findUnique.mockResolvedValueOnce(activeSharedLinkSnapshot());
+    mockTx.shareLink.findUnique.mockResolvedValueOnce(
+      activeSharedLinkSnapshot(),
+    );
     mockTx.briefClaim.findUnique.mockResolvedValueOnce({
       id: "claim_1",
       snapshotId: "snapshot_1",
@@ -128,7 +131,9 @@ describe("createPublicComment", () => {
 
   it("falls back to share-link actor attribution when email is absent", async () => {
     resetPublicReviewMocks();
-    mockTx.shareLink.findUnique.mockResolvedValueOnce(activeSharedLinkSnapshot());
+    mockTx.shareLink.findUnique.mockResolvedValueOnce(
+      activeSharedLinkSnapshot(),
+    );
     mockTx.briefComment.create.mockResolvedValueOnce({ id: "comment_1" });
 
     await createPublicComment("demo-token", {
@@ -148,7 +153,9 @@ describe("createPublicComment", () => {
 describe("createPublicFollowUpAnswer", () => {
   it("creates an answer and marks open questions as answered", async () => {
     resetPublicReviewMocks();
-    mockTx.shareLink.findUnique.mockResolvedValueOnce(activeSharedLinkSnapshot());
+    mockTx.shareLink.findUnique.mockResolvedValueOnce(
+      activeSharedLinkSnapshot(),
+    );
     mockTx.briefQuestion.findUnique.mockResolvedValueOnce({
       id: "question_1",
       snapshotId: "snapshot_1",
@@ -178,7 +185,9 @@ describe("createPublicFollowUpAnswer", () => {
 
   it("rejects answers for questions outside the shared snapshot", async () => {
     resetPublicReviewMocks();
-    mockTx.shareLink.findUnique.mockResolvedValueOnce(activeSharedLinkSnapshot());
+    mockTx.shareLink.findUnique.mockResolvedValueOnce(
+      activeSharedLinkSnapshot(),
+    );
     mockTx.briefQuestion.findUnique.mockResolvedValueOnce({
       id: "question_1",
       snapshotId: "snapshot_other",
@@ -198,7 +207,9 @@ describe("createPublicFollowUpAnswer", () => {
 describe("confirmPublicBrief", () => {
   it("confirms shared snapshots and records a client revision event", async () => {
     resetPublicReviewMocks();
-    mockTx.shareLink.findUnique.mockResolvedValueOnce(activeSharedLinkSnapshot());
+    mockTx.shareLink.findUnique.mockResolvedValueOnce(
+      activeSharedLinkSnapshot(),
+    );
     mockTx.briefSnapshot.update.mockResolvedValueOnce({
       id: "snapshot_1",
       status: "CONFIRMED",
@@ -252,8 +263,8 @@ describe("confirmPublicBrief", () => {
     resetPublicReviewMocks();
     mockTx.shareLink.findUnique.mockResolvedValueOnce(null);
 
-    await expect(confirmPublicBrief("missing-token", {})).rejects.toBeInstanceOf(
-      PublicShareLinkNotFoundError,
-    );
+    await expect(
+      confirmPublicBrief("missing-token", {}),
+    ).rejects.toBeInstanceOf(PublicShareLinkNotFoundError);
   });
 });

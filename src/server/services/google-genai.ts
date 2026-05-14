@@ -6,7 +6,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
 
 import { serverEnv } from "@/lib/env/server";
-import { BriefOutputSchema } from "@/server/validators/brief-output";
+import {
+  BriefOutputSchema,
+  FinalizedDocumentOutputSchema,
+} from "@/server/validators/brief-output";
 
 const MODEL = "gemini-2.5-flash";
 const TEMP_CREDENTIALS_PATH = join(
@@ -54,6 +57,21 @@ export type SourceBundle = {
   assets: SourceBundleAsset[];
   /** Claims from the most-recent snapshot, included in the prompt on regeneration so the model builds on prior work and user-added lines. */
   existingClaims?: Array<{ text: string; section: string }>;
+};
+
+export type FinalizedBriefVersion = {
+  version: number;
+  claims: Array<{
+    section: string;
+    text: string;
+    confidence: string;
+  }>;
+  questions: Array<{
+    section: string;
+    text: string;
+    reason: string;
+    status: string;
+  }>;
 };
 
 const responseJsonSchema = {
@@ -157,6 +175,67 @@ const responseJsonSchema = {
   required: ["summary", "goals", "ambiguities", "followUpQuestions"],
 } as const;
 
+const finalizedClaimJsonSchema = {
+  type: Type.OBJECT,
+  properties: {
+    text: { type: Type.STRING },
+    confidence: {
+      type: Type.STRING,
+      enum: ["LOW", "MEDIUM", "HIGH"],
+    },
+    evidence: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          sourceAssetId: { type: Type.STRING },
+          excerpt: { type: Type.STRING },
+        },
+        required: ["sourceAssetId", "excerpt"],
+      },
+    },
+  },
+  required: ["text", "confidence", "evidence"],
+} as const;
+
+const finalizedDocumentJsonSchema = {
+  type: Type.OBJECT,
+  properties: {
+    projectOverview: {
+      type: Type.ARRAY,
+      items: finalizedClaimJsonSchema,
+    },
+    projectGoals: {
+      type: Type.ARRAY,
+      items: finalizedClaimJsonSchema,
+    },
+    mainFeatures: {
+      type: Type.ARRAY,
+      items: finalizedClaimJsonSchema,
+    },
+    functionalRequirements: {
+      type: Type.ARRAY,
+      items: finalizedClaimJsonSchema,
+    },
+    nonFunctionalRequirements: {
+      type: Type.ARRAY,
+      items: finalizedClaimJsonSchema,
+    },
+    userFlows: {
+      type: Type.ARRAY,
+      items: finalizedClaimJsonSchema,
+    },
+  },
+  required: [
+    "projectOverview",
+    "projectGoals",
+    "mainFeatures",
+    "functionalRequirements",
+    "nonFunctionalRequirements",
+    "userFlows",
+  ],
+} as const;
+
 const audioTranscriptionJsonSchema = {
   type: Type.OBJECT,
   properties: {
@@ -213,9 +292,32 @@ Rules:
 - Draw evidence from ALL provided sources — do not focus only on the first one or two. Where relevant, every source should appear in at least one evidence reference across the output.
 - For IMAGE_SOURCE blocks, inspect the attached image directly. Useful images may include client chat screenshots, UI screenshots, notes, sequence diagrams, architecture diagrams, feature sketches, or other product/project material.
 - If an image is unclear or not project-relevant, such as a random selfie or generic photo, do not invent requirements. Add an ambiguity or follow-up question saying that the image source does not provide enough actionable project information.
-- Cap each section at 5 items.
+- Prefer dense, content-rich output. Expand known requirements with concrete scope, constraints, examples, actors, and inferred structure when supported by the intake.
+- Cap summary and goals at 12 items each.
+- Cap ambiguities and follow-up questions at 4 items each. Only ask questions that are truly unavoidable for continuing the brief; do not ask questions merely because details are incomplete.
 - Prefer HIGH confidence only when the source material clearly supports it.
 - Excerpts must be short and copied from the cited text source when possible. For image sources, use short visible text from the image or a concise visual description.
+- Output JSON only.`;
+
+const FINALIZED_DOCUMENT_SYSTEM_PROMPT = `You are a senior product analyst composing a finalized requirements document from prior generated brief versions.
+
+You will receive the latest generated brief versions. Produce a complete, dense requirements document as JSON with exactly these top-level keys:
+- "projectOverview"
+- "projectGoals"
+- "mainFeatures"
+- "functionalRequirements"
+- "nonFunctionalRequirements"
+- "userFlows"
+
+Each item is a claim object with "text", "confidence", and "evidence". Evidence can be an empty array because this document is composed from brief versions rather than raw source blocks.
+
+Rules:
+- Ask no questions of any kind.
+- Do not create ambiguity or follow-up question sections.
+- Answer everything from the provided brief content.
+- Prefer more content over sparse summaries. Write clear, detailed requirement statements with actors, behaviors, constraints, dependencies, and expected outcomes where the brief supports or reasonably implies them.
+- Convert missing details into reasonable assumptions or write "To be confirmed later" inside the relevant section text.
+- Keep the document internally consistent. Prefer newer brief versions when versions conflict, while preserving useful detail from older versions.
 - Output JSON only.`;
 
 export class GoogleGenAIConfigError extends Error {
@@ -351,7 +453,10 @@ function buildPromptText(bundle: SourceBundle, retryHint?: string) {
       bySect.set(c.section, bucket);
     }
     const sections = [...bySect.entries()]
-      .map(([sec, texts]) => `[${sec}]\n${texts.map((t, i) => `${i + 1}. ${t}`).join("\n")}`)
+      .map(
+        ([sec, texts]) =>
+          `[${sec}]\n${texts.map((t, i) => `${i + 1}. ${t}`).join("\n")}`,
+      )
       .join("\n\n");
     existingClaimsText = `\n\nEXISTING REQUIREMENTS (preserve and build upon these — they include both AI-generated and manually added lines; update, refine, or extend them based on the sources above):\n\n${sections}`;
   }
@@ -396,6 +501,49 @@ async function buildPromptContents(bundle: SourceBundle, retryHint?: string) {
   }
 
   return parts;
+}
+
+function buildFinalizedDocumentPrompt(
+  briefVersions: FinalizedBriefVersion[],
+  retryHint?: string,
+) {
+  const versionsText = briefVersions
+    .map((brief) => {
+      const lines: string[] = [`[BRIEF_VERSION ${brief.version}]`];
+
+      const claimsBySection = new Map<string, typeof brief.claims>();
+      for (const claim of brief.claims) {
+        const bucket = claimsBySection.get(claim.section) ?? [];
+        bucket.push(claim);
+        claimsBySection.set(claim.section, bucket);
+      }
+
+      for (const [section, claims] of claimsBySection) {
+        lines.push(`${section}:`);
+        for (const claim of claims) {
+          lines.push(`- [${claim.confidence}] ${claim.text}`);
+        }
+      }
+
+      if (brief.questions.length > 0) {
+        lines.push("QUESTIONS_AND_OPEN_ITEMS:");
+        for (const question of brief.questions) {
+          lines.push(
+            `- [${question.section}/${question.status}] ${question.text} Reason: ${question.reason}`,
+          );
+        }
+      }
+
+      lines.push(`[/BRIEF_VERSION ${brief.version}]`);
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  const retryText = retryHint
+    ? `\n\nYour previous response was invalid: ${retryHint}\nReturn only corrected JSON.`
+    : "";
+
+  return `Compose a finalized requirements document from these generated brief versions. Use the latest version as the strongest source when details conflict, but preserve useful detail from earlier versions.\n\n${versionsText}${retryText}`;
 }
 
 export function extractJson(raw: string) {
@@ -758,6 +906,67 @@ export async function generateBriefFromBundle(
           ? error.message
           : "Failed to parse Gemini output.",
     });
+    throw error;
+  }
+}
+
+export async function generateFinalizedDocumentFromBriefs(
+  briefVersions: FinalizedBriefVersion[],
+  retryHint?: string,
+) {
+  let response;
+  try {
+    response = await getClient().models.generateContent({
+      model: MODEL,
+      contents: [
+        { text: buildFinalizedDocumentPrompt(briefVersions, retryHint) },
+      ],
+      config: {
+        systemInstruction: FINALIZED_DOCUMENT_SYSTEM_PROMPT,
+        temperature: 0.2,
+        maxOutputTokens: 16384,
+        responseMimeType: "application/json",
+        responseJsonSchema: finalizedDocumentJsonSchema,
+      },
+    });
+  } catch (error) {
+    logGoogleGenAI("error", "Gemini finalized document call failed.", {
+      project: serverEnv.GOOGLE_CLOUD_PROJECT ?? null,
+      location: serverEnv.GOOGLE_CLOUD_LOCATION ?? null,
+      briefVersionCount: briefVersions.length,
+      retry: Boolean(retryHint),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown Gemini error.",
+    });
+    throw error;
+  }
+
+  const rawText = response.text;
+  if (!rawText) {
+    logGoogleGenAI("error", "Gemini finalized document returned empty text.", {
+      briefVersionCount: briefVersions.length,
+      retry: Boolean(retryHint),
+    });
+    throw new Error("Model returned an empty finalized document response.");
+  }
+
+  try {
+    return FinalizedDocumentOutputSchema.parse(extractJson(rawText));
+  } catch (error) {
+    logGoogleGenAI(
+      "warn",
+      "Gemini finalized document returned invalid structured output.",
+      {
+        briefVersionCount: briefVersions.length,
+        retry: Boolean(retryHint),
+        rawPreview: rawText.slice(0, 500),
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Failed to parse Gemini output.",
+      },
+    );
     throw error;
   }
 }

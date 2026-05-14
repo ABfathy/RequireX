@@ -4,9 +4,25 @@ import type { SnapshotWithDetails } from "@/server/services/snapshot";
 const SECTION_LABELS = {
   SUMMARY: "Summary",
   GOALS: "Goals",
+  PROJECT_OVERVIEW: "Project Overview",
+  PROJECT_GOALS: "Project Goals",
+  MAIN_FEATURES: "Main Features",
+  FUNCTIONAL_REQUIREMENTS: "Functional Requirements",
+  NON_FUNCTIONAL_REQUIREMENTS: "Non-Functional Requirements",
+  USER_FLOWS: "User Flows",
   AMBIGUITIES: "Ambiguities",
   FOLLOW_UP_QUESTIONS: "Follow-up Questions",
 } as const;
+
+const GENERATED_CLAIM_SECTIONS = ["SUMMARY", "GOALS"] as const;
+const FINALIZED_CLAIM_SECTIONS = [
+  "PROJECT_OVERVIEW",
+  "PROJECT_GOALS",
+  "MAIN_FEATURES",
+  "FUNCTIONAL_REQUIREMENTS",
+  "NON_FUNCTIONAL_REQUIREMENTS",
+  "USER_FLOWS",
+] as const;
 
 type EvidenceRow =
   SnapshotWithDetails["claims"][number]["evidenceRefs"][number];
@@ -46,19 +62,34 @@ export function snapshotToDocLines(
 
   const sourceIndex = buildSourceIndex(snapshot);
 
+  const versionLabel =
+    snapshot.documentType === "FINALIZED_DOCUMENT"
+      ? "Finalized Version"
+      : "Brief Version";
+
   lines.push({
     lineNum: lineNum++,
     type: "meta",
-    text: `v${snapshot.version} - ${snapshot.status.toLowerCase()}`,
+    text: `${versionLabel} ${snapshot.version} - ${snapshot.status.toLowerCase()}`,
     small: true,
   });
   lines.push({ lineNum: 0, type: "blank" });
 
-  function pushClaims(section: "SUMMARY" | "GOALS") {
-    const claims = snapshot!.claims.filter((claim) => claim.section === section);
+  function pushClaims(
+    section:
+      | (typeof GENERATED_CLAIM_SECTIONS)[number]
+      | (typeof FINALIZED_CLAIM_SECTIONS)[number],
+  ) {
+    const claims = snapshot!.claims.filter(
+      (claim) => claim.section === section,
+    );
     if (claims.length === 0) return;
 
-    lines.push({ lineNum: lineNum++, type: "h2", text: SECTION_LABELS[section] });
+    lines.push({
+      lineNum: lineNum++,
+      type: "h2",
+      text: SECTION_LABELS[section],
+    });
     for (const claim of claims) {
       lines.push({
         lineNum: lineNum++,
@@ -69,7 +100,9 @@ export function snapshotToDocLines(
         section: claim.section,
         orderIndex: claim.orderIndex,
         tags: [claim.confidence.toLowerCase()],
-        evidence: claim.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
+        evidence: claim.evidenceRefs.map((row) =>
+          evidenceLine(row, sourceIndex),
+        ),
       });
     }
     lines.push({ lineNum: 0, type: "blank" });
@@ -81,7 +114,11 @@ export function snapshotToDocLines(
     );
     if (questions.length === 0) return;
 
-    lines.push({ lineNum: lineNum++, type: "h2", text: SECTION_LABELS[section] });
+    lines.push({
+      lineNum: lineNum++,
+      type: "h2",
+      text: SECTION_LABELS[section],
+    });
     for (const question of questions) {
       lines.push({
         lineNum: lineNum++,
@@ -90,7 +127,9 @@ export function snapshotToDocLines(
         reqId: question.id,
         reqType: "question",
         tags: [question.status.toLowerCase()],
-        evidence: question.evidenceRefs.map((row) => evidenceLine(row, sourceIndex)),
+        evidence: question.evidenceRefs.map((row) =>
+          evidenceLine(row, sourceIndex),
+        ),
       });
       lines.push({
         lineNum: lineNum++,
@@ -102,10 +141,19 @@ export function snapshotToDocLines(
     lines.push({ lineNum: 0, type: "blank" });
   }
 
-  pushClaims("SUMMARY");
-  pushClaims("GOALS");
-  pushQuestions("AMBIGUITIES");
-  pushQuestions("FOLLOW_UP_QUESTIONS");
+  const claimSections =
+    snapshot.documentType === "FINALIZED_DOCUMENT"
+      ? FINALIZED_CLAIM_SECTIONS
+      : GENERATED_CLAIM_SECTIONS;
+
+  for (const section of claimSections) {
+    pushClaims(section);
+  }
+
+  if (snapshot.documentType === "GENERATED_BRIEF") {
+    pushQuestions("AMBIGUITIES");
+    pushQuestions("FOLLOW_UP_QUESTIONS");
+  }
 
   return lines;
 }

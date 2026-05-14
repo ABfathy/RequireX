@@ -8,6 +8,7 @@ import type { LineDiffRow } from "@/lib/line-diff";
 interface ComparisonViewProps {
   oldVersion: number;
   newVersion: number;
+  documentType?: "GENERATED_BRIEF" | "FINALIZED_DOCUMENT";
   rows: LineDiffRow[] | null;
   loading?: boolean;
   error?: string | null;
@@ -40,6 +41,7 @@ function rowStyle(kind: LineDiffRow["kind"]): CSSProperties {
 export function ComparisonView({
   oldVersion,
   newVersion,
+  documentType = "GENERATED_BRIEF",
   rows,
   loading,
   error,
@@ -135,6 +137,10 @@ export function ComparisonView({
   }
 
   if (!rows || rows.length === 0) {
+    const label =
+      documentType === "FINALIZED_DOCUMENT"
+        ? "Finalized Version"
+        : "Brief Version";
     return (
       <div className="flex flex-col items-center justify-center gap-3 h-full py-20 text-center px-8">
         <Icons.GitCompare
@@ -153,8 +159,8 @@ export function ComparisonView({
             className="text-[13px] leading-[1.65]"
             style={{ color: "var(--fg-muted)" }}
           >
-            Versions {oldVersion} and {newVersion} render the same comparison
-            text.
+            {label} {oldVersion} and {label} {newVersion} render the same
+            comparison text.
           </p>
         </div>
       </div>
@@ -170,7 +176,14 @@ export function ComparisonView({
         >
           <Icons.GitCompare size={13} aria-hidden="true" />
           <span>
-            Version {oldVersion} vs Version {newVersion}
+            {documentType === "FINALIZED_DOCUMENT"
+              ? "Finalized Version"
+              : "Brief Version"}{" "}
+            {oldVersion} vs{" "}
+            {documentType === "FINALIZED_DOCUMENT"
+              ? "Finalized Version"
+              : "Brief Version"}{" "}
+            {newVersion}
           </span>
         </div>
       </div>

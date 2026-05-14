@@ -26,33 +26,43 @@ export async function GET(
         createdAt: true,
         snapshotId: true,
         snapshot: {
-          select: { version: true, status: true },
+          select: { version: true, documentType: true, status: true },
         },
       },
     });
 
     const commentIds = events
       .filter((e) => e.type === "CLIENT_COMMENT_ADDED")
-      .map((e) => (e.metadata as Record<string, unknown>)?.commentId as string | undefined)
+      .map(
+        (e) =>
+          (e.metadata as Record<string, unknown>)?.commentId as
+            | string
+            | undefined,
+      )
       .filter(Boolean) as string[];
 
     const answerIds = events
       .filter((e) => e.type === "CLIENT_ANSWER_ADDED")
-      .map((e) => (e.metadata as Record<string, unknown>)?.answerId as string | undefined)
+      .map(
+        (e) =>
+          (e.metadata as Record<string, unknown>)?.answerId as
+            | string
+            | undefined,
+      )
       .filter(Boolean) as string[];
 
     const [comments, answers] = await Promise.all([
       commentIds.length > 0
         ? prisma.briefComment.findMany({
-          where: { id: { in: commentIds } },
-          select: { id: true, body: true, authorName: true },
-        })
+            where: { id: { in: commentIds } },
+            select: { id: true, body: true, authorName: true },
+          })
         : [],
       answerIds.length > 0
         ? prisma.followUpAnswer.findMany({
-          where: { id: { in: answerIds } },
-          select: { id: true, body: true, authorName: true },
-        })
+            where: { id: { in: answerIds } },
+            select: { id: true, body: true, authorName: true },
+          })
         : [],
     ]);
 
@@ -64,13 +74,19 @@ export async function GET(
       let feedbackBody: string | null = null;
       let feedbackAuthor: string | null = null;
 
-      if (evt.type === "CLIENT_COMMENT_ADDED" && typeof meta.commentId === "string") {
+      if (
+        evt.type === "CLIENT_COMMENT_ADDED" &&
+        typeof meta.commentId === "string"
+      ) {
         const c = commentMap.get(meta.commentId);
         if (c) {
           feedbackBody = c.body;
           feedbackAuthor = c.authorName;
         }
-      } else if (evt.type === "CLIENT_ANSWER_ADDED" && typeof meta.answerId === "string") {
+      } else if (
+        evt.type === "CLIENT_ANSWER_ADDED" &&
+        typeof meta.answerId === "string"
+      ) {
         const a = answerMap.get(meta.answerId);
         if (a) {
           feedbackBody = a.body;
@@ -86,10 +102,13 @@ export async function GET(
         createdAt: evt.createdAt.toISOString(),
         snapshotId: evt.snapshotId,
         version: evt.snapshot?.version ?? null,
+        documentType: evt.snapshot?.documentType ?? null,
         snapshotStatus: evt.snapshot?.status ?? null,
         trigger: typeof meta.trigger === "string" ? meta.trigger : null,
-        userMessage: typeof meta.userMessage === "string" ? meta.userMessage : null,
-        selectionText: typeof meta.selectionText === "string" ? meta.selectionText : null,
+        userMessage:
+          typeof meta.userMessage === "string" ? meta.userMessage : null,
+        selectionText:
+          typeof meta.selectionText === "string" ? meta.selectionText : null,
         feedbackBody,
         feedbackAuthor,
       };

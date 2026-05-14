@@ -35,20 +35,33 @@ interface PublicBriefViewProps {
 }
 
 export function PublicBriefView({ data }: PublicBriefViewProps) {
-  const { shareToken, snapshot, project, claims, questions, revisions, comments } = data;
+  const {
+    shareToken,
+    snapshot,
+    project,
+    claims,
+    questions,
+    revisions,
+    comments,
+  } = data;
+  const isFinalized = snapshot.documentType === "FINALIZED_DOCUMENT";
 
   const requirements = [
-    ...claims.map(claimToRequirement),
-    ...questions.map(questionToRequirement),
+    ...claims.map((claim) =>
+      claimToRequirement(claim, { showStatus: !isFinalized }),
+    ),
+    ...(isFinalized ? [] : questions.map(questionToRequirement)),
   ];
 
   const revisionItems = revisions.map((rev) =>
-    revisionToRevision(rev, snapshot.version),
+    revisionToRevision(rev, snapshot.version, snapshot.documentType),
   );
 
   const [revOpen, setRevOpen] = useState(false);
   const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
-  const [answeredTexts, setAnsweredTexts] = useState<Map<string, string>>(new Map());
+  const [answeredTexts, setAnsweredTexts] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(
     snapshot.status === "CONFIRMED",
@@ -149,8 +162,12 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
       answerLookup.set(qId, text);
     }
 
-    const ambiguities = questions.filter((q) => q.section === "AMBIGUITIES");
-    const followUps = questions.filter((q) => q.section === "FOLLOW_UP_QUESTIONS");
+    const ambiguities = isFinalized
+      ? []
+      : questions.filter((q) => q.section === "AMBIGUITIES");
+    const followUps = isFinalized
+      ? []
+      : questions.filter((q) => q.section === "FOLLOW_UP_QUESTIONS");
 
     const renderQuestionSection = (
       label: string,
@@ -166,11 +183,13 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
   <div class="question-block">
     <div class="question-label">Question</div>
     <p class="question-text">${escape(q.text)}</p>
-    ${canAnswer
-      ? answerText
-        ? `<div class="answer-label">Answer</div><p class="answer-text">${escape(answerText)}</p>`
-        : `<p class="answer-empty">No answer provided</p>`
-      : ""}
+    ${
+      canAnswer
+        ? answerText
+          ? `<div class="answer-label">Answer</div><p class="answer-text">${escape(answerText)}</p>`
+          : `<p class="answer-empty">No answer provided</p>`
+        : ""
+    }
   </div>
 </div>`;
         })
@@ -188,7 +207,9 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
 
     const claimsHtml = Array.from(claimSectionMap.entries())
       .map(([section, reqs]) => {
-        const rows = reqs.map((r) => `<p class="req">${escape(r.body)}</p>`).join("\n");
+        const rows = reqs
+          .map((r) => `<p class="req">${escape(r.body)}</p>`)
+          .join("\n");
         return `<h2>${escape(section)}</h2>\n${rows}`;
       })
       .join("\n");
@@ -215,10 +236,12 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
       return `<h2>Client Comments</h2>\n${rows}`;
     })();
 
-    const bodyHtml = [claimsHtml, questionsHtml, commentsHtml].filter(Boolean).join("\n");
+    const bodyHtml = [claimsHtml, questionsHtml, commentsHtml]
+      .filter(Boolean)
+      .join("\n");
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>${escape(projectTitle)} — Brief v${snapshot.version}</title>
+<title>${escape(projectTitle)} — ${isFinalized ? "Finalized Version" : "Brief Version"} ${snapshot.version}</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 24px;color:#111;line-height:1.6}
   h1{font-size:22px;font-weight:700;margin:0 0 4px}
@@ -239,15 +262,19 @@ export function PublicBriefView({ data }: PublicBriefViewProps) {
   @media print{body{margin:20px}}
 </style></head><body>
 <h1>${escape(projectTitle)}</h1>
-<div class="meta">${escape(project.name)} · v${snapshot.version} · shared for review</div>
+<div class="meta">${escape(project.name)} · ${isFinalized ? "Finalized Version" : "Brief Version"} ${snapshot.version} · ${isFinalized ? "shared finalized document" : "shared for review"}</div>
 ${bodyHtml}
 </body></html>`;
 
     const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    iframe.style.cssText =
+      "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-    if (!doc) { document.body.removeChild(iframe); return; }
+    if (!doc) {
+      document.body.removeChild(iframe);
+      return;
+    }
     doc.open();
     doc.write(html);
     doc.close();
@@ -294,8 +321,12 @@ ${bodyHtml}
     }
   };
 
-  const docTitle = `${project.name} — Brief v${snapshot.version}`;
-  const specVersion = `v${snapshot.version}`;
+  const docTitle = `${project.name} — ${
+    isFinalized ? "Finalized Document" : "Brief"
+  }`;
+  const specVersion = `${
+    isFinalized ? "Finalized Version" : "Brief Version"
+  } ${snapshot.version}`;
 
   return (
     <div className="grid grid-rows-[48px_1fr] h-screen overflow-hidden bg-background">
@@ -311,6 +342,8 @@ ${bodyHtml}
         isConfirming={isConfirming}
         isConfirmed={isConfirmed}
         onSubmitConfirmation={submitConfirmation}
+        showConfirmationControls={!isFinalized}
+        showNeedsInputCount={!isFinalized}
       />
 
       <div
@@ -325,16 +358,19 @@ ${bodyHtml}
             project: project.name,
             version: specVersion,
             reqCount: requirements.length,
-            label: "shared for review",
+            label: isFinalized
+              ? "shared finalized document"
+              : "shared for review",
           }}
           requirements={requirements}
           onSubmitComment={submitComment}
-          onSubmitAnswer={submitAnswer}
+          onSubmitAnswer={isFinalized ? undefined : submitAnswer}
           onDownloadPdf={handleDownloadPdf}
           isConfirming={isConfirming}
           isConfirmed={isConfirmed}
           confirmError={confirmError}
           onSubmitConfirmation={submitConfirmation}
+          showConfirmationControls={!isFinalized}
         />
 
         {revOpen && (

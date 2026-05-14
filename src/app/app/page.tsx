@@ -37,7 +37,8 @@ export default async function InternalWorkspacePage({
     projects.find((p) => p.id === requestedProjectId) ?? projects[0] ?? null;
 
   const activeBundledProject = activeProject
-    ? bundledProjects.find((project) => project.id === activeProject.id) ?? null
+    ? (bundledProjects.find((project) => project.id === activeProject.id) ??
+      null)
     : null;
 
   const session =
@@ -118,6 +119,7 @@ export default async function InternalWorkspacePage({
       lines={lines}
       hasSnapshot={Boolean(latestSnapshot)}
       initialSnapshotId={latestSnapshot?.id ?? null}
+      initialDocumentType={latestSnapshot?.documentType ?? null}
     />
   );
 }
