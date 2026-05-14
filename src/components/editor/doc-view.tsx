@@ -1262,12 +1262,12 @@ export function DocView({
     >
       {/* Topbar */}
       <div
-        className="flex items-center min-h-8 px-4 py-1 gap-3 shrink-0 border-b"
+        className="flex flex-wrap items-center min-h-8 px-4 max-md:px-3 py-1 max-md:py-2 gap-3 max-md:gap-x-2 max-md:gap-y-1.5 shrink-0 border-b"
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         {/* Breadcrumbs */}
         <div
-          className="flex items-center gap-1 text-[12px] flex-1 min-w-0"
+          className="flex items-center gap-1 text-[12px] min-w-0 max-md:w-full"
           style={{ color: "var(--fg-tertiary)" }}
         >
           {projectName && (
@@ -1301,67 +1301,74 @@ export function DocView({
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-1.5 shrink-0 min-w-0">
-          {filterOpen ? (
-            <div
-              className="flex items-center gap-1 h-[24px] px-1.5 rounded-[6px] border min-w-0"
-              style={{
-                background: "var(--surface-2)",
-                borderColor: "var(--border-strong)",
-              }}
-            >
-              <Icons.Filter
-                size={10}
-                aria-hidden="true"
-                style={{ color: "var(--fg-muted)" }}
-              />
-              <input
-                ref={filterInputRef}
-                value={filterQuery}
-                onChange={(e) => setFilterQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") closeFilter();
+        {/* Actions — flex-1 so it fills space; justify-between splits left/right groups */}
+        <div className="flex items-center justify-between flex-1 min-w-0 max-md:w-full max-md:gap-1">
+
+          {/* Left group: Filter + Share */}
+          <div className="flex items-center gap-1.5">
+            {filterOpen ? (
+              <div
+                className="flex items-center gap-1 h-[24px] px-1.5 rounded-[6px] border min-w-0"
+                style={{
+                  background: "var(--surface-2)",
+                  borderColor: "var(--border-strong)",
                 }}
-                placeholder="Filter requirements…"
-                className="w-[96px] lg:w-[132px] min-w-0 bg-transparent text-[11px] focus-visible:outline-none"
-                style={{ color: "var(--fg-primary)" }}
-                aria-label="Filter requirements"
-              />
+              >
+                <Icons.Filter
+                  size={10}
+                  aria-hidden="true"
+                  style={{ color: "var(--fg-muted)" }}
+                />
+                <input
+                  ref={filterInputRef}
+                  value={filterQuery}
+                  onChange={(e) => setFilterQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") closeFilter();
+                  }}
+                  placeholder="Filter requirements…"
+                  className="w-[96px] lg:w-[132px] max-md:w-[80px] min-w-0 bg-transparent text-[11px] focus-visible:outline-none"
+                  style={{ color: "var(--fg-primary)" }}
+                  aria-label="Filter requirements"
+                />
+                <button
+                  type="button"
+                  onClick={closeFilter}
+                  aria-label="Clear filter"
+                  className="inline-flex items-center justify-center size-[14px] rounded-[2px] hover:bg-[var(--surface-3)] focus-visible:outline-none cursor-pointer"
+                  style={{ color: "var(--fg-muted)" }}
+                >
+                  <Icons.X size={9} />
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={closeFilter}
-                aria-label="Clear filter"
-                className="inline-flex items-center justify-center size-[14px] rounded-[2px] hover:bg-[var(--surface-3)] focus-visible:outline-none cursor-pointer"
-                style={{ color: "var(--fg-muted)" }}
+                onClick={() => setFilterOpen(true)}
+                className="inline-flex items-center gap-1 h-[24px] px-2.5 rounded-[6px] text-[11px] transition-[color,background-color,transform,scale] duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer whitespace-nowrap"
+                style={{
+                  color: filterQuery ? "var(--accent)" : "var(--fg-secondary)",
+                }}
               >
-                <Icons.X size={9} />
+                <Icons.Filter size={11} aria-hidden="true" />
+                <span className="max-md:hidden">Filter</span>
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setFilterOpen(true)}
-              className="inline-flex items-center gap-1 h-[24px] px-2.5 rounded-[6px] text-[11px] transition-[color,background-color,transform,scale] duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer whitespace-nowrap"
-              style={{
-                color: filterQuery ? "var(--accent)" : "var(--fg-secondary)",
-              }}
-            >
-              <Icons.Filter size={11} aria-hidden="true" />
-              <span>Filter</span>
-            </button>
-          )}
-          {hasSnapshot && !!snapshotId && !!onShareBrief && (
-            <button
-              type="button"
-              onClick={onShareBrief}
-              className="inline-flex items-center gap-1 h-[24px] px-2.5 rounded-[6px] text-[11px] transition-[color,background-color,transform,scale] duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer whitespace-nowrap"
-              style={{ color: "var(--fg-secondary)" }}
-            >
-              <Icons.Share size={11} aria-hidden="true" />
-              <span>Share</span>
-            </button>
-          )}
+            )}
+            {hasSnapshot && !!snapshotId && !!onShareBrief && (
+              <button
+                type="button"
+                onClick={onShareBrief}
+                className="inline-flex items-center gap-1 h-[24px] px-2.5 rounded-[6px] text-[11px] transition-[color,background-color,transform,scale] duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer whitespace-nowrap"
+                style={{ color: "var(--fg-secondary)" }}
+              >
+                <Icons.Share size={11} aria-hidden="true" />
+                <span className="max-md:hidden">Share</span>
+              </button>
+            )}
+          </div>
+
+          {/* Right group: Finalize + Generate */}
+          <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             disabled={finalizedDisabled}
@@ -1394,9 +1401,8 @@ export function DocView({
               aria-hidden="true"
               className={finalizing ? "animate-pulse shrink-0" : "shrink-0"}
             />
-            <span>
-              {finalizing ? "Finalizing..." : "Create Finalized"}
-            </span>
+            <span className="max-md:hidden">{finalizing ? "Finalizing..." : "Create Finalized"}</span>
+            <span className="md:hidden">{finalizing ? "…" : "Finalize"}</span>
           </button>
           <button
             type="button"
@@ -1446,12 +1452,13 @@ export function DocView({
                   : "Generate Brief"}
             </span>
           </button>
-        </div>
-      </div>
+          </div>{/* end right group */}
+        </div>{/* end actions */}
+      </div>{/* end topbar */}
 
       {showTabBar && (
         <div
-          className="flex items-center h-8 px-2 shrink-0 border-b gap-1 overflow-x-auto"
+          className="flex items-center h-8 max-md:h-10 px-2 shrink-0 border-b gap-1 overflow-x-auto"
           style={{
             background: "var(--surface-1)",
             borderColor: "var(--border)",
@@ -1465,7 +1472,7 @@ export function DocView({
             aria-selected={activeWorkspaceTab === "draft"}
             onClick={() => onSelectWorkspaceTab?.("draft")}
             className={[
-              "inline-flex items-center h-[24px] px-2 rounded-[4px] text-[11px] font-medium border",
+              "inline-flex items-center h-[24px] max-md:h-[32px] px-2 rounded-[4px] text-[11px] font-medium border",
               "transition-[color,background-color,border-color] duration-[120ms]",
               "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer",
               activeWorkspaceTab === "draft"
@@ -1481,7 +1488,7 @@ export function DocView({
             aria-selected={showingDiagrams}
             onClick={() => onSelectWorkspaceTab?.(DIAGRAMS_TAB_ID)}
             className={[
-              "inline-flex items-center gap-1.5 h-[24px] px-2 rounded-[4px] text-[11px] font-medium border",
+              "inline-flex items-center gap-1.5 h-[24px] max-md:h-[32px] px-2 rounded-[4px] text-[11px] font-medium border",
               "transition-[color,background-color,border-color] duration-[120ms]",
               "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer",
               showingDiagrams
@@ -1511,7 +1518,7 @@ export function DocView({
               <div
                 key={tab.id}
                 className={[
-                  "group inline-flex items-center h-[24px] max-w-[260px] rounded-[4px] text-[11px] font-medium border",
+                  "group inline-flex items-center h-[24px] max-md:h-[32px] max-w-[260px] rounded-[4px] text-[11px] font-medium border",
                   "transition-[color,background-color,border-color] duration-[120ms]",
                   active
                     ? "bg-[var(--surface-3)] border-[var(--border-strong)] text-[var(--fg-primary)]"
@@ -1533,7 +1540,7 @@ export function DocView({
                   type="button"
                   aria-label={`Close ${tab.label}`}
                   onClick={() => onCloseFeedbackTab?.(tab.id)}
-                  className="inline-flex items-center justify-center size-[20px] mr-0.5 rounded-[3px] opacity-70 transition-opacity duration-[120ms] hover:opacity-100 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+                  className="inline-flex items-center justify-center size-[20px] max-md:size-[28px] mr-0.5 max-md:mr-1 rounded-[3px] opacity-70 max-md:opacity-100 transition-opacity duration-[120ms] hover:opacity-100 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
                   style={{ color: "var(--fg-muted)" }}
                 >
                   <Icons.X size={9} aria-hidden="true" />
@@ -1547,7 +1554,7 @@ export function DocView({
               <div
                 key={tab.id}
                 className={[
-                  "group inline-flex items-center h-[24px] max-w-[260px] rounded-[4px] text-[11px] font-medium border",
+                  "group inline-flex items-center h-[24px] max-md:h-[32px] max-w-[260px] rounded-[4px] text-[11px] font-medium border",
                   "transition-[color,background-color,border-color] duration-[120ms]",
                   active
                     ? "bg-[var(--surface-3)] border-[var(--border-strong)] text-[var(--fg-primary)]"
@@ -1573,7 +1580,7 @@ export function DocView({
                   type="button"
                   aria-label={`Close ${tab.title}`}
                   onClick={() => onCloseComparisonTab?.(tab.id)}
-                  className="inline-flex items-center justify-center size-[20px] mr-0.5 rounded-[3px] opacity-70 transition-opacity duration-[120ms] hover:opacity-100 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+                  className="inline-flex items-center justify-center size-[20px] max-md:size-[28px] mr-0.5 max-md:mr-1 rounded-[3px] opacity-70 max-md:opacity-100 transition-opacity duration-[120ms] hover:opacity-100 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
                   style={{ color: "var(--fg-muted)" }}
                 >
                   <Icons.X size={9} aria-hidden="true" />

@@ -41,6 +41,7 @@ export default function RootLayout({
     >
       <head>
         <meta name="theme-color" content="#141517" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
       <body className="min-h-screen text-foreground antialiased">
         {/* Clerk bot-protection widget mount point — required for Smart CAPTCHA */}

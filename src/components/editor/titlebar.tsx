@@ -15,6 +15,7 @@ interface TitleBarProps {
   onToggleRight: () => void;
   onToggleTheme: () => void;
   onOpenPalette: () => void;
+  mobileTitle?: string;
 }
 
 export function TitleBar({
@@ -25,14 +26,16 @@ export function TitleBar({
   onToggleRight,
   onToggleTheme,
   onOpenPalette,
+  mobileTitle,
 }: TitleBarProps) {
   const isMac = useIsMac();
   return (
     <div
-      className="flex items-center h-8 px-3 gap-3 border-b shrink-0 select-none"
+      className="relative flex items-center h-8 max-md:h-12 px-3 gap-3 border-b shrink-0 select-none"
       style={{
         background: "var(--surface-1)",
         borderColor: "var(--border)",
+        paddingTop: "env(safe-area-inset-top, 0px)",
       }}
     >
       {/* Brand */}
@@ -43,7 +46,7 @@ export function TitleBar({
       >
         <RxLogo size={18} className="text-[var(--accent)]" />
         <span
-          className="text-[12px] font-semibold tracking-[-0.01em]"
+          className="text-[12px] font-semibold tracking-[-0.01em] max-md:hidden"
           style={{ color: "var(--fg-primary)" }}
           translate="no"
         >
@@ -51,14 +54,24 @@ export function TitleBar({
         </span>
       </Link>
 
+      {/* Mobile: centered project name */}
+      {mobileTitle && (
+        <span
+          className="hidden max-md:block absolute left-1/2 -translate-x-1/2 text-[13px] font-medium truncate max-w-[50vw] pointer-events-none"
+          style={{ color: "var(--fg-primary)" }}
+        >
+          {mobileTitle}
+        </span>
+      )}
+
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Menu trigger */}
+      {/* Desktop: command palette search button */}
       <button
         type="button"
         onClick={onOpenPalette}
-        className="flex items-center gap-2.5 h-[26px] px-3 rounded-[6px] border bg-[var(--surface-2)] transition-[color,background-color,transform,scale] duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
+        className="max-md:hidden flex items-center gap-2.5 h-[26px] px-3 rounded-[6px] border bg-[var(--surface-2)] transition-[color,background-color,transform,scale] duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
         style={{
           borderColor: "var(--border-strong)",
           color: "var(--fg-muted)",
@@ -79,11 +92,22 @@ export function TitleBar({
         <Kbd>{isMac ? "⌘K" : "Ctrl+K"}</Kbd>
       </button>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Mobile: compact icon-only search button */}
+      <button
+        type="button"
+        onClick={onOpenPalette}
+        aria-label="Commands and actions"
+        className="md:hidden inline-flex items-center justify-center size-9 rounded-[6px] border bg-[var(--surface-2)] transition-[color,background-color,transform,scale] duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer shrink-0"
+        style={{ borderColor: "var(--border-strong)" }}
+      >
+        <Icons.Search size={16} style={{ color: "var(--fg-tertiary)" }} />
+      </button>
 
-      {/* Right tools */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* Spacer */}
+      <div className="flex-1 max-md:hidden" />
+
+      {/* Right tools — desktop only (sidebar/panel toggles replaced by bottom nav on mobile) */}
+      <div className="flex items-center gap-1 shrink-0 max-md:hidden">
         <IconButton
           label="Toggle sidebar"
           active={sidebarOpen}
@@ -98,26 +122,28 @@ export function TitleBar({
         >
           <Icons.PanelRight size={14} />
         </IconButton>
-        <IconButton
-          label={
-            theme === null
-              ? "Toggle theme"
-              : theme === "dark"
-                ? "Switch to light mode"
-                : "Switch to dark mode"
-          }
-          onClick={onToggleTheme}
-          suppressHydrationWarning
-        >
-          {theme === null ? (
-            <span aria-hidden="true" style={{ width: 14, height: 14 }} />
-          ) : theme === "dark" ? (
-            <Icons.Sun size={14} />
-          ) : (
-            <Icons.Moon size={14} />
-          )}
-        </IconButton>
       </div>
+
+      {/* Theme toggle — visible on all sizes */}
+      <IconButton
+        label={
+          theme === null
+            ? "Toggle theme"
+            : theme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+        }
+        onClick={onToggleTheme}
+        suppressHydrationWarning
+      >
+        {theme === null ? (
+          <span aria-hidden="true" style={{ width: 14, height: 14 }} />
+        ) : theme === "dark" ? (
+          <Icons.Sun size={14} />
+        ) : (
+          <Icons.Moon size={14} />
+        )}
+      </IconButton>
     </div>
   );
 }

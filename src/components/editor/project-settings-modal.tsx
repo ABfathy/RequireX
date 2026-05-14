@@ -64,12 +64,12 @@ export function ProjectSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "var(--overlay)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <div
-        className="w-[420px] rounded-[10px] overflow-hidden"
+        className="w-full max-w-[420px] rounded-[10px] overflow-hidden"
         style={{
           background: "var(--surface-2)",
           boxShadow: "var(--shadow-lg-val)",
