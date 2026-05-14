@@ -41,7 +41,7 @@ export default function HomePage() {
           className="text-[15px] leading-[1.65] mb-8 text-pretty"
           style={{ color: "var(--fg-tertiary)" }}
         >
-          Ingest PDFs, transcripts, tickets, and code. RequireX extracts,
+          Ingest PDFs, transcripts, audio, and images. RequireX extracts,
           structures, and traces every requirement, then shares a clean brief
           your clients can actually review.
         </p>
@@ -98,12 +98,12 @@ export default function HomePage() {
         <div className="grid grid-cols-2 gap-3">
           <NavCard
             href="/demo/workspace"
-            label="Internal Workspace"
+            label="Demo Internal Workspace"
             description="Editor, chat, source ingestion, revision history."
           />
           <NavCard
             href="/demo/brief"
-            label="Client Brief View"
+            label="Demo Client Brief View"
             description="Shareable review link — comment, answer, approve."
           />
         </div>
