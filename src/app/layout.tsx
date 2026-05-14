@@ -21,6 +21,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "RequireX",
   description: "AI intake and brief generation for messy client requirements.",
+  icons: {
+    icon: "/rx-logo.png",
+    shortcut: "/rx-logo.png",
+    apple: "/rx-logo.png",
+  },
 };
 
 export default function RootLayout({
