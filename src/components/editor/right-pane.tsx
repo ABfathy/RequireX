@@ -9,6 +9,7 @@ import { AddTextDialog } from "./add-text-dialog";
 
 /* ── Types ─────────────────────────────────────────────── */
 type RightTab = "sources" | "chat" | "revisions";
+type DocumentType = "GENERATED_BRIEF" | "FINALIZED_DOCUMENT";
 
 export interface SnapshotListItem {
   id: string;
@@ -49,6 +50,7 @@ export interface SnapshotSummary {
   eventId: string;
   id: string | null;
   version: number | null;
+  documentType: DocumentType | null;
   snapshotStatus: string | null;
   type: string;
   summary: string;
@@ -84,8 +86,8 @@ export interface RightPaneProps {
   viewingSnapshotId?: string | null;
   onViewSnapshot?: (id: string | null) => Promise<void>;
   onCompareSnapshots?: (
-    first: { id: string; version: number },
-    second: { id: string; version: number },
+    first: { id: string; version: number; documentType: DocumentType },
+    second: { id: string; version: number; documentType: DocumentType },
   ) => void;
   newFeedbackCount?: number;
   onClearFeedbackBadge?: () => void;
@@ -739,8 +741,8 @@ function RevisionsTab({
   viewingSnapshotId?: string | null;
   onViewSnapshot?: (id: string | null) => Promise<void>;
   onCompareSnapshots?: (
-    first: { id: string; version: number },
-    second: { id: string; version: number },
+    first: { id: string; version: number; documentType: DocumentType },
+    second: { id: string; version: number; documentType: DocumentType },
   ) => void;
   sessionId?: string;
   onOpenFeedbackTab?: (snapshotId: string) => void;
@@ -852,13 +854,18 @@ function RevisionsTab({
   const comparableSnapshots = Array.from(
     new Map(
       displaySnapshots
-        .filter((snap) => snap.id && snap.version != null)
+        .filter((snap) => snap.id && snap.version != null && snap.documentType)
         .map((snap) => [
           snap.id!,
           {
             id: snap.id!,
             version: snap.version!,
-            label: `Version ${snap.version}`,
+            documentType: snap.documentType!,
+            label: `${
+              snap.documentType === "FINALIZED_DOCUMENT"
+                ? "Finalized Version"
+                : "Brief Version"
+            } ${snap.version}`,
           },
         ]),
     ).values(),
@@ -885,10 +892,12 @@ function RevisionsTab({
             !isConfirmed &&
             !!snap.id &&
             snap.version != null &&
+            !!snap.documentType &&
             !!onCompareSnapshots;
           const compareOpen = canCompare && compareBaseId === snap.id;
           const compareOptions = comparableSnapshots.filter(
-            (item) => item.id !== snap.id,
+            (item) =>
+              item.id !== snap.id && item.documentType === snap.documentType,
           );
           const feedbackItems = snap.id
             ? (feedbackBySnapshot.get(snap.id) ?? [])
@@ -962,7 +971,10 @@ function RevisionsTab({
                             : "var(--fg-tertiary)",
                         }}
                       >
-                        v{snap.version}
+                        {snap.documentType === "FINALIZED_DOCUMENT"
+                          ? "Finalized"
+                          : "Brief"}{" "}
+                        {snap.version}
                       </span>
                     )}
                     <span
@@ -1035,8 +1047,16 @@ function RevisionsTab({
                 {canCompare && (
                   <button
                     type="button"
-                    aria-label={`Compare version ${snap.version}`}
-                    title={`Compare version ${snap.version}`}
+                    aria-label={`Compare ${
+                      snap.documentType === "FINALIZED_DOCUMENT"
+                        ? "finalized version"
+                        : "brief version"
+                    } ${snap.version}`}
+                    title={`Compare ${
+                      snap.documentType === "FINALIZED_DOCUMENT"
+                        ? "Finalized Version"
+                        : "Brief Version"
+                    } ${snap.version}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       setCompareError(null);
@@ -1147,7 +1167,11 @@ function RevisionsTab({
                       fontFamily: "var(--font-mono)",
                     }}
                   >
-                    Compare v{snap.version} with
+                    Compare{" "}
+                    {snap.documentType === "FINALIZED_DOCUMENT"
+                      ? "Finalized Version"
+                      : "Brief Version"}{" "}
+                    {snap.version} with
                   </div>
                   {compareOptions.length === 0 ? (
                     <p
@@ -1163,14 +1187,28 @@ function RevisionsTab({
                           key={option.id}
                           type="button"
                           onClick={() => {
-                            if (!snap.id || snap.version == null) return;
+                            if (
+                              !snap.id ||
+                              snap.version == null ||
+                              !snap.documentType
+                            ) {
+                              return;
+                            }
                             if (option.version === snap.version) {
                               setCompareError("Choose a different version.");
                               return;
                             }
                             onCompareSnapshots(
-                              { id: snap.id, version: snap.version },
-                              { id: option.id, version: option.version },
+                              {
+                                id: snap.id,
+                                version: snap.version,
+                                documentType: snap.documentType,
+                              },
+                              {
+                                id: option.id,
+                                version: option.version,
+                                documentType: option.documentType,
+                              },
                             );
                             setCompareBaseId(null);
                             setCompareError(null);

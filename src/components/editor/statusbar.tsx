@@ -6,12 +6,14 @@ interface StatusBarProps {
   selectedReq?: string | null;
   extractStatus?: ExtractStatus;
   currentVersion?: number | null;
+  currentDocumentType?: "GENERATED_BRIEF" | "FINALIZED_DOCUMENT" | null;
 }
 
 export function StatusBar({
   selectedReq,
   extractStatus = "idle",
   currentVersion,
+  currentDocumentType,
 }: StatusBarProps) {
   const dotColor =
     extractStatus === "running"
@@ -57,7 +59,10 @@ export function StatusBar({
           <span
             style={{ fontFamily: "var(--font-mono)", color: "var(--accent)" }}
           >
-            v{currentVersion}
+            {currentDocumentType === "FINALIZED_DOCUMENT"
+              ? "Finalized"
+              : "Brief"}{" "}
+            {currentVersion}
           </span>
         </>
       )}

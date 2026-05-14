@@ -70,13 +70,13 @@ function createTx() {
       create: vi.fn().mockResolvedValue({ id: "snapshot_1", version: 1 }),
     },
     briefClaim: {
-      create: vi
-        .fn()
-        .mockResolvedValueOnce({ id: "claim_1" })
-        .mockResolvedValueOnce({ id: "claim_2" }),
+      createManyAndReturn: vi.fn().mockResolvedValue([
+        { id: "claim_1", section: "SUMMARY", orderIndex: 0 },
+        { id: "claim_2", section: "GOALS", orderIndex: 0 },
+      ]),
     },
     briefQuestion: {
-      create: vi.fn().mockResolvedValue({ id: "question_1" }),
+      createManyAndReturn: vi.fn().mockResolvedValue([]),
     },
     evidenceRef: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -222,22 +222,42 @@ describe("runBriefGeneration", () => {
         version: 1,
       }),
     });
+    expect(tx.briefClaim.createManyAndReturn).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          snapshotId: "snapshot_1",
+          section: "SUMMARY",
+          orderIndex: 0,
+          text: "The client needs a portal.",
+        }),
+        expect.objectContaining({
+          snapshotId: "snapshot_1",
+          section: "GOALS",
+          orderIndex: 0,
+          text: "Support approvals.",
+        }),
+      ]),
+      select: {
+        id: true,
+        section: true,
+        orderIndex: true,
+      },
+    });
     expect(tx.evidenceRef.createMany).toHaveBeenCalledWith({
-      data: [
+      data: expect.arrayContaining([
         expect.objectContaining({
           snapshotId: "snapshot_1",
           sourceChunkId: "chunk_1",
+          claimId: "claim_1",
         }),
-      ],
-    });
-    expect(tx.evidenceRef.createMany).toHaveBeenNthCalledWith(2, {
-      data: [
         expect.objectContaining({
           snapshotId: "snapshot_1",
-          sourceChunkId: "chunk_2",
+          sourceChunkId: "chunk_1",
+          claimId: "claim_2",
         }),
-      ],
+      ]),
     });
+    expect(tx.evidenceRef.createMany).toHaveBeenCalledTimes(1);
     expect(mockPrisma.processingJob.update).toHaveBeenCalledWith({
       where: { id: "job_1" },
       data: expect.objectContaining({

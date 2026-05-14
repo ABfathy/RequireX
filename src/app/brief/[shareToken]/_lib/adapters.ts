@@ -58,20 +58,26 @@ const QUESTION_STATUS_TO_STATUS: Record<BriefQuestionStatus, string> = {
   RESOLVED: "approved",
 };
 
-export function claimToRequirement(claim: {
-  id: string;
-  section: BriefClaimSection;
-  orderIndex: number;
-  text: string;
-  confidence: BriefConfidence;
-}): Requirement {
+export function claimToRequirement(
+  claim: {
+    id: string;
+    section: BriefClaimSection;
+    orderIndex: number;
+    text: string;
+    confidence: BriefConfidence;
+  },
+  options?: { showStatus?: boolean },
+): Requirement {
   return {
     id: `REQ-${String(claim.orderIndex).padStart(4, "0")}`,
     section: CLAIM_SECTION_LABEL[claim.section],
     commentSection: CLAIM_SECTION_TO_COMMENT[claim.section],
     title: "",
     body: claim.text,
-    status: CONFIDENCE_TO_STATUS[claim.confidence],
+    status:
+      options?.showStatus === false
+        ? undefined
+        : CONFIDENCE_TO_STATUS[claim.confidence],
     tags: [],
     claimId: claim.id,
   };
@@ -94,7 +100,8 @@ export function questionToRequirement(question: {
     question: question.text,
     status: QUESTION_STATUS_TO_STATUS[question.status],
     tags: [],
-    questionId: question.id,
+    questionId:
+      question.section === "FOLLOW_UP_QUESTIONS" ? question.id : undefined,
   };
 }
 
@@ -115,14 +122,23 @@ export function revisionToRevision(
     summary: string;
     createdAt: Date;
     snapshotVersion: number | null;
+    snapshotDocumentType?: string | null;
   },
   currentSnapshotVersion: number,
+  currentSnapshotDocumentType?: string | null,
 ): Revision {
+  const prefix =
+    rev.snapshotDocumentType === "FINALIZED_DOCUMENT"
+      ? "Finalized Version"
+      : "Brief Version";
   return {
     id: rev.id,
-    label: rev.snapshotVersion != null ? `v${rev.snapshotVersion}` : "—",
+    label:
+      rev.snapshotVersion != null ? `${prefix} ${rev.snapshotVersion}` : "—",
     time: formatRelativeTime(rev.createdAt),
     msg: rev.summary,
-    current: rev.snapshotVersion === currentSnapshotVersion,
+    current:
+      rev.snapshotVersion === currentSnapshotVersion &&
+      rev.snapshotDocumentType === currentSnapshotDocumentType,
   };
 }

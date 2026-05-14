@@ -14,15 +14,35 @@ type ParseState =
   | "escape-skip";
 
 type SectionKey = "summary" | "goals" | "ambiguities" | "followUpQuestions";
+type FinalizedSectionKey =
+  | "projectOverview"
+  | "projectGoals"
+  | "mainFeatures"
+  | "functionalRequirements"
+  | "nonFunctionalRequirements"
+  | "userFlows";
+type StreamSectionKey = SectionKey | FinalizedSectionKey;
 
 const SECTION_DISPLAY: Record<
-  SectionKey,
+  StreamSectionKey,
   { label: string; reqType: "claim" | "question" }
 > = {
   summary: { label: "Summary", reqType: "claim" },
   goals: { label: "Goals", reqType: "claim" },
   ambiguities: { label: "Ambiguities", reqType: "question" },
   followUpQuestions: { label: "Follow-up Questions", reqType: "question" },
+  projectOverview: { label: "Project Overview", reqType: "claim" },
+  projectGoals: { label: "Project Goals", reqType: "claim" },
+  mainFeatures: { label: "Main Features", reqType: "claim" },
+  functionalRequirements: {
+    label: "Functional Requirements",
+    reqType: "claim",
+  },
+  nonFunctionalRequirements: {
+    label: "Non-Functional Requirements",
+    reqType: "claim",
+  },
+  userFlows: { label: "User Flows", reqType: "claim" },
 };
 
 const SECTION_KEYS = new Set<string>([
@@ -30,11 +50,17 @@ const SECTION_KEYS = new Set<string>([
   "goals",
   "ambiguities",
   "followUpQuestions",
+  "projectOverview",
+  "projectGoals",
+  "mainFeatures",
+  "functionalRequirements",
+  "nonFunctionalRequirements",
+  "userFlows",
 ]);
 const CONTENT_KEYS = new Set<string>(["text", "reason"]);
 
 /**
- * Incrementally parses streaming JSON from Gemini's structured brief output
+ * Incrementally parses streaming JSON from Gemini's structured document output
  * and builds DocLineData[] in the same visual format as snapshotToDocLines().
  *
  * Critical: when transitioning from a key-waiting state (after-other-key,
@@ -47,8 +73,8 @@ export class StreamingBriefParser {
   private state: ParseState = "outer";
   private depth = 0;
   private keyBuf = "";
-  private pendingSectionKey: SectionKey | null = null;
-  private currentSection: SectionKey | null = null;
+  private pendingSectionKey: StreamSectionKey | null = null;
+  private currentSection: StreamSectionKey | null = null;
   private currentField: "text" | "reason" | null = null;
   private currentText = "";
   private lineNum = 1;
@@ -225,7 +251,7 @@ export class StreamingBriefParser {
     this.keyBuf = "";
 
     if (this.depth === 1 && SECTION_KEYS.has(key)) {
-      this.pendingSectionKey = key as SectionKey;
+      this.pendingSectionKey = key as StreamSectionKey;
       this.state = "wait-section-colon";
     } else if (this.depth === 3 && CONTENT_KEYS.has(key)) {
       this.currentField = key as "text" | "reason";

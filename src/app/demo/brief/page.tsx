@@ -1,6 +1,7 @@
 import { PublicBriefView } from "@/app/brief/[shareToken]/public-brief-view";
 import type { PublicBriefViewData } from "@/server/services/public-review";
 import type {
+  BriefDocumentType,
   BriefClaimSection,
   BriefConfidence,
   BriefQuestionSection,
@@ -14,6 +15,7 @@ const DEMO_DATA: PublicBriefViewData = {
   snapshot: {
     id: "demo-snap-2",
     version: 2,
+    documentType: "GENERATED_BRIEF" as BriefDocumentType,
     status: "SHARED" as BriefSnapshotStatus,
     createdAt: new Date("2026-05-14T09:00:00Z"),
   },
@@ -154,6 +156,7 @@ const DEMO_DATA: PublicBriefViewData = {
       summary: "Initial brief generated from WhatsApp summary, requirements deck, voice note, and spreadsheet screenshot.",
       createdAt: new Date("2026-05-13T14:00:00Z"),
       snapshotVersion: 1,
+      snapshotDocumentType: "GENERATED_BRIEF" as BriefDocumentType,
     },
     {
       id: "demo-rev-2",
@@ -161,6 +164,7 @@ const DEMO_DATA: PublicBriefViewData = {
       summary: "Regenerated with updated voice note transcript — expanded offline mode requirements and added SLA target.",
       createdAt: new Date("2026-05-14T09:00:00Z"),
       snapshotVersion: 2,
+      snapshotDocumentType: "GENERATED_BRIEF" as BriefDocumentType,
     },
     {
       id: "demo-rev-3",
@@ -168,6 +172,7 @@ const DEMO_DATA: PublicBriefViewData = {
       summary: "James Okafor commented on Functional Requirements — offline mode is P0.",
       createdAt: new Date("2026-05-14T10:30:00Z"),
       snapshotVersion: null,
+      snapshotDocumentType: null,
     },
   ],
   diagrams: [

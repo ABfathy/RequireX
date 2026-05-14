@@ -43,6 +43,7 @@ interface ClientDocProps {
   isConfirmed?: boolean;
   confirmError?: string | null;
   onSubmitConfirmation?: () => void;
+  showConfirmationControls?: boolean;
 }
 
 function ClientDoc({
@@ -56,6 +57,7 @@ function ClientDoc({
   isConfirmed,
   confirmError,
   onSubmitConfirmation,
+  showConfirmationControls = true,
 }: ClientDocProps) {
   const sections = [...new Set(requirements.map((r) => r.section))];
 
@@ -113,27 +115,28 @@ function ClientDoc({
             >
               Download PDF
             </Button>
-            {isConfirmed ? (
-              <Button variant="secondary" disabled>
-                <Check size={13} />
-                Feedback submitted
-              </Button>
-            ) : (
-              <Button
-                variant="default"
-                disabled={isConfirming}
-                onClick={onSubmitConfirmation}
-              >
-                {isConfirming ? (
-                  "Submitting..."
-                ) : (
-                  <>
-                    <Send size={13} />
-                    Submit all feedback
-                  </>
-                )}
-              </Button>
-            )}
+            {showConfirmationControls &&
+              (isConfirmed ? (
+                <Button variant="secondary" disabled>
+                  <Check size={13} />
+                  Feedback submitted
+                </Button>
+              ) : (
+                <Button
+                  variant="default"
+                  disabled={isConfirming}
+                  onClick={onSubmitConfirmation}
+                >
+                  {isConfirming ? (
+                    "Submitting..."
+                  ) : (
+                    <>
+                      <Send size={13} />
+                      Submit all feedback
+                    </>
+                  )}
+                </Button>
+              ))}
           </div>
         </div>
       </div>

@@ -364,7 +364,6 @@ enum FeedbackReviewStatus {
   ACCEPTED
   DECLINED
 }
-
 enum BriefClaimSection {
   SUMMARY
   GOALS

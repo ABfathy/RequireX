@@ -11,6 +11,7 @@ import {
   ActorType,
   type BriefClaimSection,
   type BriefConfidence,
+  type BriefDocumentType,
   type BriefQuestionSection,
   BriefQuestionStatus,
   BriefSnapshotStatus,
@@ -31,6 +32,7 @@ type PublicReviewDb = {
           select: {
             id: true;
             status: true;
+            documentType: true;
             projectId: true;
             sessionId: true;
           };
@@ -44,6 +46,7 @@ type PublicReviewDb = {
       snapshot: {
         id: string;
         status: BriefSnapshotStatus;
+        documentType: BriefDocumentType;
         projectId: string;
         sessionId: string;
       };
@@ -61,6 +64,7 @@ type PublicReviewAccessContext = {
   shareLinkId: string;
   snapshotId: string;
   snapshotStatus: BriefSnapshotStatus;
+  documentType: BriefDocumentType;
 };
 
 type ClientAttribution = {
@@ -127,6 +131,7 @@ async function getPublicReviewAccessContext(
         select: {
           id: true,
           status: true,
+          documentType: true,
           projectId: true,
           sessionId: true,
         },
@@ -155,6 +160,7 @@ async function getPublicReviewAccessContext(
     shareLinkId: shareLink.id,
     snapshotId: shareLink.snapshot.id,
     snapshotStatus: shareLink.snapshot.status,
+    documentType: shareLink.snapshot.documentType,
   };
 }
 
@@ -346,6 +352,7 @@ export type PublicBriefViewData = {
   snapshot: {
     id: string;
     version: number;
+    documentType: BriefDocumentType;
     status: BriefSnapshotStatus;
     createdAt: Date;
   };
@@ -387,6 +394,7 @@ export type PublicBriefViewData = {
     summary: string;
     createdAt: Date;
     snapshotVersion: number | null;
+    snapshotDocumentType: BriefDocumentType | null;
   }>;
   diagrams: Array<{
     id: string;
@@ -409,6 +417,7 @@ export async function loadPublicBriefView(
       select: {
         id: true,
         version: true,
+        documentType: true,
         status: true,
         createdAt: true,
         project: {
@@ -450,7 +459,7 @@ export async function loadPublicBriefView(
         type: true,
         summary: true,
         createdAt: true,
-        snapshot: { select: { version: true } },
+        snapshot: { select: { version: true, documentType: true } },
       },
     }),
     prisma.briefDiagram.findMany({
@@ -489,6 +498,7 @@ export async function loadPublicBriefView(
     snapshot: {
       id: snapshot.id,
       version: snapshot.version,
+      documentType: snapshot.documentType,
       status: snapshot.status,
       createdAt: snapshot.createdAt,
     },
@@ -505,6 +515,7 @@ export async function loadPublicBriefView(
       summary: rev.summary,
       createdAt: rev.createdAt,
       snapshotVersion: rev.snapshot?.version ?? null,
+      snapshotDocumentType: rev.snapshot?.documentType ?? null,
     })),
     diagrams: diagramRows.map((d) => ({
       id: d.id,
@@ -530,6 +541,10 @@ export async function confirmPublicBrief(
         status: BriefSnapshotStatus.CONFIRMED,
         sessionId: access.sessionId,
       };
+    }
+
+    if (access.documentType !== "GENERATED_BRIEF") {
+      throw new PublicReviewReadOnlyError(access.snapshotStatus);
     }
 
     assertWritablePublicSnapshot(access.snapshotStatus);

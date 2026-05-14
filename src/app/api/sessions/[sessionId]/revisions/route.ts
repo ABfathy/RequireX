@@ -26,7 +26,7 @@ export async function GET(
         createdAt: true,
         snapshotId: true,
         snapshot: {
-          select: { version: true, status: true },
+          select: { version: true, documentType: true, status: true },
         },
       },
     });
@@ -54,15 +54,15 @@ export async function GET(
     const [comments, answers] = await Promise.all([
       commentIds.length > 0
         ? prisma.briefComment.findMany({
-          where: { id: { in: commentIds } },
-          select: { id: true, body: true, authorName: true, reviewStatus: true },
-        })
+            where: { id: { in: commentIds } },
+            select: { id: true, body: true, authorName: true, reviewStatus: true },
+          })
         : [],
       answerIds.length > 0
         ? prisma.followUpAnswer.findMany({
-          where: { id: { in: answerIds } },
-          select: { id: true, body: true, authorName: true, reviewStatus: true },
-        })
+            where: { id: { in: answerIds } },
+            select: { id: true, body: true, authorName: true, reviewStatus: true },
+          })
         : [],
     ]);
 
@@ -73,12 +73,14 @@ export async function GET(
       const meta = (evt.metadata ?? {}) as Record<string, unknown>;
       let feedbackBody: string | null = null;
       let feedbackAuthor: string | null = null;
-
       let feedbackReviewStatus: string | null = null;
       let feedbackItemId: string | null = null;
       let feedbackItemType: "comment" | "answer" | null = null;
 
-      if (evt.type === "CLIENT_COMMENT_ADDED" && typeof meta.commentId === "string") {
+      if (
+        evt.type === "CLIENT_COMMENT_ADDED" &&
+        typeof meta.commentId === "string"
+      ) {
         const c = commentMap.get(meta.commentId);
         if (c) {
           feedbackBody = c.body;
@@ -109,6 +111,7 @@ export async function GET(
         createdAt: evt.createdAt.toISOString(),
         snapshotId: evt.snapshotId,
         version: evt.snapshot?.version ?? null,
+        documentType: evt.snapshot?.documentType ?? null,
         snapshotStatus: evt.snapshot?.status ?? null,
         trigger: typeof meta.trigger === "string" ? meta.trigger : null,
         userMessage:

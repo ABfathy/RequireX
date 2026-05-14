@@ -37,7 +37,7 @@ export interface Requirement {
   commentSection: BriefCommentSection;
   title: string;
   body: string;
-  status: string;
+  status?: string;
   tags: string[];
   question?: string;
   /** Real UUID when this card maps to a BriefClaim row; omit for mock/section-only comments */
@@ -111,9 +111,11 @@ function RequirementCard({
         {/* Left: ID + status — never overflow, always first */}
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-mono text-xs text-fg-4 shrink-0">{req.id}</span>
-          <Pill tone={STATUS_TONE[req.status] ?? "neutral"}>
-            {STATUS_LABEL[req.status] ?? req.status}
-          </Pill>
+          {req.status && (
+            <Pill tone={STATUS_TONE[req.status] ?? "neutral"}>
+              {STATUS_LABEL[req.status] ?? req.status}
+            </Pill>
+          )}
         </div>
 
         {/* Desktop spacer */}

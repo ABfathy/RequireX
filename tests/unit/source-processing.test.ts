@@ -114,6 +114,72 @@ describe("source processing", () => {
     });
   });
 
+  it("accepts UploadThing ufs.sh app subdomains when processing PDFs", async () => {
+    const pdf = makePdfWithTextStream("Client needs a vendor dashboard.");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-length": String(pdf.length) }),
+        arrayBuffer: async () => toArrayBuffer(pdf),
+      }),
+    );
+    mockPrisma.sourceAsset.findFirst.mockResolvedValueOnce({
+      id: "asset_ufs",
+      sessionId: "session_1",
+      sourceType: "PDF",
+      status: "UPLOADED",
+      textContent: null,
+      chunks: [],
+      appUrl: "https://dsl3bex521.ufs.sh/f/pdf",
+      ufsUrl: "https://dsl3bex521.ufs.sh/f/pdf",
+      mimeType: "application/pdf",
+      providerMetadata: null,
+    });
+
+    const result = await processPdfAsset({
+      assetId: "asset_ufs",
+      sessionId: "session_1",
+      requestedBy: "user_1",
+    });
+
+    expect(result.status).toBe("processed");
+    expect(fetch).toHaveBeenCalledWith(
+      "https://dsl3bex521.ufs.sh/f/pdf",
+      expect.any(Object),
+    );
+  });
+
+  it("rejects asset URL hosts that only look like ufs.sh", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    mockPrisma.sourceAsset.findFirst.mockResolvedValueOnce({
+      id: "asset_bad_host",
+      sessionId: "session_1",
+      sourceType: "PDF",
+      status: "UPLOADED",
+      textContent: null,
+      chunks: [],
+      appUrl: "https://ufs.sh.evil.example/f/pdf",
+      ufsUrl: "https://ufs.sh.evil.example/f/pdf",
+      mimeType: "application/pdf",
+      providerMetadata: null,
+    });
+
+    const result = await processPdfAsset({
+      assetId: "asset_bad_host",
+      sessionId: "session_1",
+      requestedBy: "user_1",
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      errorMessage: "Untrusted asset URL host: ufs.sh.evil.example",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("transcribes audio to English text and chunks", async () => {
     const audio = Buffer.from("fake-audio");
     vi.stubGlobal(

@@ -29,6 +29,7 @@ import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
 
 type RightTab = "sources" | "chat" | "revisions";
+type DocumentType = "GENERATED_BRIEF" | "FINALIZED_DOCUMENT";
 
 export interface ChatMessage {
   id: string;
@@ -44,6 +45,7 @@ export interface SnapshotSummary {
   eventId: string;
   id: string | null;
   version: number | null;
+  documentType: DocumentType | null;
   snapshotStatus: string | null;
   type: string;
   summary: string;
@@ -86,6 +88,7 @@ interface EditorShellProps {
   hasSnapshot?: boolean;
   initialSnapshotId?: string | null;
   isDemo?: boolean;
+  initialDocumentType?: DocumentType | null;
 }
 
 interface CacheEntry {
@@ -98,6 +101,7 @@ type SerializableProjectCache = Record<string, CacheEntry>;
 type ComparableSnapshot = {
   id: string;
   version: number;
+  documentType: DocumentType;
 };
 
 type ComparisonTab = {
@@ -107,6 +111,7 @@ type ComparisonTab = {
   newSnapshotId: string;
   oldVersion: number;
   newVersion: number;
+  documentType: DocumentType;
   status: "loading" | "ready" | "error";
   rows: LineDiffRow[] | null;
   error: string | null;
@@ -158,7 +163,12 @@ function escapeHtml(s: string) {
 type SseEvent =
   | { type: "start"; jobId?: string }
   | { type: "token"; text: string }
-  | { type: "complete"; snapshotId: string; version: number }
+  | {
+      type: "complete";
+      snapshotId: string;
+      version: number;
+      documentType?: DocumentType;
+    }
   | { type: "error"; code: string; message: string };
 
 const SMOOTH_CHAR_DELAY_MS = 5; // ~200 chars/sec — matches typical model generation speed
@@ -170,12 +180,20 @@ async function readSseStream(
   body: ReadableStream<Uint8Array>,
   onLines: (lines: DocLineData[]) => void,
   onJobId?: (jobId: string) => void,
-): Promise<{ snapshotId: string; version: number }> {
+): Promise<{
+  snapshotId: string;
+  version: number;
+  documentType?: DocumentType;
+}> {
   const parser = new StreamingBriefParser();
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
-  let completeResult: { snapshotId: string; version: number } | null = null;
+  let completeResult: {
+    snapshotId: string;
+    version: number;
+    documentType?: DocumentType;
+  } | null = null;
   let lastRenderTime = 0;
 
   const flushIfDue = () => {
@@ -208,7 +226,11 @@ async function readSseStream(
         const snapshot = parser.getSnapshot();
         if (snapshot.length > 0) onLines(snapshot);
       } else if (evt.type === "complete") {
-        completeResult = { snapshotId: evt.snapshotId, version: evt.version };
+        completeResult = {
+          snapshotId: evt.snapshotId,
+          version: evt.version,
+          documentType: evt.documentType,
+        };
       } else if (evt.type === "error") {
         throw new Error(evt.message);
       }
@@ -228,6 +250,29 @@ function comparisonTabId(oldSnapshotId: string, newSnapshotId: string) {
   return `comparison-${oldSnapshotId}-${newSnapshotId}`;
 }
 
+function documentVersionLabel(
+  documentType: DocumentType | null | undefined,
+  version: number | null | undefined,
+) {
+  if (version == null) return null;
+  return `${documentType === "FINALIZED_DOCUMENT" ? "Finalized Version" : "Brief Version"} ${version}`;
+}
+
+function upsertSnapshotSummary(
+  snapshots: SnapshotSummary[],
+  snapshot: SnapshotSummary,
+) {
+  const existingIndex = snapshots.findIndex((item) => item.id === snapshot.id);
+  if (existingIndex === -1) return [...snapshots, snapshot];
+
+  const next = [...snapshots];
+  next[existingIndex] = {
+    ...next[existingIndex],
+    ...snapshot,
+  };
+  return next;
+}
+
 function linesToComparisonText(lines: DocLineData[]) {
   return lines
     .filter((line) => line.type !== "meta")
@@ -245,7 +290,11 @@ async function fetchSnapshotForComparison(snapshotId: string) {
         : "Could not load one of the selected versions.",
     );
   }
-  return (await res.json()) as { lines: DocLineData[]; version: number };
+  return (await res.json()) as {
+    lines: DocLineData[];
+    version: number;
+    documentType: DocumentType;
+  };
 }
 
 export function EditorShell({
@@ -258,6 +307,7 @@ export function EditorShell({
   hasSnapshot = false,
   initialSnapshotId = null,
   isDemo = false,
+  initialDocumentType = null,
 }: EditorShellProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectListItem[]>(initialProjects);
@@ -280,6 +330,7 @@ export function EditorShell({
   const [rightTab, setRightTab] = useState<RightTab>("sources");
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [extractStatus, setExtractStatus] = useState<
     "idle" | "queued" | "running" | "failed"
@@ -293,6 +344,10 @@ export function EditorShell({
   const [pendingFeedbackSnapshotId, setPendingFeedbackSnapshotId] = useState<string | null>(null);
   const shouldPollFeedbackRef = useRef(false);
   const latestSnapshotIdRef = useRef<string | null>(initialSnapshotId ?? null);
+  const previousSessionIdRef = useRef<string | null>(
+    initialSession?.id ?? null,
+  );
+  const pendingSnapshotSummaryRef = useRef<SnapshotSummary | null>(null);
   const [streamingLines, setStreamingLines] = useState<DocLineData[] | null>(
     null,
   );
@@ -300,6 +355,8 @@ export function EditorShell({
   const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(
     initialSnapshotId,
   );
+  const [currentDocumentType, setCurrentDocumentType] =
+    useState<DocumentType | null>(initialDocumentType);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [selectedDiagramType, setSelectedDiagramType] = useState<string | null>(
@@ -542,6 +599,7 @@ export function EditorShell({
           createdAt: string;
           snapshotId: string | null;
           version: number | null;
+          documentType: DocumentType | null;
           snapshotStatus: string | null;
           trigger: string | null;
           userMessage: string | null;
@@ -570,39 +628,50 @@ export function EditorShell({
           })),
       );
 
-      // All revisions go to the revisions tab
-      setSnapshots(
-        allRevisions.map((r) => ({
-          eventId: r.id,
-          id: r.snapshotId,
-          version: r.version,
-          snapshotStatus: r.snapshotStatus,
-          type: r.type,
-          summary: r.summary,
-          createdAt: r.createdAt,
-          trigger: r.trigger,
-          userMessage: r.userMessage,
-          feedbackBody: r.feedbackBody,
-          feedbackAuthor: r.feedbackAuthor,
-          feedbackReviewStatus: r.feedbackReviewStatus,
-          feedbackItemId: r.feedbackItemId,
-          feedbackItemType: r.feedbackItemType,
-        })),
-      );
+      // All revisions go to the revisions tab. Keep a just-created snapshot in
+      // local state if the immediate refetch lags behind the write.
+      const nextSnapshots = allRevisions.map((r) => ({
+        eventId: r.id,
+        id: r.snapshotId,
+        version: r.version,
+        documentType: r.documentType,
+        snapshotStatus: r.snapshotStatus,
+        type: r.type,
+        summary: r.summary,
+        createdAt: r.createdAt,
+        trigger: r.trigger,
+        userMessage: r.userMessage,
+        feedbackBody: r.feedbackBody,
+        feedbackAuthor: r.feedbackAuthor,
+        feedbackReviewStatus: r.feedbackReviewStatus,
+        feedbackItemId: r.feedbackItemId,
+        feedbackItemType: r.feedbackItemType,
+      }));
+      const pendingSnapshot = pendingSnapshotSummaryRef.current;
+      if (
+        pendingSnapshot &&
+        nextSnapshots.some((snapshot) => snapshot.id === pendingSnapshot.id)
+      ) {
+        pendingSnapshotSummaryRef.current = null;
+      }
+      const snapshotsForState =
+        pendingSnapshot &&
+        !nextSnapshots.some((snapshot) => snapshot.id === pendingSnapshot.id)
+          ? upsertSnapshotSummary(nextSnapshots, pendingSnapshot)
+          : nextSnapshots;
+      setSnapshots(snapshotsForState);
 
-      // Track the latest generated snapshot so Return-to-latest can reset correctly
-      const latestGenerated = [...allRevisions]
+      // Track the latest document snapshot so Return-to-latest can reset correctly
+      const latestDocument = [...snapshotsForState]
         .reverse()
         .find(
-          (r) =>
-            (r.type === "GENERATED" || r.type === "REGENERATED") &&
-            r.snapshotId,
+          (r) => (r.type === "GENERATED" || r.type === "REGENERATED") && r.id,
         );
-      if (latestGenerated?.snapshotId) {
-        latestSnapshotIdRef.current = latestGenerated.snapshotId;
+      if (latestDocument?.id) {
+        latestSnapshotIdRef.current = latestDocument.id;
       }
 
-      // Detect new client feedback events
+      // Detect new client feedback events.
       const feedbackIds = new Set(
         allRevisions
           .filter(
@@ -615,14 +684,14 @@ export function EditorShell({
       );
 
       const isFirstLoad = seenEventIdsRef.current.size === 0;
-      const newFeedback = [...feedbackIds].filter((id) => !seenEventIdsRef.current.has(id));
+      const newFeedback = [...feedbackIds].filter(
+        (id) => !seenEventIdsRef.current.has(id),
+      );
 
       if (isFirstLoad) {
-        // Initialize seen IDs without showing notification
         for (const id of feedbackIds) seenEventIdsRef.current.add(id);
       } else if (newFeedback.length > 0) {
         for (const id of newFeedback) seenEventIdsRef.current.add(id);
-        // Find the snapshot the new feedback belongs to
         const latestFeedback = [...allRevisions]
           .reverse()
           .find(
@@ -783,6 +852,7 @@ export function EditorShell({
       if (newSnapshotId) {
         latestSnapshotIdRef.current = newSnapshotId;
         setCurrentSnapshotId(newSnapshotId);
+        setCurrentDocumentType("GENERATED_BRIEF");
       }
       if (sessionId) await loadRevisions(sessionId);
       await refreshSources();
@@ -809,9 +879,173 @@ export function EditorShell({
     stopJobPoll,
   ]);
 
+  const handleCreateFinalizedDocument = useCallback(async () => {
+    if (!sessionId || finalizing) return;
+
+    setFinalizing(true);
+    setGenerationError(null);
+    setExtractStatus("running");
+
+    const PHASE_LABELS = [
+      "Collecting generated briefs…",
+      "Drafting finalized document…",
+    ];
+    let phaseIdx = 0;
+    const makeHeaderLines = (phaseLabel: string): DocLineData[] => [
+      {
+        lineNum: 1,
+        type: "meta",
+        text: phaseLabel,
+        small: true,
+      },
+      { lineNum: 0, type: "blank" },
+    ];
+    const initialHeader = makeHeaderLines(PHASE_LABELS[0]!);
+    setStreamingLines(initialHeader);
+
+    const phaseInterval = setInterval(() => {
+      phaseIdx = Math.min(phaseIdx + 1, PHASE_LABELS.length - 1);
+      const nextLabel = PHASE_LABELS[phaseIdx];
+      setStreamingLines((prev) => {
+        if (!prev || prev.length < 1) return prev;
+        const updated = [...prev];
+        updated[0] = {
+          lineNum: 1,
+          type: "meta",
+          text: nextLabel,
+          small: true,
+        };
+        return updated;
+      });
+    }, 3000);
+
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/finalized-documents`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+
+      if (!res.ok) {
+        clearInterval(phaseInterval);
+        const payload = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+        throw new Error(
+          payload?.message ??
+            payload?.error ??
+            "Failed to create finalized document.",
+        );
+      }
+
+      let result: {
+        snapshotId: string;
+        version: number;
+        documentType: DocumentType;
+      };
+      const lineOffset = initialHeader.length;
+      let firstToken = true;
+
+      const onStreamLines = (parserLines: DocLineData[]) => {
+        if (firstToken) {
+          clearInterval(phaseInterval);
+          firstToken = false;
+        }
+        const shifted = parserLines.map((line) => ({
+          ...line,
+          lineNum: line.lineNum > 0 ? line.lineNum + lineOffset : 0,
+        }));
+        setStreamingLines([
+          ...makeHeaderLines("Drafting finalized document…"),
+          ...shifted,
+        ]);
+      };
+
+      if (
+        res.headers.get("content-type")?.includes("text/event-stream") &&
+        res.body
+      ) {
+        const streamResult = await readSseStream(res.body, onStreamLines);
+        result = {
+          snapshotId: streamResult.snapshotId,
+          version: streamResult.version,
+          documentType: streamResult.documentType ?? "FINALIZED_DOCUMENT",
+        };
+      } else {
+        clearInterval(phaseInterval);
+        result = (await res.json()) as {
+          snapshotId: string;
+          version: number;
+          documentType: DocumentType;
+        };
+      }
+
+      const optimisticSnapshot: SnapshotSummary = {
+        eventId: `optimistic-finalized-${result.snapshotId}`,
+        id: result.snapshotId,
+        version: result.version,
+        documentType: result.documentType,
+        snapshotStatus: "DRAFT",
+        type: "GENERATED",
+        summary: `Generated finalized document v${result.version}.`,
+        createdAt: new Date().toISOString(),
+        trigger: null,
+        userMessage: null,
+        feedbackBody: null,
+        feedbackAuthor: null,
+      };
+      pendingSnapshotSummaryRef.current = optimisticSnapshot;
+      setSnapshots((prev) => upsertSnapshotSummary(prev, optimisticSnapshot));
+
+      const snapshotRes = await fetch(`/api/snapshots/${result.snapshotId}`, {
+        cache: "no-store",
+      });
+      if (snapshotRes.ok) {
+        const data = (await snapshotRes.json()) as {
+          lines: DocLineData[];
+          version: number;
+          documentType: DocumentType;
+        };
+        setClientLines(data.lines);
+      }
+
+      latestSnapshotIdRef.current = result.snapshotId;
+      setCurrentSnapshotId(result.snapshotId);
+      setCurrentDocumentType(result.documentType);
+      setSelectedReq(null);
+      setViewingVersion(null);
+      setStreamingLines(null);
+      setExtractStatus("idle");
+      await loadRevisions(sessionId);
+      router.refresh();
+    } catch (error) {
+      clearInterval(phaseInterval);
+      setExtractStatus("failed");
+      setGenerationError(
+        error instanceof Error
+          ? error.message
+          : "Failed to create finalized document.",
+      );
+      setStreamingLines(null);
+    } finally {
+      clearInterval(phaseInterval);
+      setFinalizing(false);
+    }
+  }, [sessionId, finalizing, loadRevisions, router]);
+
   const handleSendMessage = useCallback(
     async (userMessage: string, selectionText?: string) => {
-      if (!sessionId || !currentSnapshotId || revising) return;
+      if (
+        !sessionId ||
+        !currentSnapshotId ||
+        currentDocumentType !== "GENERATED_BRIEF" ||
+        revising
+      ) {
+        return;
+      }
 
       setRevising(true);
       setGenerationError(null);
@@ -858,6 +1092,7 @@ export function EditorShell({
 
         latestSnapshotIdRef.current = newSnapshotId;
         setCurrentSnapshotId(newSnapshotId);
+        setCurrentDocumentType("GENERATED_BRIEF");
         setSelectedReq(null);
         setClientLines(null);
         await loadRevisions(sessionId);
@@ -873,6 +1108,7 @@ export function EditorShell({
     [
       sessionId,
       currentSnapshotId,
+      currentDocumentType,
       revising,
       selectedReq,
       loadRevisions,
@@ -963,7 +1199,9 @@ export function EditorShell({
 
   // Poll whenever there's at least one snapshot (share may have happened, clients may be active)
   useEffect(() => {
-    shouldPollFeedbackRef.current = snapshots.some((s) => s.id != null);
+    shouldPollFeedbackRef.current = snapshots.some(
+      (s) => s.snapshotStatus === "SHARED",
+    );
   }, [snapshots]);
 
   // Poll every 15s — fires loadRevisions when session has any snapshot
@@ -1003,6 +1241,14 @@ export function EditorShell({
         fetchSnapshotForComparison(tab.oldSnapshotId),
         fetchSnapshotForComparison(tab.newSnapshotId),
       ]);
+      if (
+        oldSnapshot.documentType !== tab.documentType ||
+        newSnapshot.documentType !== tab.documentType
+      ) {
+        throw new Error(
+          "Generated briefs and finalized documents cannot be compared together.",
+        );
+      }
       const rows = diffLines(
         linesToComparisonText(oldSnapshot.lines),
         linesToComparisonText(newSnapshot.lines),
@@ -1036,7 +1282,13 @@ export function EditorShell({
 
   const handleOpenComparison = useCallback(
     (first: ComparableSnapshot, second: ComparableSnapshot) => {
-      if (first.id === second.id || first.version === second.version) return;
+      if (
+        first.id === second.id ||
+        first.version === second.version ||
+        first.documentType !== second.documentType
+      ) {
+        return;
+      }
 
       const [older, newer] =
         first.version < second.version ? [first, second] : [second, first];
@@ -1050,11 +1302,12 @@ export function EditorShell({
 
       const tab: ComparisonTab = {
         id,
-        title: `Comparison: Version ${older.version} vs Version ${newer.version}`,
+        title: `Comparison: ${documentVersionLabel(older.documentType, older.version)} vs ${documentVersionLabel(newer.documentType, newer.version)}`,
         oldSnapshotId: older.id,
         newSnapshotId: newer.id,
         oldVersion: older.version,
         newVersion: newer.version,
+        documentType: older.documentType,
         status: "loading",
         rows: null,
         error: null,
@@ -1216,6 +1469,12 @@ export function EditorShell({
         setViewingVersion(null);
         if (latestSnapshotIdRef.current) {
           setCurrentSnapshotId(latestSnapshotIdRef.current);
+          const latestSnapshot = snapshots.find(
+            (snapshot) => snapshot.id === latestSnapshotIdRef.current,
+          );
+          if (latestSnapshot?.documentType) {
+            setCurrentDocumentType(latestSnapshot.documentType);
+          }
         }
         return;
       }
@@ -1228,15 +1487,17 @@ export function EditorShell({
         const data = (await res.json()) as {
           lines: DocLineData[];
           version: number;
+          documentType: DocumentType;
         };
         setClientLines(data.lines);
         setViewingVersion(data.version ?? null);
         setCurrentSnapshotId(snapshotId);
+        setCurrentDocumentType(data.documentType);
       } catch {
         // silently ignore
       }
     },
-    [currentSnapshotId],
+    [currentSnapshotId, snapshots],
   );
 
   /* Soft client-side project switch. Cache hit -> swap state + replace URL
@@ -1253,6 +1514,7 @@ export function EditorShell({
         setGenerationError(null);
         setSourcesError(undefined);
         setCurrentSnapshotId(null);
+        setCurrentDocumentType(null);
         setChatMessages([]);
         setSnapshots([]);
         setComparisonTabs([]);
@@ -1342,8 +1604,12 @@ export function EditorShell({
   useEffect(() => {
     displayLinesRef.current = displayLines;
   });
-  const currentVersion =
-    snapshots.find((s) => s.id === currentSnapshotId)?.version ?? null;
+  const currentSnapshotSummary = snapshots.find(
+    (s) => s.id === currentSnapshotId,
+  );
+  const currentVersion = currentSnapshotSummary?.version ?? null;
+  const effectiveDocumentType =
+    currentSnapshotSummary?.documentType ?? currentDocumentType;
   const displayHasSnapshot = usesServerSnapshot
     ? hasSnapshot
     : currentSnapshotId !== null;
@@ -1359,11 +1625,20 @@ export function EditorShell({
     const snapshotId = latestSnapshot.id;
     fetch(`/api/snapshots/${snapshotId}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { lines: DocLineData[]; version: number } | null) => {
-        if (!data) return;
-        setClientLines(data.lines);
-        setCurrentSnapshotId(snapshotId);
-      })
+      .then(
+        (
+          data: {
+            lines: DocLineData[];
+            version: number;
+            documentType: DocumentType;
+          } | null,
+        ) => {
+          if (!data) return;
+          setClientLines(data.lines);
+          setCurrentSnapshotId(snapshotId);
+          setCurrentDocumentType(data.documentType);
+        },
+      )
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshots, usesServerSnapshot]);
@@ -1375,7 +1650,7 @@ export function EditorShell({
     : "no-session";
   const appState: AppState = revising
     ? "revising"
-    : generating
+    : generating || finalizing
       ? "generating"
       : generationError
         ? "failed"
@@ -1383,6 +1658,14 @@ export function EditorShell({
 
   const activeProjectName =
     projects.find((p) => p.id === activeProjectId)?.name ?? null;
+  const hasGeneratedBrief =
+    snapshots.some(
+      (snapshot) =>
+        snapshot.id != null && snapshot.documentType === "GENERATED_BRIEF",
+    ) ||
+    (displayHasSnapshot && effectiveDocumentType !== "FINALIZED_DOCUMENT");
+  const canCreateFinalizedDocument =
+    Boolean(sessionId) && hasGeneratedBrief && !generating && !finalizing;
 
   const selectedReqText = selectedReq
     ? (displayLines.find((l) => l.reqId === selectedReq && l.type === "body")
@@ -1396,6 +1679,7 @@ export function EditorShell({
     <ComparisonView
       oldVersion={activeComparisonTab.oldVersion}
       newVersion={activeComparisonTab.newVersion}
+      documentType={activeComparisonTab.documentType}
       rows={activeComparisonTab.rows}
       loading={activeComparisonTab.status === "loading"}
       error={activeComparisonTab.error}
@@ -1539,16 +1823,35 @@ ${lines
 
   /* Reset snapshot state when session changes */
   useEffect(() => {
-    if (!sessionId) return;
+    if (previousSessionIdRef.current === sessionId) return;
+    previousSessionIdRef.current = sessionId ?? null;
+
+    if (!sessionId) {
+      setSnapshots([]);
+      setViewingVersion(null);
+      setClientLines(null);
+      setChatMessages([]);
+      setComparisonTabs([]);
+      setCurrentSnapshotId(null);
+      setCurrentDocumentType(null);
+      setActiveWorkspaceTab(DRAFT_TAB_ID);
+      pendingSnapshotSummaryRef.current = null;
+      return;
+    }
+
     setSnapshots([]);
     setViewingVersion(null);
     setClientLines(null);
     setChatMessages([]);
     setComparisonTabs([]);
     setFeedbackTabs([]);
-    setActiveWorkspaceTab(DRAFT_TAB_ID);
     setRegeneratedSnapshotIds(new Set());
-  }, [sessionId]);
+    setCurrentDocumentType(
+      sessionId === initialSession?.id ? initialDocumentType : null,
+    );
+    setActiveWorkspaceTab(DRAFT_TAB_ID);
+    pendingSnapshotSummaryRef.current = null;
+  }, [sessionId, initialSession?.id, initialDocumentType]);
 
   // Clean up polls when the component unmounts
   useEffect(
@@ -1667,11 +1970,18 @@ ${lines
           appState={appState}
           projectName={activeProjectName}
           currentVersion={currentVersion}
+          currentDocumentType={effectiveDocumentType}
           selectedReq={selectedReq}
           onSelectReq={handleSelectReq}
           onAddSources={handleOpenSources}
           onAttachFiles={!isDemo && sessionId ? handleUploadFiles : undefined}
           onGenerateBrief={!isDemo && sessionId ? handleGenerateBrief : undefined}
+          onCreateFinalizedDocument={
+            !isDemo && canCreateFinalizedDocument
+              ? handleCreateFinalizedDocument
+              : undefined
+          }
+          finalizing={finalizing}
           generating={generating}
           hasSnapshot={displayHasSnapshot}
           generationError={generationError}
@@ -1681,7 +1991,12 @@ ${lines
           selectedReqText={selectedReqText}
           onClearSelection={() => setSelectedReq(null)}
           onSendMessage={
-            !isDemo && sessionId && currentSnapshotId ? handleSendOrDiagram : undefined
+            !isDemo &&
+            sessionId &&
+            currentSnapshotId &&
+            effectiveDocumentType === "GENERATED_BRIEF"
+              ? handleSendOrDiagram
+              : undefined
           }
           revising={revising}
           selectedDiagramType={selectedDiagramType}
@@ -1769,6 +2084,7 @@ ${lines
       <StatusBar
         selectedReq={selectedReq}
         currentVersion={currentVersion}
+        currentDocumentType={effectiveDocumentType}
         extractStatus={extractStatus}
       />
 

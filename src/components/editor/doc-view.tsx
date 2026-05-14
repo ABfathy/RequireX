@@ -1029,11 +1029,14 @@ export interface DocViewProps {
   appState?: AppState;
   projectName?: string | null;
   currentVersion?: number | null;
+  currentDocumentType?: "GENERATED_BRIEF" | "FINALIZED_DOCUMENT" | null;
   selectedReq: string | null;
   onSelectReq: (id: string) => void;
   onAddSources?: () => void;
   onGenerateBrief?: () => void;
+  onCreateFinalizedDocument?: () => void;
   generating?: boolean;
+  finalizing?: boolean;
   hasSnapshot?: boolean;
   generationError?: string | null;
   onRetry?: () => void;
@@ -1079,11 +1082,14 @@ export function DocView({
   appState = "no-session",
   projectName,
   currentVersion,
+  currentDocumentType = null,
   selectedReq,
   onSelectReq,
   onAddSources,
   onGenerateBrief,
+  onCreateFinalizedDocument,
   generating = false,
+  finalizing = false,
   hasSnapshot = false,
   generationError = null,
   onRetry,
@@ -1162,21 +1168,36 @@ export function DocView({
     appState === "generating" ||
     appState === "revising" ||
     generating ||
+    finalizing ||
     revising ||
     !onGenerateBrief;
   const showingDiagrams = activeWorkspaceTab === DIAGRAMS_TAB_ID;
+  const activeFeedbackTab =
+    feedbackTabs.find((t) => t.id === activeWorkspaceTab) ?? null;
+  const showingFeedback = activeFeedbackTab !== null;
+  const finalizedDisabled =
+    appState === "no-session" ||
+    appState === "generating" ||
+    appState === "revising" ||
+    generating ||
+    finalizing ||
+    revising ||
+    !onCreateFinalizedDocument;
   const showingComparison =
     activeWorkspaceTab !== "draft" &&
     !showingDiagrams &&
-    !feedbackTabs.some((t) => t.id === activeWorkspaceTab) &&
+    !showingFeedback &&
     activeComparisonContent;
-  const activeFeedbackTab = feedbackTabs.find((t) => t.id === activeWorkspaceTab) ?? null;
-  const showingFeedback = activeFeedbackTab !== null;
   const showTabBar =
     comparisonTabs.length > 0 ||
     diagrams.length > 0 ||
     diagramsLoading ||
     feedbackTabs.length > 0;
+  const displayedVersion = viewingVersion ?? currentVersion;
+  const displayedVersionLabel =
+    displayedVersion == null
+      ? null
+      : `${currentDocumentType === "FINALIZED_DOCUMENT" ? "Finalized Version" : "Brief Version"} ${displayedVersion}`;
 
   return (
     <div
@@ -1210,7 +1231,7 @@ export function DocView({
               )}
             </>
           )}
-          {(viewingVersion != null || currentVersion != null) && (
+          {displayedVersionLabel && (
             <span
               style={{
                 fontFamily: "var(--font-mono)",
@@ -1218,7 +1239,7 @@ export function DocView({
                 fontSize: 11,
               }}
             >
-              v{viewingVersion ?? currentVersion}
+              {displayedVersionLabel}
             </span>
           )}
         </div>
@@ -1284,6 +1305,33 @@ export function DocView({
               <span>Share</span>
             </button>
           )}
+          <button
+            type="button"
+            disabled={finalizedDisabled}
+            title={
+              finalizing
+                ? "Finalized document generation in progress"
+                : finalizedDisabled
+                  ? "Generate a brief first"
+                  : undefined
+            }
+            onClick={onCreateFinalizedDocument}
+            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            style={
+              !finalizedDisabled
+                ? { background: "var(--surface-3)", color: "var(--fg-primary)" }
+                : { background: "var(--surface-3)", color: "var(--fg-muted)" }
+            }
+          >
+            <Icons.FileText
+              size={11}
+              aria-hidden="true"
+              className={finalizing ? "animate-pulse" : undefined}
+            />
+            <span>
+              {finalizing ? "Finalizing..." : "Create Finalized Document"}
+            </span>
+          </button>
           <button
             type="button"
             disabled={generateDisabled}
@@ -1497,8 +1545,13 @@ export function DocView({
         >
           <span>
             Viewing{" "}
-            <span className="font-mono font-medium">v{viewingVersion}</span> —
-            this is a past version
+            <span className="font-mono font-medium">
+              {currentDocumentType === "FINALIZED_DOCUMENT"
+                ? "Finalized Version"
+                : "Brief Version"}{" "}
+              {viewingVersion}
+            </span>{" "}
+            — this is a past version
           </span>
           <button
             type="button"

@@ -91,6 +91,7 @@ export async function runBriefRevision({
     where: { id: snapshotId },
     select: {
       id: true,
+      documentType: true,
       claims: { select: { section: true, text: true, confidence: true } },
       questions: { select: { section: true, text: true, reason: true } },
     },
@@ -100,6 +101,13 @@ export async function runBriefRevision({
     throw new BriefPipelineError(
       "SNAPSHOT_NOT_FOUND",
       "Brief snapshot was not found.",
+    );
+  }
+
+  if (snapshot.documentType !== "GENERATED_BRIEF") {
+    throw new BriefPipelineError(
+      "UNSUPPORTED_DOCUMENT_TYPE",
+      "Only generated briefs can be revised through chat.",
     );
   }
 
@@ -204,6 +212,7 @@ export async function* runBriefRevisionStream(
       where: { id: input.snapshotId },
       select: {
         id: true,
+        documentType: true,
         claims: { select: { section: true, text: true, confidence: true } },
         questions: { select: { section: true, text: true, reason: true } },
       },
@@ -213,6 +222,13 @@ export async function* runBriefRevisionStream(
       throw new BriefPipelineError(
         "SNAPSHOT_NOT_FOUND",
         "Brief snapshot was not found.",
+      );
+    }
+
+    if (snapshot.documentType !== "GENERATED_BRIEF") {
+      throw new BriefPipelineError(
+        "UNSUPPORTED_DOCUMENT_TYPE",
+        "Only generated briefs can be revised through chat.",
       );
     }
 

@@ -119,6 +119,7 @@ export default async function InternalWorkspacePage({
       lines={lines}
       hasSnapshot={Boolean(latestSnapshot)}
       initialSnapshotId={latestSnapshot?.id ?? null}
+      initialDocumentType={latestSnapshot?.documentType ?? null}
     />
   );
 }

@@ -23,6 +23,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({
       lines,
       version: snapshot.version,
+      documentType: snapshot.documentType,
       status: snapshot.status,
     });
   } catch (err) {

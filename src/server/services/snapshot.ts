@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 export async function getLatestSnapshot(sessionId: string) {
   return prisma.briefSnapshot.findFirst({
     where: { sessionId },
-    orderBy: { version: "desc" },
+    orderBy: { createdAt: "desc" },
     include: {
       claims: {
         orderBy: [{ section: "asc" }, { orderIndex: "asc" }],
@@ -50,8 +50,14 @@ export type SnapshotWithDetails = NonNullable<
 export async function getAllSnapshots(sessionId: string) {
   return prisma.briefSnapshot.findMany({
     where: { sessionId },
-    orderBy: { version: "desc" },
-    select: { id: true, version: true, status: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      version: true,
+      documentType: true,
+      status: true,
+      createdAt: true,
+    },
   });
 }
 

@@ -52,6 +52,7 @@ function activeSharedLinkSnapshot() {
     snapshot: {
       id: "snapshot_1",
       status: "SHARED",
+      documentType: "GENERATED_BRIEF",
       projectId: "project_1",
       sessionId: "session_1",
     },
