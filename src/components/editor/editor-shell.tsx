@@ -1140,9 +1140,14 @@ export function EditorShell({
         });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as {
+            error?: string;
             message?: string;
           } | null;
-          throw new Error(payload?.message ?? "Failed to generate diagram.");
+          throw new Error(
+            payload?.message && payload?.error
+              ? `${payload.message} (${payload.error})`
+              : payload?.message ?? "Failed to generate diagram.",
+          );
         }
         const diagram =
           (await res.json()) as import("./diagrams-shell").DiagramItem;

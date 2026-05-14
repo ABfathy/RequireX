@@ -6,7 +6,10 @@ import {
   isInternalAuthorizationError,
   requireInternalAuth,
 } from "@/server/auth/internal";
-import { generateDiagram } from "@/server/services/diagram-generation";
+import {
+  generateDiagram,
+  isDiagramGenerationError,
+} from "@/server/services/diagram-generation";
 
 const requestSchema = z.object({
   snapshotId: z.string().uuid(),
@@ -122,6 +125,53 @@ export async function POST(
       return NextResponse.json(
         { error: "INVALID_REQUEST", message: "Invalid request body." },
         { status: 400 },
+      );
+    }
+    if (isDiagramGenerationError(error)) {
+      const mapping = {
+        SNAPSHOT_NOT_FOUND: {
+          status: 404,
+          error: "SNAPSHOT_NOT_FOUND",
+        },
+        EMPTY_MODEL_OUTPUT: {
+          status: 502,
+          error: "DIAGRAM_MODEL_EMPTY",
+        },
+        NON_STOP_FINISH: {
+          status: 502,
+          error: "DIAGRAM_MODEL_INCOMPLETE",
+        },
+        INVALID_JSON: {
+          status: 502,
+          error: "DIAGRAM_JSON_INVALID",
+        },
+        INVALID_SCHEMA: {
+          status: 502,
+          error: "DIAGRAM_JSON_INVALID",
+        },
+        INVALID_MERMAID_PARSE: {
+          status: 422,
+          error: "DIAGRAM_MERMAID_PARSE_FAILED",
+        },
+        INVALID_MERMAID_RENDER: {
+          status: 422,
+          error: "DIAGRAM_MERMAID_RENDER_FAILED",
+        },
+        DIAGRAM_TYPE_MISMATCH: {
+          status: 422,
+          error: "DIAGRAM_TYPE_MISMATCH",
+        },
+      } as const;
+
+      const mapped = mapping[error.code];
+      console.error({
+        scope: "api.sessions.diagrams.post",
+        code: error.code,
+        message: error.message,
+      });
+      return NextResponse.json(
+        { error: mapped.error, message: error.userMessage },
+        { status: mapped.status },
       );
     }
     console.error({ scope: "api.sessions.diagrams.post", error });

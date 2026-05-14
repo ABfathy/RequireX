@@ -1,10 +1,11 @@
-import { Type } from "@google/genai";
+import { FinishReason, Type, type GenerateContentResponse } from "@google/genai";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
 
 import { type DiagramType } from "../../../generated/prisma/client";
 import {
+  getStructuredResponseMetadata,
   getClient,
   MODEL,
   parseStructuredResponse,
@@ -106,6 +107,44 @@ export type GenerateDiagramInput = {
   userContext?: string;
 };
 
+export type DiagramGenerationErrorCode =
+  | "EMPTY_MODEL_OUTPUT"
+  | "NON_STOP_FINISH"
+  | "INVALID_JSON"
+  | "INVALID_SCHEMA"
+  | "INVALID_MERMAID_PARSE"
+  | "INVALID_MERMAID_RENDER"
+  | "DIAGRAM_TYPE_MISMATCH"
+  | "SNAPSHOT_NOT_FOUND";
+
+export class DiagramGenerationError extends Error {
+  readonly name = "DiagramGenerationError";
+
+  constructor(
+    readonly code: DiagramGenerationErrorCode,
+    message: string,
+    readonly options?: {
+      cause?: unknown;
+      userMessage?: string;
+      finishReason?: string | null;
+      phase?: "request" | "parse" | "render";
+      repairAttemptCount?: number;
+    },
+  ) {
+    super(message, options?.cause ? { cause: options.cause } : undefined);
+  }
+
+  get userMessage() {
+    return this.options?.userMessage ?? this.message;
+  }
+}
+
+export function isDiagramGenerationError(
+  error: unknown,
+): error is DiagramGenerationError {
+  return error instanceof DiagramGenerationError;
+}
+
 function serializeSnapshotForDiagram(snapshot: {
   claims: Array<{ section: string; text: string; confidence: string }>;
   questions: Array<{ section: string; text: string; reason: string }>;
@@ -158,14 +197,194 @@ async function validateMermaidCode(code: string) {
 
   try {
     const result = await mermaid.parse(code);
-    return { ok: true as const, diagramType: result.diagramType };
+    const diagramType = result.diagramType;
+
+    if (typeof document === "undefined") {
+      return { ok: true as const, diagramType };
+    }
+
+    try {
+      await mermaid.render(
+        `mermaid-validate-${Math.random().toString(36).slice(2)}`,
+        code,
+      );
+      return { ok: true as const, diagramType };
+    } catch (error) {
+      return {
+        ok: false as const,
+        phase: "render" as const,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unknown Mermaid render error.",
+      };
+    }
   } catch (error) {
     return {
       ok: false as const,
+      phase: "parse" as const,
       message:
         error instanceof Error ? error.message : "Unknown Mermaid parse error.",
     };
   }
+}
+
+function matchesRequestedDiagramType(
+  requestedType: DiagramType,
+  mermaidDiagramType: string | undefined,
+) {
+  if (!mermaidDiagramType) return false;
+
+  const normalized = mermaidDiagramType.toLowerCase();
+  const families: Record<DiagramType, string[]> = {
+    FLOWCHART: ["flowchart", "flowchart-v2", "graph"],
+    SEQUENCE: ["sequence"],
+    ARCHITECTURE: ["architecture", "flowchart", "flowchart-v2", "graph"],
+    ACTIVITY: ["state", "statediagram", "statediagram-v2"],
+    USER_JOURNEY: ["journey"],
+  };
+
+  return families[requestedType].some((candidate) =>
+    normalized.includes(candidate),
+  );
+}
+
+function mapValidationErrorCode(phase: "parse" | "render") {
+  return phase === "render"
+    ? "INVALID_MERMAID_RENDER"
+    : "INVALID_MERMAID_PARSE";
+}
+
+function logDiagramFailure(
+  error: DiagramGenerationError,
+  details: {
+    diagramType: DiagramType;
+    finishReason?: string | null;
+    repairAttemptCount: number;
+  },
+) {
+  console.warn({
+    scope: "diagram-generation",
+    code: error.code,
+    message: error.message,
+    phase: error.options?.phase ?? null,
+    diagramType: details.diagramType,
+    finishReason: error.options?.finishReason ?? details.finishReason ?? null,
+    repairAttemptCount:
+      error.options?.repairAttemptCount ?? details.repairAttemptCount,
+  });
+}
+
+function parseDiagramResponse(
+  response: GenerateContentResponse,
+  repairAttemptCount: number,
+) {
+  const metadata = getStructuredResponseMetadata(response);
+
+  if (!response.text?.trim()) {
+    throw new DiagramGenerationError(
+      "EMPTY_MODEL_OUTPUT",
+      "Model returned an empty response.",
+      {
+        userMessage:
+          "The diagram model returned an empty response. Please try again.",
+        finishReason: metadata.finishReason,
+        phase: "request",
+        repairAttemptCount,
+      },
+    );
+  }
+
+  if (
+    metadata.finishReason &&
+    metadata.finishReason !== FinishReason.STOP &&
+    metadata.finishReason !== FinishReason.FINISH_REASON_UNSPECIFIED
+  ) {
+    throw new DiagramGenerationError(
+      "NON_STOP_FINISH",
+      `Structured output ended with finish reason ${metadata.finishReason}.`,
+      {
+        userMessage:
+          "The diagram model stopped before completing a valid response. Please try again.",
+        finishReason: metadata.finishReason,
+        phase: "request",
+        repairAttemptCount,
+      },
+    );
+  }
+
+  try {
+    return {
+      parsed: parseStructuredResponse(response, DiagramOutputSchema).parsed,
+      finishReason: metadata.finishReason,
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new DiagramGenerationError(
+        "INVALID_SCHEMA",
+        "Diagram response did not match the expected schema.",
+        {
+          cause: error,
+          userMessage:
+            "The diagram model returned an unexpected response shape. Please try again.",
+          finishReason: metadata.finishReason,
+          phase: "parse",
+          repairAttemptCount,
+        },
+      );
+    }
+
+    throw new DiagramGenerationError(
+      "INVALID_JSON",
+      error instanceof Error ? error.message : "Diagram response was not valid JSON.",
+      {
+        cause: error,
+        userMessage:
+          "The diagram model returned invalid structured output. Please try again.",
+        finishReason: metadata.finishReason,
+        phase: "parse",
+        repairAttemptCount,
+      },
+    );
+  }
+}
+
+async function validateRequestedDiagram(
+  diagramType: DiagramType,
+  mermaidCode: string,
+  repairAttemptCount: number,
+) {
+  const validation = await validateMermaidCode(mermaidCode);
+
+  if (!validation.ok) {
+    throw new DiagramGenerationError(
+      mapValidationErrorCode(validation.phase),
+      `Generated Mermaid code failed ${validation.phase} validation: ${validation.message}`,
+      {
+        userMessage:
+          validation.phase === "render"
+            ? "The generated Mermaid diagram could not be rendered. Please try again."
+            : "The generated Mermaid diagram was not valid Mermaid syntax. Please try again.",
+        phase: validation.phase,
+        repairAttemptCount,
+      },
+    );
+  }
+
+  if (!matchesRequestedDiagramType(diagramType, validation.diagramType)) {
+    throw new DiagramGenerationError(
+      "DIAGRAM_TYPE_MISMATCH",
+      `Expected ${diagramType} Mermaid output, received ${validation.diagramType ?? "unknown"}.`,
+      {
+        userMessage:
+          "The generated diagram did not match the requested diagram type. Please try again.",
+        phase: "parse",
+        repairAttemptCount,
+      },
+    );
+  }
+
+  return validation;
 }
 
 async function requestDiagramJson(input: {
@@ -216,7 +435,13 @@ export async function generateDiagram(input: GenerateDiagramInput) {
   });
 
   if (!snapshot) {
-    throw new Error("Snapshot not found.");
+    throw new DiagramGenerationError(
+      "SNAPSHOT_NOT_FOUND",
+      "Snapshot not found.",
+      {
+        userMessage: "Snapshot not found.",
+      },
+    );
   }
 
   const briefSummary = serializeSnapshotForDiagram(snapshot);
@@ -230,52 +455,89 @@ export async function generateDiagram(input: GenerateDiagramInput) {
     .filter(Boolean)
     .join("\n");
 
-  const result = await requestDiagramJson({
-    diagramType,
-    userPrompt,
-  });
-
-  let rawText = result.text ?? "";
+  let repairAttemptCount = 0;
+  let finishReason: string | null | undefined = null;
   let parsed: z.infer<typeof DiagramOutputSchema>;
+
   try {
-    parsed = parseStructuredResponse(result, DiagramOutputSchema).parsed;
-  } catch {
+    const result = await requestDiagramJson({
+      diagramType,
+      userPrompt,
+    });
+    const firstPass = parseDiagramResponse(result, repairAttemptCount);
+    finishReason = firstPass.finishReason;
+    parsed = {
+      ...firstPass.parsed,
+      mermaidCode: stripMarkdownFences(firstPass.parsed.mermaidCode),
+    };
+  } catch (error) {
+    if (!(error instanceof DiagramGenerationError)) throw error;
+
+    repairAttemptCount += 1;
+    logDiagramFailure(error, {
+      diagramType,
+      finishReason,
+      repairAttemptCount,
+    });
+
     const retryResult = await requestDiagramJson({
       diagramType,
       userPrompt,
-      previousRawText: rawText,
+      previousRawText: "",
       extraRepairInstruction:
-        'Your response was not valid JSON. Reply with only a JSON object: {"title":"...","mermaidCode":"...","description":"..."}. No markdown fences, no explanation.',
+        error.code === "EMPTY_MODEL_OUTPUT" || error.code === "NON_STOP_FINISH"
+          ? "Your previous response was incomplete or empty. Regenerate the full response now as a complete JSON object with title, mermaidCode, and description. Reply with JSON only."
+          : 'Your response was not valid JSON or did not match the required schema. Reply with only a JSON object: {"title":"...","mermaidCode":"...","description":"..."}. No markdown fences, no explanation.',
     });
-    rawText = retryResult.text ?? "";
-    parsed = parseStructuredResponse(retryResult, DiagramOutputSchema).parsed;
+    const retried = parseDiagramResponse(retryResult, repairAttemptCount);
+    finishReason = retried.finishReason;
+    parsed = {
+      ...retried.parsed,
+      mermaidCode: stripMarkdownFences(retried.parsed.mermaidCode),
+    };
   }
 
-  parsed = {
-    ...parsed,
-    mermaidCode: stripMarkdownFences(parsed.mermaidCode),
-  };
-
-  const validation = await validateMermaidCode(parsed.mermaidCode);
-  if (!validation.ok) {
-    const repairResult = await requestDiagramJson({
+  try {
+    await validateRequestedDiagram(
       diagramType,
-      userPrompt,
-      previousRawText: JSON.stringify(parsed),
-      extraRepairInstruction: `The JSON was valid, but mermaidCode failed Mermaid syntax validation with this error: ${validation.message}\nReturn the same JSON shape, preserve the diagram intent, preserve title/description unless they are clearly wrong, and fix only mermaidCode so Mermaid can parse it. Reply with JSON only and no markdown fences.`,
-    });
-    const repaired = parseStructuredResponse(repairResult, DiagramOutputSchema)
-      .parsed;
-    parsed = {
-      ...repaired,
-      mermaidCode: stripMarkdownFences(repaired.mermaidCode),
-    };
+      parsed.mermaidCode,
+      repairAttemptCount,
+    );
+  } catch (error) {
+    if (!(error instanceof DiagramGenerationError)) throw error;
 
-    const repairedValidation = await validateMermaidCode(parsed.mermaidCode);
-    if (!repairedValidation.ok) {
-      throw new Error(
-        `Generated Mermaid code could not be validated: ${repairedValidation.message}`,
+    repairAttemptCount += 1;
+    logDiagramFailure(error, {
+      diagramType,
+      finishReason,
+      repairAttemptCount,
+    });
+
+    if (
+      error.code === "INVALID_MERMAID_PARSE" ||
+      error.code === "INVALID_MERMAID_RENDER" ||
+      error.code === "DIAGRAM_TYPE_MISMATCH"
+    ) {
+      const repairResult = await requestDiagramJson({
+        diagramType,
+        userPrompt,
+        previousRawText: JSON.stringify(parsed),
+        extraRepairInstruction: `${error.message}
+Return the same JSON shape, preserve the diagram intent, preserve title/description unless they are clearly wrong, and fix only mermaidCode so Mermaid validates and matches the requested diagram type. Reply with JSON only and no markdown fences.`,
+      });
+      const repaired = parseDiagramResponse(repairResult, repairAttemptCount);
+      finishReason = repaired.finishReason;
+      parsed = {
+        ...repaired.parsed,
+        mermaidCode: stripMarkdownFences(repaired.parsed.mermaidCode),
+      };
+      await validateRequestedDiagram(
+        diagramType,
+        parsed.mermaidCode,
+        repairAttemptCount,
       );
+    } else {
+      throw error;
     }
   }
 

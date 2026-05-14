@@ -27,6 +27,9 @@ export function MermaidDiagram({
     async function render() {
       setLoading(true);
       setError(null);
+      if (containerRef.current) {
+        containerRef.current.innerHTML = "";
+      }
       const mermaid = (await import("mermaid")).default;
       mermaid.initialize({
         startOnLoad: false,
@@ -57,6 +60,16 @@ export function MermaidDiagram({
   if (error) {
     return (
       <div className={className} style={style}>
+        <div
+          className="px-3 py-2 text-[11px] border-b"
+          style={{
+            background: "color-mix(in srgb, #f59e0b 10%, var(--surface-1))",
+            color: "var(--fg-secondary)",
+            borderColor: "var(--border)",
+          }}
+        >
+          Diagram render failed: {error}
+        </div>
         <pre
           className="text-[11px] rounded-[6px] p-3 overflow-auto"
           style={{
