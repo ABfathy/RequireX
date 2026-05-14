@@ -101,8 +101,7 @@ export function RxLogo({
       height={size}
       alt=""
       aria-hidden="true"
-      className={className}
-      style={{ mixBlendMode: "screen", display: "inline-block", flexShrink: 0 }}
+      className={`rx-logo-img shrink-0${className ? ` ${className}` : ""}`}
     />
   );
 }
