@@ -1155,6 +1155,7 @@ export function DocView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const isProgrammaticScrollRef = useRef(false);
+  const scrollRafRef = useRef<number | null>(null);
   // Singleton edit guard: at most one DocLine can be in edit mode at a time.
   // Storing the reqId (instead of a boolean) lets us derive isEditing per-row
   // without any per-row state mutation.
@@ -1169,18 +1170,45 @@ export function DocView({
   useEffect(() => {
     if (!hasStreamingContent) {
       shouldStickToBottomRef.current = true;
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
     }
   }, [hasStreamingContent]);
 
+  // Wheel fires BEFORE scroll — earliest signal of user scroll-up intent.
   useEffect(() => {
     const scroller = scrollRef.current;
-    if (!scroller || !hasStreamingContent) return;
-    if (!shouldStickToBottomRef.current) return;
+    if (!scroller) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) {
+        shouldStickToBottomRef.current = false;
+        if (scrollRafRef.current !== null) {
+          cancelAnimationFrame(scrollRafRef.current);
+          scrollRafRef.current = null;
+        }
+      }
+    };
+    scroller.addEventListener("wheel", onWheel, { passive: true });
+    return () => scroller.removeEventListener("wheel", onWheel);
+  }, []);
 
-    isProgrammaticScrollRef.current = true;
-    scroller.scrollTop = scroller.scrollHeight;
-    requestAnimationFrame(() => {
-      isProgrammaticScrollRef.current = false;
+  // Throttled auto-scroll: at most one scroll per animation frame regardless
+  // of how fast streaming content arrives.
+  useEffect(() => {
+    if (!hasStreamingContent || !shouldStickToBottomRef.current) return;
+    if (scrollRafRef.current !== null) return; // already scheduled this frame
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      if (!shouldStickToBottomRef.current) return; // recheck after yield
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      isProgrammaticScrollRef.current = true;
+      scroller.scrollTop = scroller.scrollHeight;
+      requestAnimationFrame(() => {
+        isProgrammaticScrollRef.current = false;
+      });
     });
   }, [hasStreamingContent, streamingLines]);
 
