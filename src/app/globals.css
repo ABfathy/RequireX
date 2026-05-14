@@ -244,6 +244,18 @@ button,
   touch-action: manipulation;
 }
 
+/* ── Logo blend mode ─────────────────────────────────── */
+
+.rx-logo-img {
+  display: inline-block;
+  mix-blend-mode: screen;
+}
+
+[data-theme="light"] .rx-logo-img {
+  mix-blend-mode: multiply;
+  filter: invert(1) hue-rotate(180deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

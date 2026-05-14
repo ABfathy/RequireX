@@ -146,8 +146,38 @@ export async function generateDiagram(input: GenerateDiagramInput) {
     },
   });
 
-  const rawText = result.text ?? "";
-  const parsed = DiagramOutputSchema.parse(extractJson(rawText));
+  let rawText = result.text ?? "";
+  let parsed: z.infer<typeof DiagramOutputSchema>;
+  try {
+    parsed = DiagramOutputSchema.parse(extractJson(rawText));
+  } catch {
+    const retryResult = await getClient().models.generateContent({
+      model: MODEL,
+      contents: [
+        { role: "user", parts: [{ text: userPrompt }] },
+        { role: "model", parts: [{ text: rawText }] },
+        {
+          role: "user",
+          parts: [
+            {
+              text: 'Your response was not valid JSON. Reply with only a JSON object: {"title":"...","mermaidCode":"...","description":"..."}. No markdown fences, no explanation.',
+            },
+          ],
+        },
+      ],
+      config: {
+        systemInstruction: DIAGRAM_SYSTEM_PROMPTS[diagramType],
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        responseJsonSchema: diagramResponseJsonSchema,
+      },
+    });
+    rawText = retryResult.text ?? "";
+    parsed = DiagramOutputSchema.parse(extractJson(rawText));
+  }
+
+  await prisma.briefDiagram.deleteMany({ where: { snapshotId, diagramType } });
 
   return prisma.briefDiagram.create({
     data: {

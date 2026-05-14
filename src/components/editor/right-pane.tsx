@@ -563,43 +563,43 @@ function SourcesTab({
             type="button"
             onClick={() => setPasteOpen(true)}
             disabled={!onSubmitText}
-            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1 overflow-hidden"
             style={{
               color: "var(--fg-tertiary)",
               borderColor: "var(--border)",
               background: "transparent",
             }}
           >
-            <Icons.Plus size={12} aria-hidden="true" />
-            <span>Add text</span>
+            <Icons.Plus size={12} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">Add text</span>
           </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={!onUploadFiles}
-            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1 overflow-hidden"
             style={{
               color: "var(--fg-tertiary)",
               borderColor: "var(--border)",
               background: "transparent",
             }}
           >
-            <Icons.FileText size={12} aria-hidden="true" />
-            <span>Upload files</span>
+            <Icons.FileText size={12} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">Upload files</span>
           </button>
           <button
             type="button"
             onClick={() => folderInputRef.current?.click()}
             disabled={!onUploadFiles}
-            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1"
+            className="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] text-[11px] border transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-1 overflow-hidden"
             style={{
               color: "var(--fg-tertiary)",
               borderColor: "var(--border)",
               background: "transparent",
             }}
           >
-            <Icons.Folder size={12} aria-hidden="true" />
-            <span>Add folder</span>
+            <Icons.Folder size={12} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">Add folder</span>
           </button>
           <input
             ref={fileInputRef}

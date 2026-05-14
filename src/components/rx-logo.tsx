@@ -16,8 +16,8 @@ function RxLogo({ size = 16, className }: RxLogoProps) {
       height={size}
       alt=""
       aria-hidden="true"
-      className={cn("shrink-0", className)}
-      style={{ mixBlendMode: "screen", display: "inline-block" }}
+      className={cn("shrink-0 rx-logo-img", className)}
+      style={{}}
     />
   );
 }
