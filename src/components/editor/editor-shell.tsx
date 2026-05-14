@@ -460,7 +460,7 @@ export function EditorShell({
       setSourcesLoading(true);
       try {
         const isTxt = (f: File) =>
-          f.type === "text/plain" || f.name.endsWith(".txt") || f.name.endsWith(".rdt");
+          f.type === "text/plain" || f.name.endsWith(".txt") || f.name.endsWith(".rtf");
         const txtFiles = files.filter(isTxt);
         const uploadable = files.filter((f) => !isTxt(f));
 

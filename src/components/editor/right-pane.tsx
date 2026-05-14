@@ -357,7 +357,7 @@ function SkeletonRow() {
 /* ── SourcesTab ─────────────────────────────────────────── */
 
 const ACCEPTED_MIME = /^(image\/|audio\/|application\/pdf|text\/plain)/;
-const isAccepted = (f: File) => ACCEPTED_MIME.test(f.type) || f.name.endsWith(".rdt");
+const isAccepted = (f: File) => ACCEPTED_MIME.test(f.type) || f.name.endsWith(".rtf");
 
 async function collectFolderFiles(entry: FileSystemEntry): Promise<File[]> {
   if (entry.isFile) {
