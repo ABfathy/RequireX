@@ -64,7 +64,7 @@ async function buildAcceptedFeedbackMessage(snapshotId: string): Promise<string>
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
-    await requireInternalAuth();
+    const auth = await requireInternalAuth();
     const { sessionId } = await params;
 
     const body = await req.json();
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       sessionId,
       snapshotId: parsed.data.snapshotId,
       userMessage,
-      requestedBy: "editor:feedback-review",
+      requestedBy: auth.clerkUserId,
     });
 
     return NextResponse.json({ ok: true, snapshotId: newSnapshot.snapshotId });
