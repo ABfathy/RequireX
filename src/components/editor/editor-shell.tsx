@@ -297,6 +297,7 @@ export function EditorShell({
   const [comparisonTabs, setComparisonTabs] = useState<ComparisonTab[]>([]);
   const [feedbackTabs, setFeedbackTabs] = useState<WorkspaceFeedbackTab[]>([]);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState(DRAFT_TAB_ID);
+  const [regeneratedSnapshotIds, setRegeneratedSnapshotIds] = useState<Set<string>>(new Set());
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     initialActiveProjectId,
@@ -482,8 +483,8 @@ export function EditorShell({
     [sessionId, startUpload],
   );
 
-  const loadRevisions = useCallback(async (sid: string) => {
-    setRevisionsLoading(true);
+  const loadRevisions = useCallback(async (sid: string, silent = false) => {
+    if (!silent) setRevisionsLoading(true);
     try {
       const res = await fetch(`/api/sessions/${sid}/revisions`, {
         cache: "no-store",
@@ -593,7 +594,7 @@ export function EditorShell({
     } catch {
       // silently fail — not critical
     } finally {
-      setRevisionsLoading(false);
+      if (!silent) setRevisionsLoading(false);
     }
   }, []);
 
@@ -828,7 +829,7 @@ export function EditorShell({
     if (!sessionId) return;
     feedbackPollRef.current = setInterval(() => {
       if (shouldPollFeedbackRef.current) {
-        void loadRevisions(sessionId);
+        void loadRevisions(sessionId, true);
       }
     }, 15_000);
     return () => stopFeedbackPoll();
@@ -934,6 +935,43 @@ export function EditorShell({
     },
     [activeWorkspaceTab],
   );
+
+  const handleFeedbackRegenerate = useCallback(async (snapshotId: string) => {
+    if (!sessionId) return;
+    setRegeneratedSnapshotIds((prev) => new Set([...prev, snapshotId]));
+    setActiveWorkspaceTab(DRAFT_TAB_ID);
+    setRevising(true);
+    setClientLines(null);
+    setGenerationError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/regenerate-from-feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshotId }),
+      });
+      const data = await res.json() as { ok?: boolean; snapshotId?: string; message?: string };
+      if (!res.ok) {
+        setGenerationError(data.message ?? "Regeneration failed. Please try again.");
+        return;
+      }
+      const newSnapshotId = data.snapshotId;
+      if (newSnapshotId) {
+        latestSnapshotIdRef.current = newSnapshotId;
+        setCurrentSnapshotId(newSnapshotId);
+        setViewingVersion(null);
+        const snap = await fetch(`/api/snapshots/${newSnapshotId}`, { cache: "no-store" });
+        if (snap.ok) {
+          const snapData = await snap.json() as { lines: DocLineData[]; version: number };
+          setClientLines(snapData.lines);
+        }
+        void loadRevisions(sessionId, true);
+      }
+    } catch {
+      setGenerationError("Network error. Please try again.");
+    } finally {
+      setRevising(false);
+    }
+  }, [sessionId, loadRevisions]);
 
   const handleOpenFeedbackTab = useCallback((snapshotId: string) => {
     const id = `feedback-${snapshotId}`;
@@ -1347,6 +1385,7 @@ ${lines.map((l) => {
     setComparisonTabs([]);
     setFeedbackTabs([]);
     setActiveWorkspaceTab(DRAFT_TAB_ID);
+    setRegeneratedSnapshotIds(new Set());
   }, [sessionId]);
 
   // Clean up polls when the component unmounts
@@ -1490,15 +1529,14 @@ ${lines.map((l) => {
             title: tab.title,
           }))}
           feedbackTabs={feedbackTabs}
+          regeneratedSnapshotIds={regeneratedSnapshotIds}
           activeWorkspaceTab={activeWorkspaceTab}
           activeComparisonContent={activeComparisonContent}
           onSelectWorkspaceTab={setActiveWorkspaceTab}
           onCloseComparisonTab={handleCloseComparisonTab}
           onCloseFeedbackTab={handleCloseFeedbackTab}
           sessionId={session?.id}
-          onRegenerateStarted={() => {
-            if (sessionId) void loadRevisions(sessionId);
-          }}
+          onRequestRegenerate={handleFeedbackRegenerate}
           onOpenSource={(id) => {
             const s = sources.find((src) => src.id === id);
             if (s) setPreviewItem(s);

@@ -943,7 +943,8 @@ export interface DocViewProps {
   sessionId?: string | null;
   snapshotId?: string | null;
   onShareBrief?: () => void;
-  onRegenerateStarted?: () => void;
+  onRequestRegenerate?: (snapshotId: string) => void;
+  regeneratedSnapshotIds?: Set<string>;
 }
 
 export function DocView({
@@ -981,8 +982,9 @@ export function DocView({
   onCloseFeedbackTab,
   sessionId,
   snapshotId,
-  onRegenerateStarted,
+  onRequestRegenerate,
   onShareBrief,
+  regeneratedSnapshotIds,
 }: DocViewProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
@@ -1103,38 +1105,13 @@ export function DocView({
             <button
               type="button"
               onClick={onShareBrief}
-              className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
-              style={{ background: "var(--surface-3)", color: "var(--fg-muted)" }}
+              className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] transition-colors duration-[120ms] hover:bg-[var(--surface-3)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] cursor-pointer"
+              style={{ color: "var(--fg-muted)" }}
             >
               <Icons.Share size={11} aria-hidden="true" />
               <span>Share</span>
             </button>
           )}
-          <button
-            type="button"
-            disabled={generateDisabled}
-            title={
-              generating
-                ? "Generation in progress"
-                : generateDisabled
-                  ? "Add sources first"
-                  : undefined
-            }
-            onClick={onGenerateBrief}
-            className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            style={
-              canGenerate && !generateDisabled
-                ? { background: "var(--accent)", color: "var(--accent-fg)" }
-                : { background: "var(--surface-3)", color: "var(--fg-muted)" }
-            }
-          >
-            {hasSnapshot && !generating ? (
-              <Icons.Refresh size={11} aria-hidden="true" />
-            ) : (
-              <Icons.Download size={11} aria-hidden="true" className={generating ? "animate-spin" : undefined} />
-            )}
-            <span>{generating ? "Generating..." : hasSnapshot ? "Regenerate" : "Generate Brief"}</span>
-          </button>
         </div>
       </div>
 
@@ -1295,51 +1272,81 @@ export function DocView({
           <FeedbackTab
             sessionId={sessionId}
             snapshotId={activeFeedbackTab.snapshotId}
-            onRegenerateStarted={() => {
-              onRegenerateStarted?.();
-              onSelectWorkspaceTab?.("draft");
-            }}
+            alreadyRegenerated={regeneratedSnapshotIds?.has(activeFeedbackTab.snapshotId)}
+            onRequestRegenerate={onRequestRegenerate}
           />
-        ) : (<div className="flex-1 overflow-y-auto py-4">
-        {showingComparison ? (
-          activeComparisonContent
-        ) : streamingLines && streamingLines.length > 0 ? (
-          streamingLines.map((line, i) => (
-            <DocLine
-              key={i}
-              line={line}
-              selectedReq={null}
-              onSelectReq={() => undefined}
-              // Streaming lines are read-only — editing is never active here.
-              isEditing={false}
-              onStartEdit={() => undefined}
-              onStopEdit={() => undefined}
-            />
-          ))
-        ) : (appState === "generating" || appState === "revising") ? (
-          <EmptyDoc state={appState} onAddSources={onAddSources} generationError={generationError} onRetry={onRetry} />
-        ) : appState !== "ready" ? (
-          <EmptyDoc state={appState} onAddSources={onAddSources} generationError={generationError} onRetry={onRetry} />
-        ) : lines.length === 0 ? (
-          <EmptyDoc state="no-sources" onAddSources={onAddSources} />
         ) : (
-          applyFilter(lines, filterQuery).map((line, i) => (
-            <DocLine
-              key={line.reqId ?? i}
-              line={line}
-              selectedReq={selectedReq}
-              onSelectReq={onSelectReq}
-              onUpdateLine={onUpdateLine}
-              onInsertLineAfter={onInsertLineAfter}
-              autoFocus={!!autoFocusReqId && line.reqId === autoFocusReqId}
-              onAutoFocusConsumed={onAutoFocusConsumed}
-              onOpenSource={onOpenSource}
-              isEditing={!!line.reqId && line.reqId === activeEditReqId}
-              onStartEdit={() => line.reqId && setActiveEditReqId(line.reqId)}
-              onStopEdit={() => setActiveEditReqId(null)}
-            />
-          ))
-        )}
+        <div className="flex-1 overflow-y-auto">
+          {activeWorkspaceTab === "draft" && (!!onGenerateBrief || generating) && (
+            <div
+              className="sticky top-0 z-10 flex items-center justify-between px-4 py-2 border-b"
+              style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+            >
+              <span
+                className="text-[11px]"
+                style={{ fontFamily: "var(--font-mono)", color: "var(--fg-muted)" }}
+              >
+                {hasSnapshot && currentVersion != null ? `v${currentVersion}` : "No brief yet"}
+              </span>
+              <button
+                type="button"
+                disabled={generateDisabled}
+                onClick={onGenerateBrief}
+                className="flex items-center gap-1 h-[22px] px-2 rounded-[4px] text-[11px] font-medium transition-colors duration-[120ms] hover:brightness-110 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring)]"
+                style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+              >
+                {generating ? (
+                  <Icons.Refresh size={11} className="animate-spin" aria-hidden="true" />
+                ) : hasSnapshot ? (
+                  <Icons.Refresh size={11} aria-hidden="true" />
+                ) : (
+                  <Icons.Download size={11} aria-hidden="true" />
+                )}
+                <span>{generating ? "Generating…" : hasSnapshot ? "Regenerate" : "Generate Brief"}</span>
+              </button>
+            </div>
+          )}
+          <div className="py-4">
+          {showingComparison ? (
+            activeComparisonContent
+          ) : streamingLines && streamingLines.length > 0 ? (
+            streamingLines.map((line, i) => (
+              <DocLine
+                key={i}
+                line={line}
+                selectedReq={null}
+                onSelectReq={() => undefined}
+                // Streaming lines are read-only — editing is never active here.
+                isEditing={false}
+                onStartEdit={() => undefined}
+                onStopEdit={() => undefined}
+              />
+            ))
+          ) : (appState === "generating" || appState === "revising") ? (
+            <EmptyDoc state={appState} onAddSources={onAddSources} generationError={generationError} onRetry={onRetry} />
+          ) : appState !== "ready" ? (
+            <EmptyDoc state={appState} onAddSources={onAddSources} generationError={generationError} onRetry={onRetry} />
+          ) : lines.length === 0 ? (
+            <EmptyDoc state="no-sources" onAddSources={onAddSources} />
+          ) : (
+            applyFilter(lines, filterQuery).map((line, i) => (
+              <DocLine
+                key={line.reqId ?? i}
+                line={line}
+                selectedReq={selectedReq}
+                onSelectReq={onSelectReq}
+                onUpdateLine={onUpdateLine}
+                onInsertLineAfter={onInsertLineAfter}
+                autoFocus={!!autoFocusReqId && line.reqId === autoFocusReqId}
+                onAutoFocusConsumed={onAutoFocusConsumed}
+                onOpenSource={onOpenSource}
+                isEditing={!!line.reqId && line.reqId === activeEditReqId}
+                onStartEdit={() => line.reqId && setActiveEditReqId(line.reqId)}
+                onStopEdit={() => setActiveEditReqId(null)}
+              />
+            ))
+          )}
+          </div>
         </div>
         )}
       </div>

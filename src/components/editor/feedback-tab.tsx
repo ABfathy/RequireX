@@ -31,7 +31,8 @@ interface CommentItem {
 export interface FeedbackTabProps {
   sessionId: string;
   snapshotId: string;
-  onRegenerateStarted: () => void;
+  onRequestRegenerate?: (snapshotId: string) => void;
+  alreadyRegenerated?: boolean;
 }
 
 const STATUS_LABEL: Record<ReviewStatus, string> = {
@@ -112,13 +113,16 @@ function ReviewButtons({
   );
 }
 
-export function FeedbackTab({ sessionId, snapshotId, onRegenerateStarted }: FeedbackTabProps) {
+export function FeedbackTab({
+  sessionId,
+  snapshotId,
+  onRequestRegenerate,
+  alreadyRegenerated = false,
+}: FeedbackTabProps) {
   const [answers, setAnswers] = useState<AnswerItem[]>([]);
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenError, setRegenError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
 
   const fetchFeedback = useCallback(async () => {
@@ -202,33 +206,16 @@ export function FeedbackTab({ sessionId, snapshotId, onRegenerateStarted }: Feed
     if (items.length > 0) void patchItems(items);
   }, [answers, comments, patchItems]);
 
-  const handleRegenerate = useCallback(async () => {
-    setRegenerating(true);
-    setRegenError(null);
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}/regenerate-from-feedback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ snapshotId }),
-      });
-      const data = await res.json() as { ok?: boolean; message?: string };
-      if (!res.ok) {
-        setRegenError(data.message ?? "Regeneration failed. Please try again.");
-        return;
-      }
-      onRegenerateStarted();
-    } catch {
-      setRegenError("Network error. Please try again.");
-    } finally {
-      setRegenerating(false);
-    }
-  }, [sessionId, snapshotId, onRegenerateStarted]);
-
   const hasAccepted =
     answers.some((a) => a.reviewStatus === "ACCEPTED") ||
     comments.some((c) => c.reviewStatus === "ACCEPTED");
 
   const totalCount = answers.length + comments.length;
+
+  const allReviewed =
+    totalCount > 0 &&
+    answers.every((a) => a.reviewStatus !== "PENDING") &&
+    comments.every((c) => c.reviewStatus !== "PENDING");
 
   if (loading) {
     return (
@@ -270,26 +257,45 @@ export function FeedbackTab({ sessionId, snapshotId, onRegenerateStarted }: Feed
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-2.5 border-b shrink-0"
-        style={{ borderColor: "var(--border)" }}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold" style={{ color: "var(--fg-2)" }}>
-            Feedback Review
-          </span>
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-            style={{ background: "var(--surface-2)", color: "var(--fg-muted)" }}
+      <div className="shrink-0 border-b" style={{ borderColor: "var(--border)" }}>
+        {/* Row 1: title + refresh */}
+        <div className="flex items-center justify-between px-4 pt-2.5 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold" style={{ color: "var(--fg-2)" }}>
+              Feedback Review
+            </span>
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+              style={{ background: "var(--surface-2)", color: "var(--fg-muted)" }}
+            >
+              {totalCount}
+            </span>
+            {allReviewed && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                style={{ background: "var(--success-subtle)", color: "var(--success)" }}
+              >
+                Reviewed
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => void fetchFeedback()}
+            disabled={loading}
+            title="Reload feedback (pick up new client submissions)"
+            className="flex items-center justify-center size-6 rounded transition-colors hover:bg-[var(--surface-3)] disabled:opacity-40 cursor-pointer focus-visible:outline-none"
+            style={{ color: "var(--fg-tertiary)" }}
           >
-            {totalCount}
-          </span>
+            <Icons.Refresh size={13} />
+          </button>
         </div>
-        <div className="flex gap-1.5">
+
+        {/* Row 2: batch controls + save */}
+        <div className="flex items-center gap-1.5 px-4 pb-2.5">
           <button
             onClick={acceptAll}
-            disabled={updating}
-            className="text-[10px] font-medium px-2 py-1 rounded transition-colors"
+            disabled={updating || allReviewed}
+            className="text-[10px] font-medium px-2 py-1 rounded transition-colors disabled:opacity-40 hover:opacity-80 active:scale-[0.97]"
             style={{
               background: "var(--success-subtle)",
               color: "var(--success)",
@@ -300,8 +306,8 @@ export function FeedbackTab({ sessionId, snapshotId, onRegenerateStarted }: Feed
           </button>
           <button
             onClick={declineAll}
-            disabled={updating}
-            className="text-[10px] font-medium px-2 py-1 rounded transition-colors"
+            disabled={updating || allReviewed}
+            className="text-[10px] font-medium px-2 py-1 rounded transition-colors disabled:opacity-40 hover:opacity-80 active:scale-[0.97]"
             style={{
               background: "var(--danger-subtle)",
               color: "var(--danger)",
@@ -310,7 +316,25 @@ export function FeedbackTab({ sessionId, snapshotId, onRegenerateStarted }: Feed
           >
             Decline all
           </button>
+          <div className="flex-1" />
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => onRequestRegenerate?.(snapshotId)}
+            disabled={!hasAccepted || alreadyRegenerated}
+          >
+            {alreadyRegenerated ? "Regenerated ✓" : "Save & Regenerate"}
+          </Button>
         </div>
+
+        {/* Hint strip */}
+        {!hasAccepted && (
+          <div className="px-4 pb-2">
+            <p className="text-[10px]" style={{ color: "var(--fg-muted)" }}>
+              Accept at least one item to regenerate
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -355,7 +379,7 @@ export function FeedbackTab({ sessionId, snapshotId, onRegenerateStarted }: Feed
                     status={answer.reviewStatus}
                     onAccept={() => updateAnswerStatus(answer.id, "ACCEPTED")}
                     onDecline={() => updateAnswerStatus(answer.id, "DECLINED")}
-                    disabled={updating}
+                    disabled={updating || allReviewed}
                   />
                 </div>
               ))}
@@ -402,50 +426,12 @@ export function FeedbackTab({ sessionId, snapshotId, onRegenerateStarted }: Feed
                     status={comment.reviewStatus}
                     onAccept={() => updateCommentStatus(comment.id, "ACCEPTED")}
                     onDecline={() => updateCommentStatus(comment.id, "DECLINED")}
-                    disabled={updating}
+                    disabled={updating || allReviewed}
                   />
                 </div>
               ))}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div
-        className="px-4 py-3 border-t shrink-0 flex flex-col gap-2"
-        style={{ borderColor: "var(--border)" }}
-      >
-        {regenError && (
-          <p className="text-[11px] leading-snug px-1" style={{ color: "var(--danger)" }}>
-            {regenError}
-          </p>
-        )}
-        <div className="flex gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            className="flex-1"
-            onClick={() => void handleRegenerate()}
-            disabled={regenerating || !hasAccepted}
-            aria-busy={regenerating}
-          >
-            {regenerating ? "Regenerating…" : "Save & Regenerate"}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void fetchFeedback()}
-            disabled={loading || regenerating}
-            title="Reload feedback (pick up new client submissions)"
-          >
-            <Icons.Refresh size={13} />
-          </Button>
-        </div>
-        {!hasAccepted && !regenError && (
-          <p className="text-center text-[10px]" style={{ color: "var(--fg-muted)" }}>
-            Accept at least one item to regenerate
-          </p>
         )}
       </div>
     </div>

@@ -626,6 +626,7 @@ function RevisionsTab({
   const [compareError, setCompareError] = useState<string | null>(null);
   const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
   const [reviewingSnapshotId, setReviewingSnapshotId] = useState<string | null>(null);
+  const [batchReviewedIds, setBatchReviewedIds] = useState<Set<string>>(new Set());
 
   async function handleBatchReview(snapshotFeedback: SnapshotSummary[], status: "ACCEPTED" | "DECLINED") {
     if (!sessionId) return;
@@ -637,13 +638,15 @@ function RevisionsTab({
         status,
       }));
     if (items.length === 0) return;
-    setReviewingSnapshotId(snapshotFeedback[0]?.id ?? null);
+    const snapshotId = snapshotFeedback[0]?.id ?? null;
+    setReviewingSnapshotId(snapshotId);
     try {
       await fetch(`/api/sessions/${sessionId}/feedback-review`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items }),
       });
+      if (snapshotId) setBatchReviewedIds((prev) => new Set([...prev, snapshotId]));
     } finally {
       setReviewingSnapshotId(null);
     }
@@ -756,6 +759,12 @@ function RevisionsTab({
           );
           const feedbackItems = snap.id ? (feedbackBySnapshot.get(snap.id) ?? []) : [];
           const feedbackExpanded = expandedFeedbackId === snap.eventId;
+          const allFeedbackReviewed =
+            feedbackItems.length > 0 &&
+            feedbackItems.every(
+              (fb) => fb.feedbackReviewStatus === "ACCEPTED" || fb.feedbackReviewStatus === "DECLINED",
+            );
+          const hideReviewButtons = allFeedbackReviewed || batchReviewedIds.has(snap.id ?? "");
           return (
             <div key={snap.eventId ?? `rev-${idx}`}>
               <div
@@ -840,7 +849,7 @@ function RevisionsTab({
                           {feedbackItems.length} feedback{feedbackExpanded ? " — hide" : " — view"}
                         </span>
                       </button>
-                      {sessionId && (
+                      {sessionId && !hideReviewButtons && (
                         <div className="flex items-center gap-1 ml-auto">
                           <button
                             type="button"
