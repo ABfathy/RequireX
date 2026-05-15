@@ -35,7 +35,7 @@ export function StatusBar({
 
   return (
     <div
-      className="flex items-center h-[22px] px-3 gap-2 border-t shrink-0"
+      className="flex items-center h-[22px] px-3 gap-2 border-t shrink-0 max-md:hidden"
       style={{
         background: "var(--surface-1)",
         borderColor: "var(--border)",

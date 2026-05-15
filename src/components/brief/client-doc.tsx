@@ -51,7 +51,7 @@ function BriefSectionNav({ sections }: { sections: string[] }) {
   return (
     <nav
       aria-label="Jump to section"
-      className="flex overflow-x-auto no-scrollbar border-b border-border mb-4 sticky top-0 z-10"
+      className="flex w-full overflow-x-auto no-scrollbar border-b border-border mb-4 sticky top-0 z-10"
       style={{ background: "var(--surface-1)" }}
     >
       {sections.map((section) => {
@@ -69,7 +69,7 @@ function BriefSectionNav({ sections }: { sections: string[] }) {
               }
             }}
             className={cn(
-              "relative flex-none px-3 py-2 text-[11px] font-medium whitespace-nowrap cursor-pointer",
+              "relative flex-1 min-w-[72px] px-2 py-2.5 text-[11px] font-medium whitespace-nowrap text-center cursor-pointer",
               "transition-[color] duration-fast ease-out-app",
               "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent",
               isActive ? "text-fg-1" : "text-fg-4 hover:text-fg-2",
@@ -142,8 +142,8 @@ function ClientDoc({
   const sections = [...new Set(requirements.map((r) => r.section))];
 
   return (
-    <div className="flex-1 overflow-auto flex flex-col items-center py-6 px-4 pb-16 sm:py-10 sm:px-12 sm:pb-20">
-      <div className="w-full max-w-[920px] flex flex-col">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col items-center py-6 px-4 pb-16 sm:py-10 sm:px-12 sm:pb-20">
+      <div className="w-full max-w-[920px] flex flex-col min-w-0">
         {/* Title */}
         <div className="text-2xl font-semibold tracking-[-0.02em] text-fg-1 leading-[1.2] mb-2">
           {title}

@@ -2,14 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { usePersistentState } from "@/lib/hooks/use-persistent-state";
 import { diffLines, type LineDiffRow } from "@/lib/line-diff";
 import { StreamingBriefParser } from "@/lib/streaming-brief-parser";
 import { useUploadThing } from "@/lib/uploadthing-client";
 
+import { Icons } from "@/components/icons";
 import { CommandPalette } from "./command-palette";
 import { ComparisonView } from "./comparison-view";
 import {
@@ -324,6 +326,9 @@ export function EditorShell({
 }: EditorShellProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectListItem[]>(initialProjects);
+  const isMobile = useIsMobile();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = usePersistentState(
@@ -1869,15 +1874,17 @@ ${lines
     [stopJobPoll, stopFeedbackPoll],
   );
 
-  const colTemplate = [
-    sidebarOpen ? `${sidebarWidth}px` : "0px",
-    "1fr",
-    rightOpen ? `${rightWidth}px` : "0px",
-  ].join(" ");
+  const colTemplate = isMobile
+    ? "1fr"
+    : [
+        sidebarOpen ? `${sidebarWidth}px` : "0px",
+        "1fr",
+        rightOpen ? `${rightWidth}px` : "0px",
+      ].join(" ");
 
   return (
     <div
-      className="flex flex-col h-screen overflow-hidden"
+      className="flex flex-col h-screen overflow-hidden max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
       style={{ background: "var(--background)" }}
     >
       <TitleBar
@@ -1888,12 +1895,13 @@ ${lines
         onToggleRight={() => setRightOpen((p) => !p)}
         onToggleTheme={toggleTheme}
         onOpenPalette={() => setPaletteOpen(true)}
+        mobileTitle={activeProjectName ?? undefined}
       />
 
       {/* New-feedback notification banner */}
       {hasPendingFeedback && (
         <div
-          className="flex items-center justify-between px-4 py-2 shrink-0 text-[12px]"
+          className="flex items-center justify-between px-4 py-2 shrink-0 text-[12px] max-md:flex-col max-md:items-start max-md:gap-2"
           style={{
             background: "color-mix(in srgb, var(--info) 12%, var(--surface-1))",
             borderBottom: "1px solid color-mix(in srgb, var(--info) 30%, transparent)",
@@ -1949,7 +1957,7 @@ ${lines
             : "grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1)",
         }}
       >
-        <div className="relative overflow-hidden" style={{ minWidth: 0 }}>
+        <div className="relative overflow-hidden max-md:hidden" style={{ minWidth: 0 }}>
           {sidebarOpen && (
             <ProjectSidebar
               projects={projects}
@@ -2046,7 +2054,7 @@ ${lines
           }}
         />
 
-        <div className="relative overflow-hidden" style={{ minWidth: 0 }}>
+        <div className="relative overflow-hidden max-md:hidden" style={{ minWidth: 0 }}>
           {rightOpen && (
             <ResizeHandle
               side="left"
@@ -2097,6 +2105,215 @@ ${lines
         currentDocumentType={effectiveDocumentType}
         extractStatus={extractStatus}
       />
+
+      {/* ── Mobile drawers + bottom nav (only mounted on mobile) ── */}
+      {isMobile && (
+        <>
+          {/* Left drawer — Projects */}
+          {mobileSidebarOpen && (
+            <div
+              className="fixed inset-0 z-40"
+              style={{ background: "var(--overlay, rgba(0,0,0,0.45))" }}
+              onClick={() => setMobileSidebarOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+          <div
+            className="fixed top-0 left-0 bottom-0 z-50 flex flex-col"
+            style={{
+              width: "min(85vw, 320px)",
+              background: "var(--surface-1)",
+              borderRight: "1px solid var(--border)",
+              transform: mobileSidebarOpen ? "translateX(0)" : "translateX(-100%)",
+              transition: "transform 250ms cubic-bezier(0.2, 0, 0, 1)",
+              paddingTop: "env(safe-area-inset-top, 0px)",
+            }}
+            aria-label="Projects sidebar"
+            aria-hidden={!mobileSidebarOpen}
+          >
+            <div
+              className="flex items-center justify-between h-10 px-3 shrink-0 border-b"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <span
+                className="text-[11px] font-semibold tracking-[0.05em] uppercase"
+                style={{ color: "var(--fg-muted)" }}
+              >
+                Projects
+              </span>
+              <button
+                type="button"
+                aria-label="Close projects"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="inline-flex items-center justify-center size-9 rounded-[6px] transition-colors hover:bg-[var(--surface-3)]"
+                style={{ color: "var(--fg-tertiary)" }}
+              >
+                <Icons.X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ProjectSidebar
+                projects={projects}
+                activeProjectId={activeProjectId}
+                onOpenPalette={() => {
+                  setProjectSearchOpen(true);
+                  setMobileSidebarOpen(false);
+                }}
+                onSwitchProject={(id) => {
+                  handleSwitchProject(id);
+                  setMobileSidebarOpen(false);
+                }}
+                onDeleteProject={handleDeleteProject}
+              />
+            </div>
+            <div
+              className="shrink-0"
+              style={{
+                height: "calc(3.5rem + env(safe-area-inset-bottom, 0px))",
+                background: "var(--surface-1)",
+              }}
+            />
+          </div>
+
+          {/* Right drawer — Sources / Chat / Revisions */}
+          {mobileRightOpen && (
+            <div
+              className="fixed inset-0 z-40"
+              style={{ background: "var(--overlay, rgba(0,0,0,0.45))" }}
+              onClick={() => setMobileRightOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+          <div
+            className="fixed top-0 right-0 bottom-0 z-50 flex flex-col"
+            style={{
+              width: "min(92vw, 480px)",
+              background: "var(--surface-1)",
+              borderLeft: "1px solid var(--border)",
+              transform: mobileRightOpen ? "translateX(0)" : "translateX(100%)",
+              transition: "transform 250ms cubic-bezier(0.2, 0, 0, 1)",
+              paddingTop: "env(safe-area-inset-top, 0px)",
+            }}
+            aria-label="Sources, chat and revisions"
+            aria-hidden={!mobileRightOpen}
+          >
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <RightPane
+                activeTab={rightTab}
+                onTabChange={setRightTab}
+                sessionId={session?.id}
+                sources={sources}
+                sourcesLoading={sourcesLoading || isUploading}
+                sourcesError={sourcesError}
+                onSubmitText={!isDemo && sessionId ? handleSubmitText : undefined}
+                onDeleteSource={!isDemo && sessionId ? handleDeleteSource : undefined}
+                onRenameSource={!isDemo && sessionId ? handleRenameSource : undefined}
+                onUploadFiles={!isDemo && sessionId ? handleUploadFiles : undefined}
+                onRetrySourceLoad={refreshSources}
+                onPreviewSource={setPreviewItem}
+                chatMessages={chatMessages}
+                snapshots={snapshots}
+                snapshotsLoading={revisionsLoading}
+                viewingSnapshotId={currentSnapshotId}
+                onViewSnapshot={handleSelectRevision}
+                onCompareSnapshots={handleOpenComparison}
+                newFeedbackCount={newFeedbackCount}
+                onClearFeedbackBadge={() => setNewFeedbackCount(0)}
+                onOpenFeedbackTab={handleOpenFeedbackTab}
+              />
+            </div>
+            <div
+              className="shrink-0"
+              style={{
+                height: "calc(3.5rem + env(safe-area-inset-bottom, 0px))",
+                background: "var(--surface-2)",
+              }}
+            />
+          </div>
+
+          {/* Bottom navigation bar */}
+          <nav
+            className="fixed bottom-0 left-0 right-0 z-30 flex items-stretch border-t"
+            style={{
+              background: "var(--surface-1)",
+              borderColor: "var(--border)",
+              height: "calc(3.5rem + env(safe-area-inset-bottom, 0px))",
+              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            }}
+            aria-label="Editor navigation"
+          >
+            <MobileNavButton
+              icon={<Icons.Sidebar size={20} />}
+              label="Projects"
+              active={mobileSidebarOpen}
+              onClick={() => {
+                setMobileRightOpen(false);
+                setMobileSidebarOpen((p) => !p);
+              }}
+            />
+            <MobileNavButton
+              icon={<Icons.FileText size={20} />}
+              label="Sources"
+              active={mobileRightOpen && rightTab === "sources"}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setRightTab("sources");
+                setMobileRightOpen((p) => (rightTab === "sources" ? !p : true));
+              }}
+            />
+            <MobileNavButton
+              icon={<Icons.MessageSquare size={20} />}
+              label="Chat"
+              active={mobileRightOpen && rightTab === "chat"}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setRightTab("chat");
+                setMobileRightOpen((p) => (rightTab === "chat" ? !p : true));
+              }}
+            />
+            <MobileNavButton
+              icon={<Icons.History size={20} />}
+              label="Revisions"
+              badge={newFeedbackCount > 0 ? newFeedbackCount : undefined}
+              active={mobileRightOpen && rightTab === "revisions"}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setRightTab("revisions");
+                setMobileRightOpen((p) => (rightTab === "revisions" ? !p : true));
+              }}
+            />
+            {/* Status indicator replacing the hidden StatusBar */}
+            <div className="flex flex-col items-center justify-center flex-1 gap-0.5 px-2 select-none">
+              <span
+                className="size-2 rounded-full shrink-0"
+                style={{
+                  background:
+                    extractStatus === "running"
+                      ? "var(--warning)"
+                      : extractStatus === "queued"
+                        ? "var(--info)"
+                        : extractStatus === "failed"
+                          ? "var(--danger)"
+                          : "var(--success)",
+                }}
+                aria-hidden="true"
+              />
+              <span
+                className="text-[9px] leading-none"
+                style={{ color: "var(--fg-tertiary)", fontFamily: "var(--font-mono)" }}
+              >
+                {extractStatus === "running"
+                  ? "generating"
+                  : extractStatus === "queued"
+                    ? "queued"
+                    : extractStatus === "failed"
+                      ? "failed"
+                      : "idle"}
+              </span>
+            </div>
+          </nav>
+        </>
+      )}
 
       {previewItem && (
         <SourcePreviewModal
@@ -2154,5 +2371,47 @@ ${lines
         />
       )}
     </div>
+  );
+}
+
+function MobileNavButton({
+  icon,
+  label,
+  active,
+  badge,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  badge?: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className="relative flex flex-col items-center justify-center flex-1 gap-[3px] min-h-0 transition-colors duration-[120ms] active:scale-[0.96] transition-transform"
+      style={{
+        color: active ? "var(--accent)" : "var(--fg-tertiary)",
+        background: "transparent",
+        border: "none",
+        cursor: "pointer",
+        minWidth: 44,
+      }}
+    >
+      {icon}
+      <span className="text-[9px] leading-none">{label}</span>
+      {badge != null && (
+        <span
+          className="absolute top-1.5 right-[calc(50%-16px)] min-w-[16px] h-4 flex items-center justify-center rounded-full text-[9px] font-bold px-[3px]"
+          style={{ background: "var(--accent)", color: "#fff" }}
+        >
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
+    </button>
   );
 }

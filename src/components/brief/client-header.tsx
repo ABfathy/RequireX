@@ -55,21 +55,21 @@ function ClientHeader({
       {/* Separator — desktop only */}
       <div className="hidden sm:block w-px h-4 bg-border shrink-0" />
 
-      {/* Doc name — truncates on small screens */}
+      {/* Doc name — flex-1 on mobile to push controls right; natural width on sm+ */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1 sm:flex-none">
         <span className="text-[13px] text-fg-3 font-normal truncate min-w-0">
           {docName}
         </span>
-        <span className="text-fg-4 text-[13px] shrink-0 hidden xs:inline">
+        <span className="text-fg-4 text-[13px] shrink-0 hidden sm:inline">
           ·
         </span>
-        <span className="text-[13px] text-fg-4 font-mono shrink-0 hidden xs:inline">
+        <span className="text-[13px] text-fg-4 font-mono shrink-0 hidden sm:inline">
           {specVersion}
         </span>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Spacer — desktop only; on mobile the flex-1 doc name already pushes controls right */}
+      <div className="hidden sm:block flex-1" />
 
       {/* Req count — hidden on mobile */}
       <span className="hidden md:block font-mono text-[10.5px] text-fg-4 shrink-0">
@@ -86,6 +86,7 @@ function ClientHeader({
         aria-pressed={revOpen}
         active={revOpen}
         onClick={onToggleRev}
+        className="hidden sm:inline-grid"
       >
         <History size={14} />
       </IconBtn>

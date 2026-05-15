@@ -99,7 +99,7 @@ function RequirementCard({
   return (
     <div
       className={cn(
-        "group border rounded-lg p-4 px-[18px] mb-2 relative cursor-default",
+        "group border rounded-lg p-4 px-[18px] mb-2 relative cursor-default min-w-0",
         "transition-colors duration-fast ease-out-app",
         hasComment
           ? "border-accent bg-accent-subtle"
@@ -147,12 +147,12 @@ function RequirementCard({
       </div>
 
       {/* Title */}
-      <div className="text-md font-semibold text-fg-1 tracking-[-0.01em] mb-1.5">
+      <div className="text-md font-semibold text-fg-1 tracking-[-0.01em] mb-1.5 break-words">
         {req.title}
       </div>
 
       {/* Body */}
-      <div className="text-[14px] text-fg-2 leading-[1.65]">{req.body}</div>
+      <div className="text-[14px] text-fg-2 leading-[1.65] break-words">{req.body}</div>
 
       {/* Question block — manages its own answered/submitted state internally */}
       {hasQuestion && (

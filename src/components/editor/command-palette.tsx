@@ -125,17 +125,18 @@ export function CommandPalette({
   return (
     /* Scrim */
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] max-md:items-end max-md:pt-0"
       style={{ background: "var(--overlay)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       {/* Palette card */}
       <div
-        className="w-[540px] rounded-[8px] overflow-hidden"
+        className="w-full max-w-[540px] mx-4 rounded-[8px] max-md:mx-0 max-md:rounded-b-none max-md:rounded-t-[16px] overflow-hidden"
         style={{
           background: "var(--surface-2)",
           boxShadow: "var(--shadow-lg-val)",
           border: "1px solid var(--border-strong)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -158,7 +159,7 @@ export function CommandPalette({
         </div>
 
         {/* Command list */}
-        <div className="py-1 max-h-[320px] overflow-y-auto">
+        <div className="py-1 max-h-[320px] max-md:max-h-[55vh] overflow-y-auto">
           {filtered.length === 0 ? (
             <div
               className="py-8 text-center text-[12px]"

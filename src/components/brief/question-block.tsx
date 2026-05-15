@@ -45,7 +45,7 @@ function QuestionBlock({ question, onSubmitAnswer }: QuestionBlockProps) {
         <div className="text-[10px] font-medium uppercase tracking-[0.07em] text-success mb-1">
           Answer submitted
         </div>
-        <div className="text-[12.5px] text-fg-1 leading-normal p-1.5 px-[9px] bg-surface-2 rounded-sm border border-border">
+        <div className="text-[12.5px] text-fg-1 leading-normal p-1.5 px-[9px] bg-surface-2 rounded-sm border border-border break-words">
           {answerText}
         </div>
       </div>
@@ -57,7 +57,7 @@ function QuestionBlock({ question, onSubmitAnswer }: QuestionBlockProps) {
       <div className="text-[10px] font-medium uppercase tracking-[0.07em] text-warning mb-1">
         Question
       </div>
-      <div className="text-[12.5px] text-fg-2 leading-normal mb-2">
+      <div className="text-[12.5px] text-fg-2 leading-normal mb-2 break-words">
         {question}
       </div>
       <label htmlFor={textareaId} className="sr-only">
