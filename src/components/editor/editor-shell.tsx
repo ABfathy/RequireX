@@ -25,11 +25,11 @@ import { ResizeHandle } from "./resize-handle";
 import { RightPane, type SourceItem, type SourceType } from "./right-pane";
 import { ShareModal } from "./share-modal";
 import { SourcePreviewModal } from "./source-preview-modal";
+import { StatusBar } from "./statusbar";
 import {
   makeStreamingPhaseHeaderLines,
   updateStreamingPhaseHeader,
 } from "./streaming-phase";
-import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
 
 type RightTab = "sources" | "chat" | "revisions";
@@ -341,6 +341,8 @@ export function EditorShell({
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<SourceItem | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("sources");
+  const [requestSourceFilePickerNonce, setRequestSourceFilePickerNonce] =
+    useState(0);
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
@@ -1756,9 +1758,12 @@ export function EditorShell({
     setSelectedReq((cur) => (cur === id ? null : id));
   }
 
-  function handleOpenSources() {
+  function handleOpenSources(openFilePicker = false) {
     setRightOpen(true);
     setRightTab("sources");
+    if (openFilePicker) {
+      setRequestSourceFilePickerNonce((current) => current + 1);
+    }
   }
 
   const handleShareBrief = useCallback(() => setShareModalOpen(true), []);
@@ -1975,7 +1980,7 @@ ${lines
           currentDocumentType={effectiveDocumentType}
           selectedReq={selectedReq}
           onSelectReq={handleSelectReq}
-          onAddSources={handleOpenSources}
+          onAddSources={() => handleOpenSources(true)}
           onAttachFiles={!isDemo && sessionId ? handleUploadFiles : undefined}
           onGenerateBrief={!isDemo && sessionId ? handleGenerateBrief : undefined}
           onCreateFinalizedDocument={
@@ -2058,6 +2063,10 @@ ${lines
             <RightPane
               activeTab={rightTab}
               onTabChange={setRightTab}
+              requestFilePickerNonce={requestSourceFilePickerNonce}
+              onRequestFilePickerHandled={() =>
+                setRequestSourceFilePickerNonce(0)
+              }
               sessionId={session?.id}
               sources={sources}
               sourcesLoading={sourcesLoading || isUploading}

@@ -67,6 +67,8 @@ export interface SnapshotSummary {
 export interface RightPaneProps {
   activeTab: RightTab;
   onTabChange: (tab: RightTab) => void;
+  requestFilePickerNonce?: number;
+  onRequestFilePickerHandled?: () => void;
   sessionId?: string;
   /* sources tab */
   sources?: SourceItem[];
@@ -385,6 +387,8 @@ async function collectFolderFiles(entry: FileSystemEntry): Promise<File[]> {
 }
 
 interface SourcesTabProps {
+  requestFilePickerNonce?: number;
+  onRequestFilePickerHandled?: () => void;
   sources?: SourceItem[];
   loading?: boolean;
   error?: string;
@@ -397,6 +401,8 @@ interface SourcesTabProps {
 }
 
 function SourcesTab({
+  requestFilePickerNonce,
+  onRequestFilePickerHandled,
   sources,
   loading,
   error,
@@ -412,6 +418,12 @@ function SourcesTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+
+  useEffect(() => {
+    if (!requestFilePickerNonce || !onUploadFiles) return;
+    fileInputRef.current?.click();
+    onRequestFilePickerHandled?.();
+  }, [onRequestFilePickerHandled, onUploadFiles, requestFilePickerNonce]);
 
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files ? Array.from(e.target.files) : [];
@@ -1253,6 +1265,8 @@ function RevisionsTab({
 export function RightPane({
   activeTab,
   onTabChange,
+  requestFilePickerNonce,
+  onRequestFilePickerHandled,
   sessionId,
   sources,
   sourcesLoading,
@@ -1343,6 +1357,8 @@ export function RightPane({
       >
         {activeTab === "sources" && (
           <SourcesTab
+            requestFilePickerNonce={requestFilePickerNonce}
+            onRequestFilePickerHandled={onRequestFilePickerHandled}
             sources={sources}
             loading={sourcesLoading}
             error={sourcesError}
