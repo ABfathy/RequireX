@@ -1097,6 +1097,7 @@ export interface DocViewProps {
   diagramError?: string | null;
   onRequestRegenerate?: (snapshotId: string) => void;
   regeneratedSnapshotIds?: Set<string>;
+  onFeedbackReviewed?: () => void;
 }
 
 export function DocView({
@@ -1140,6 +1141,7 @@ export function DocView({
   sessionId,
   snapshotId,
   onRequestRegenerate,
+  onFeedbackReviewed,
   onShareBrief,
   selectedDiagramType,
   onClearDiagramType,
@@ -1644,6 +1646,7 @@ export function DocView({
             snapshotId={activeFeedbackTab.snapshotId}
             alreadyRegenerated={regeneratedSnapshotIds?.has(activeFeedbackTab.snapshotId)}
             onRequestRegenerate={onRequestRegenerate}
+            onFeedbackReviewed={onFeedbackReviewed}
           />
         ) : showingDiagrams ? (
           <DiagramsShell diagrams={diagrams} loading={diagramsLoading} />

@@ -94,6 +94,7 @@ export interface RightPaneProps {
   newFeedbackCount?: number;
   onClearFeedbackBadge?: () => void;
   onOpenFeedbackTab?: (snapshotId: string) => void;
+  onFeedbackReviewed?: () => void;
 }
 
 const TABS: { id: RightTab; label: string }[] = [
@@ -755,6 +756,7 @@ function RevisionsTab({
   onCompareSnapshots,
   sessionId,
   onOpenFeedbackTab,
+  onFeedbackReviewed,
 }: {
   snapshots?: SnapshotSummary[];
   loading?: boolean;
@@ -766,6 +768,7 @@ function RevisionsTab({
   ) => void;
   sessionId?: string;
   onOpenFeedbackTab?: (snapshotId: string) => void;
+  onFeedbackReviewed?: () => void;
 }) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [compareBaseId, setCompareBaseId] = useState<string | null>(null);
@@ -793,6 +796,7 @@ function RevisionsTab({
         body: JSON.stringify({ items }),
       });
       if (snapshotId) setBatchReviewedIds((prev) => new Set([...prev, snapshotId]));
+      onFeedbackReviewed?.();
     } finally {
       setReviewingSnapshotId(null);
     }
@@ -1286,6 +1290,7 @@ export function RightPane({
   newFeedbackCount = 0,
   onClearFeedbackBadge,
   onOpenFeedbackTab,
+  onFeedbackReviewed,
 }: RightPaneProps) {
   return (
     <aside
@@ -1401,6 +1406,7 @@ export function RightPane({
               onCompareSnapshots={onCompareSnapshots}
               sessionId={sessionId}
               onOpenFeedbackTab={onOpenFeedbackTab}
+              onFeedbackReviewed={onFeedbackReviewed}
             />
           </>
         )}

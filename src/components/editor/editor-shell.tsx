@@ -147,6 +147,7 @@ type BundledProject = {
   name: string;
   clientName: string;
   updatedAt: string;
+  pendingFeedbackCount: number;
   session: SessionRef;
   assets: ApiAsset[];
 };
@@ -357,12 +358,10 @@ export function EditorShell({
   >("idle");
   const jobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const feedbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastFeedbackCountRef = useRef(0);
-  const seenEventIdsRef = useRef<Set<string>>(new Set());
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
   const [hasPendingFeedback, setHasPendingFeedback] = useState(false);
   const [pendingFeedbackSnapshotId, setPendingFeedbackSnapshotId] = useState<string | null>(null);
-  const shouldPollFeedbackRef = useRef(false);
+  const dismissedPendingSnapshotIdRef = useRef<string | null>(null);
   const latestSnapshotIdRef = useRef<string | null>(initialSnapshotId ?? null);
   const previousSessionIdRef = useRef<string | null>(
     initialSession?.id ?? null,
@@ -434,12 +433,30 @@ export function EditorShell({
   /* Warm the remaining client cache with every project's session + sources in
      one shot. Server-provided top projects and locally mutated active project
      state are preserved by skipping already-cached ids. */
-  useEffect(() => {
-    const ctrl = new AbortController();
-    fetch("/api/projects", { cache: "no-store", signal: ctrl.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { projects: BundledProject[] } | null) => {
-        if (!data) return;
+  const refreshProjects = useCallback(async (firstLoad = false) => {
+    try {
+      const res = await fetch("/api/projects", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { projects: BundledProject[] } | null;
+      if (!data) return;
+
+      // Merge pendingFeedbackCount onto known projects (preserves local
+      // optimistic state like in-flight deletes — we only update rows
+      // already present, never re-add removed ones).
+      setProjects((prev) => {
+        const byId = new Map(data.projects.map((p) => [p.id, p]));
+        let changed = false;
+        const next = prev.map((p) => {
+          const fresh = byId.get(p.id);
+          if (!fresh) return p;
+          if (p.pendingFeedbackCount === fresh.pendingFeedbackCount) return p;
+          changed = true;
+          return { ...p, pendingFeedbackCount: fresh.pendingFeedbackCount };
+        });
+        return changed ? next : prev;
+      });
+
+      if (firstLoad) {
         setProjectCache((prev) => {
           const next = new Map(prev);
           for (const p of data.projects) {
@@ -451,10 +468,17 @@ export function EditorShell({
           }
           return next;
         });
-      })
-      .catch(() => {});
-    return () => ctrl.abort();
+      }
+    } catch {
+      // network errors are non-critical; next poll will retry
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshProjects(true);
+    const interval = setInterval(() => void refreshProjects(false), 30_000);
+    return () => clearInterval(interval);
+  }, [refreshProjects]);
 
   const refreshSources = useCallback(async () => {
     if (!sessionId) return;
@@ -635,6 +659,10 @@ export function EditorShell({
           feedbackItemId: string | null;
           feedbackItemType: "comment" | "answer" | null;
         }>;
+        pendingFeedback?: {
+          count: number;
+          latestSnapshotId: string | null;
+        };
       };
       const allRevisions = data.revisions ?? [];
 
@@ -696,28 +724,13 @@ export function EditorShell({
         latestSnapshotIdRef.current = latestDocument.id;
       }
 
-      // Detect new client feedback events.
-      const feedbackIds = new Set(
-        allRevisions
-          .filter(
-            (r) =>
-              r.type === "CLIENT_COMMENT_ADDED" ||
-              r.type === "CLIENT_ANSWER_ADDED" ||
-              r.type === "BRIEF_CONFIRMED",
-          )
-          .map((r) => r.id),
-      );
-
-      const isFirstLoad = seenEventIdsRef.current.size === 0;
-      const newFeedback = [...feedbackIds].filter(
-        (id) => !seenEventIdsRef.current.has(id),
-      );
-
-      if (isFirstLoad) {
-        for (const id of feedbackIds) seenEventIdsRef.current.add(id);
-      } else if (newFeedback.length > 0) {
-        for (const id of newFeedback) seenEventIdsRef.current.add(id);
-        const latestFeedback = [...allRevisions]
+      // Pending-feedback summary is source of truth for the banner + badges.
+      // It reflects BriefComment/FollowUpAnswer rows with reviewStatus=PENDING,
+      // so it stays true across reloads until the editor reviews each item.
+      const pending = data.pendingFeedback ?? { count: 0, latestSnapshotId: null };
+      const latestSnapshotForFeedback =
+        pending.latestSnapshotId ??
+        [...allRevisions]
           .reverse()
           .find(
             (r) =>
@@ -725,14 +738,23 @@ export function EditorShell({
                 r.type === "CLIENT_ANSWER_ADDED" ||
                 r.type === "CLIENT_COMMENT_ADDED") &&
               r.snapshotId,
-          );
-        setPendingFeedbackSnapshotId(latestFeedback?.snapshotId ?? null);
-        setHasPendingFeedback(true);
-        setNewFeedbackCount((prev) => prev + newFeedback.length);
-      }
+          )?.snapshotId ??
+        null;
 
-      const feedbackCount = feedbackIds.size;
-      lastFeedbackCountRef.current = feedbackCount;
+      setNewFeedbackCount(pending.count);
+      if (pending.count > 0) {
+        setPendingFeedbackSnapshotId(latestSnapshotForFeedback);
+        // Top banner stays dismissed for the same pending batch (same latest
+        // snapshot id). A new snapshot or a count growing past the dismissed
+        // snapshot's batch surfaces the banner again.
+        if (dismissedPendingSnapshotIdRef.current !== latestSnapshotForFeedback) {
+          setHasPendingFeedback(true);
+        }
+      } else {
+        setPendingFeedbackSnapshotId(null);
+        setHasPendingFeedback(false);
+        dismissedPendingSnapshotIdRef.current = null;
+      }
     } catch {
       // silently fail — not critical
     } finally {
@@ -1187,30 +1209,21 @@ export function EditorShell({
       .finally(() => setDiagramsLoading(false));
   }, [sessionId]);
 
-  // Reset feedback badge and counter when session changes
+  // Reset feedback badge and counter when session changes. The next
+  // loadRevisions for the new session repopulates these from the server.
   useEffect(() => {
-    lastFeedbackCountRef.current = 0;
-    seenEventIdsRef.current = new Set();
     setNewFeedbackCount(0);
     setHasPendingFeedback(false);
     setPendingFeedbackSnapshotId(null);
-    shouldPollFeedbackRef.current = false;
+    dismissedPendingSnapshotIdRef.current = null;
   }, [sessionId]);
 
-  // Poll whenever there's at least one snapshot (share may have happened, clients may be active)
-  useEffect(() => {
-    shouldPollFeedbackRef.current = snapshots.some(
-      (s) => s.snapshotStatus === "SHARED",
-    );
-  }, [snapshots]);
-
-  // Poll every 15s — fires loadRevisions when session has any snapshot
+  // Poll every 15s — pending feedback can exist regardless of snapshot
+  // status, so no snapshot-status gate.
   useEffect(() => {
     if (!sessionId) return;
     feedbackPollRef.current = setInterval(() => {
-      if (shouldPollFeedbackRef.current) {
-        void loadRevisions(sessionId, true);
-      }
+      void loadRevisions(sessionId, true);
     }, 15_000);
     return () => stopFeedbackPoll();
   }, [sessionId, loadRevisions, stopFeedbackPoll]);
@@ -1400,6 +1413,15 @@ export function EditorShell({
     },
     [activeWorkspaceTab],
   );
+
+  // Called when feedback items are accepted/declined from any surface
+  // (feedback tab, right-pane batch buttons). Refreshes both the per-session
+  // pending count (banner + Revisions badge + in-tab banner) and the
+  // per-project count (sidebar dot) so all surfaces clear in sync.
+  const handleFeedbackReviewed = useCallback(() => {
+    if (sessionId) void loadRevisions(sessionId, true);
+    void refreshProjects(false);
+  }, [sessionId, loadRevisions, refreshProjects]);
 
   const handleRetryComparison = useCallback(
     (id: string) => {
@@ -1923,6 +1945,8 @@ ${lines
                 type="button"
                 onClick={() => {
                   handleOpenFeedbackTab(pendingFeedbackSnapshotId);
+                  dismissedPendingSnapshotIdRef.current =
+                    pendingFeedbackSnapshotId;
                   setHasPendingFeedback(false);
                 }}
                 className="text-[11px] font-medium px-2 py-0.5 rounded transition-colors cursor-pointer"
@@ -1936,7 +1960,11 @@ ${lines
             )}
             <button
               type="button"
-              onClick={() => setHasPendingFeedback(false)}
+              onClick={() => {
+                dismissedPendingSnapshotIdRef.current =
+                  pendingFeedbackSnapshotId;
+                setHasPendingFeedback(false);
+              }}
               className="text-[11px] opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
               style={{ color: "var(--fg-muted)" }}
               aria-label="Dismiss notification"
@@ -2048,6 +2076,7 @@ ${lines
           onCloseFeedbackTab={handleCloseFeedbackTab}
           sessionId={session?.id}
           onRequestRegenerate={!isDemo ? handleFeedbackRegenerate : undefined}
+          onFeedbackReviewed={handleFeedbackReviewed}
           onOpenSource={(id) => {
             const s = sources.find((src) => src.id === id);
             if (s) setPreviewItem(s);
@@ -2094,6 +2123,7 @@ ${lines
               newFeedbackCount={newFeedbackCount}
               onClearFeedbackBadge={() => setNewFeedbackCount(0)}
               onOpenFeedbackTab={handleOpenFeedbackTab}
+              onFeedbackReviewed={handleFeedbackReviewed}
             />
           )}
         </div>
@@ -2220,6 +2250,7 @@ ${lines
                 newFeedbackCount={newFeedbackCount}
                 onClearFeedbackBadge={() => setNewFeedbackCount(0)}
                 onOpenFeedbackTab={handleOpenFeedbackTab}
+                onFeedbackReviewed={handleFeedbackReviewed}
               />
             </div>
             <div

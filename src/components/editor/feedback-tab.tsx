@@ -33,6 +33,7 @@ export interface FeedbackTabProps {
   snapshotId: string;
   onRequestRegenerate?: (snapshotId: string) => void;
   alreadyRegenerated?: boolean;
+  onFeedbackReviewed?: () => void;
 }
 
 const STATUS_LABEL: Record<ReviewStatus, string> = {
@@ -118,6 +119,7 @@ export function FeedbackTab({
   snapshotId,
   onRequestRegenerate,
   alreadyRegenerated = false,
+  onFeedbackReviewed,
 }: FeedbackTabProps) {
   const [answers, setAnswers] = useState<AnswerItem[]>([]);
   const [comments, setComments] = useState<CommentItem[]>([]);
@@ -158,13 +160,14 @@ export function FeedbackTab({
           body: JSON.stringify({ items }),
         });
         if (!res.ok) throw new Error("Update failed");
+        onFeedbackReviewed?.();
       } catch {
         void fetchFeedback();
       } finally {
         setUpdating(false);
       }
     },
-    [sessionId, fetchFeedback],
+    [sessionId, fetchFeedback, onFeedbackReviewed],
   );
 
   const updateAnswerStatus = useCallback(

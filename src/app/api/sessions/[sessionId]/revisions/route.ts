@@ -14,22 +14,60 @@ export async function GET(
     await requireInternalAuth();
     const { sessionId } = await params;
 
-    const events = await prisma.revisionEvent.findMany({
-      where: { sessionId },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        type: true,
-        actorType: true,
-        summary: true,
-        metadata: true,
-        createdAt: true,
-        snapshotId: true,
-        snapshot: {
-          select: { version: true, documentType: true, status: true },
+    const [events, pendingComments, pendingAnswers] = await Promise.all([
+      prisma.revisionEvent.findMany({
+        where: { sessionId },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          type: true,
+          actorType: true,
+          summary: true,
+          metadata: true,
+          createdAt: true,
+          snapshotId: true,
+          snapshot: {
+            select: { version: true, documentType: true, status: true },
+          },
         },
-      },
-    });
+      }),
+      prisma.briefComment.findMany({
+        where: {
+          reviewStatus: "PENDING",
+          snapshot: { sessionId },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          snapshotId: true,
+          snapshot: { select: { createdAt: true } },
+        },
+      }),
+      prisma.followUpAnswer.findMany({
+        where: {
+          reviewStatus: "PENDING",
+          snapshot: { sessionId },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          snapshotId: true,
+          snapshot: { select: { createdAt: true } },
+        },
+      }),
+    ]);
+
+    const pendingFeedbackCount =
+      pendingComments.length + pendingAnswers.length;
+    const latestPendingFeedbackSnapshotId = (() => {
+      let latest: { id: string; at: Date } | null = null;
+      for (const row of [...pendingComments, ...pendingAnswers]) {
+        const at = row.snapshot?.createdAt;
+        if (!at) continue;
+        if (!latest || at > latest.at) {
+          latest = { id: row.snapshotId, at };
+        }
+      }
+      return latest?.id ?? null;
+    })();
 
     const commentIds = events
       .filter((e) => e.type === "CLIENT_COMMENT_ADDED")
@@ -126,7 +164,13 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ revisions: result });
+    return NextResponse.json({
+      revisions: result,
+      pendingFeedback: {
+        count: pendingFeedbackCount,
+        latestSnapshotId: latestPendingFeedbackSnapshotId,
+      },
+    });
   } catch (error) {
     if (isInternalAuthorizationError(error)) {
       return NextResponse.json(

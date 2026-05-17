@@ -16,6 +16,7 @@ export interface ProjectListItem {
   name: string;
   clientName: string;
   updatedAt: string;
+  pendingFeedbackCount?: number;
 }
 
 interface ProjectSidebarProps {
@@ -207,14 +208,24 @@ function ProjectRow({
           aria-current={active ? "page" : undefined}
         >
           <span
-            className="text-[12px] truncate"
+            className="flex items-center gap-1.5 text-[12px] truncate"
             style={{
               color: active ? "var(--fg-primary)" : "var(--fg-secondary)",
               fontWeight: active ? 500 : 400,
             }}
             title={project.name}
           >
-            {project.name}
+            {(project.pendingFeedbackCount ?? 0) > 0 && (
+              <span
+                className="size-[6px] rounded-full shrink-0 animate-pulse"
+                style={{ background: "var(--info)" }}
+                role="status"
+                aria-label={`${project.pendingFeedbackCount} unreviewed client feedback item${
+                  project.pendingFeedbackCount === 1 ? "" : "s"
+                }`}
+              />
+            )}
+            <span className="truncate">{project.name}</span>
           </span>
           <span
             className="text-[10px] truncate tabular-nums"

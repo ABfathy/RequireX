@@ -13,6 +13,7 @@ export type ProjectListItem = {
   name: string;
   clientName: string;
   updatedAt: string;
+  pendingFeedbackCount: number;
 };
 
 export type ProjectSessionRef = { id: string; title: string } | null;
@@ -103,7 +104,49 @@ export async function listProjectsForUser(clerkUserId: string) {
       updatedAt: true,
     },
   });
-  return projects;
+
+  const pendingByProject = await pendingFeedbackCountsByProject(
+    projects.map((p) => p.id),
+  );
+
+  return projects.map((p) => ({
+    ...p,
+    pendingFeedbackCount: pendingByProject.get(p.id) ?? 0,
+  }));
+}
+
+async function pendingFeedbackCountsByProject(
+  projectIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (projectIds.length === 0) return counts;
+
+  const [comments, answers] = await Promise.all([
+    prisma.briefComment.findMany({
+      where: {
+        reviewStatus: "PENDING",
+        snapshot: { projectId: { in: projectIds } },
+      },
+      select: { snapshot: { select: { projectId: true } } },
+    }),
+    prisma.followUpAnswer.findMany({
+      where: {
+        reviewStatus: "PENDING",
+        snapshot: { projectId: { in: projectIds } },
+      },
+      select: { snapshot: { select: { projectId: true } } },
+    }),
+  ]);
+
+  for (const row of comments) {
+    const id = row.snapshot.projectId;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  for (const row of answers) {
+    const id = row.snapshot.projectId;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }
 
 export async function listBundledProjectsForUser(
@@ -115,7 +158,11 @@ export async function listBundledProjectsForUser(
     id: project.id,
     name: project.name,
     clientName: project.clientName,
-    updatedAt: project.updatedAt.toISOString(),
+    updatedAt:
+      project.updatedAt instanceof Date
+        ? project.updatedAt.toISOString()
+        : project.updatedAt,
+    pendingFeedbackCount: project.pendingFeedbackCount,
   }));
 
   const bundledProjects = await bundleProjects(
